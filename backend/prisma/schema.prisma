@@ -1,0 +1,273 @@
+// Schema de Prisma para el sistema SEH
+// Base de datos: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Rol {
+  ADMIN_EMPRESA
+  SUPERVISOR
+  TECNICO
+}
+
+enum TipoChecklist {
+  GENERAL
+  EPP
+  ORDEN_LIMPIEZA
+  RIESGO_QUIMICO
+  MAQUINARIA
+  ERGONOMIA
+  INCENDIO
+  OTRO
+}
+
+enum EstadoInspeccion {
+  EN_PROGRESO
+  COMPLETADA
+  CANCELADA
+}
+
+enum CumplimientoItem {
+  CUMPLE
+  NO_CUMPLE
+  NO_APLICA
+  OBSERVACION
+}
+
+enum NivelRiesgo {
+  BAJO
+  MEDIO
+  ALTO
+  CRITICO
+}
+
+enum EstadoAccion {
+  PENDIENTE
+  EN_PROGRESO
+  RESUELTA
+  VENCIDA
+}
+
+// ============================================
+// MODELOS
+// ============================================
+
+model Empresa {
+  id        String   @id @default(uuid())
+  nombre    String
+  cuit      String?  @unique
+  logoUrl   String?
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  usuarios           Usuario[]
+  checklists         Checklist[]
+  inspecciones       Inspeccion[]
+  accionesCorrectivas AccionCorrectiva[]
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String   // Hash bcrypt
+  nombre          String
+  apellido        String
+  rol             Rol      @default(TECNICO)
+  activo          Boolean  @default(true)
+  ultimoAcceso    DateTime?
+  refreshToken    String?  // Para JWT refresh
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relación con empresa
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  inspecciones        Inspeccion[]
+  accionesAsignadas   AccionCorrectiva[] @relation("AccionAsignada")
+  accionesCreadoras   AccionCorrectiva[] @relation("AccionCreador")
+
+  @@index([email])
+  @@index([empresaId])
+  @@map("usuarios")
+}
+
+model Checklist {
+  id          String         @id @default(uuid())
+  nombre      String
+  descripcion String?
+  tipo        TipoChecklist  @default(GENERAL)
+  activo      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relación con empresa
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  items        ChecklistItem[]
+  inspecciones Inspeccion[]
+
+  @@index([empresaId])
+  @@index([tipo])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String  @id @default(uuid())
+  descripcion String
+  orden       Int     // Para ordenar los items
+  obligatorio Boolean @default(true)
+
+  // Relación con checklist
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  inspeccionItems InspeccionItem[]
+
+  @@index([checklistId])
+  @@map("checklist_items")
+}
+
+model Inspeccion {
+  id              String           @id @default(uuid())
+  sector          String           // Área de la planta
+  descripcion     String?
+  fechaHoraInicio DateTime         @default(now())
+  fechaHoraFin    DateTime?
+  estado          EstadoInspeccion @default(EN_PROGRESO)
+
+  // Ubicación (opcional)
+  ubicacionTexto  String?
+  latitud         Float?
+  longitud        Float?
+
+  // Observaciones generales
+  observaciones   String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relación con empresa
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // Relación con checklist
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id])
+
+  // Relación con usuario (técnico)
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  // Relaciones
+  items     InspeccionItem[]
+  hallazgos Hallazgo[]
+
+  @@index([empresaId])
+  @@index([usuarioId])
+  @@index([checklistId])
+  @@index([estado])
+  @@index([fechaHoraInicio])
+  @@map("inspecciones")
+}
+
+model InspeccionItem {
+  id           String           @id @default(uuid())
+  cumplimiento CumplimientoItem @default(CUMPLE)
+  observacion  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relación con inspección
+  inspeccionId String
+  inspeccion   Inspeccion @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+
+  // Relación con item del checklist
+  checklistItemId String
+  checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id])
+
+  @@index([inspeccionId])
+  @@index([checklistItemId])
+  @@map("inspeccion_items")
+}
+
+model Hallazgo {
+  id              String      @id @default(uuid())
+  titulo          String
+  descripcion     String
+  nivelRiesgo     NivelRiesgo @default(MEDIO)
+  ubicacionTexto  String
+
+  // Fotos (almacenamos URLs separadas por comas o JSON)
+  fotosUrls       String?     // JSON array de URLs
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relación con inspección
+  inspeccionId String
+  inspeccion   Inspeccion @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+
+  // Relaciones
+  accionesCorrectivas AccionCorrectiva[]
+
+  @@index([inspeccionId])
+  @@index([nivelRiesgo])
+  @@map("hallazgos")
+}
+
+model AccionCorrectiva {
+  id               String       @id @default(uuid())
+  descripcion      String
+  fechaCompromiso  DateTime
+  fechaCierre      DateTime?
+  estado           EstadoAccion @default(PENDIENTE)
+
+  // Evidencia de cierre
+  evidenciaUrl     String?
+  notasCierre      String?
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Relación con empresa
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // Relación con hallazgo
+  hallazgoId String
+  hallazgo   Hallazgo @relation(fields: [hallazgoId], references: [id], onDelete: Cascade)
+
+  // Responsable (puede ser texto o referencia a usuario)
+  responsableTexto String?
+  responsableId    String?
+  responsable      Usuario? @relation("AccionAsignada", fields: [responsableId], references: [id])
+
+  // Usuario que creó la acción
+  creadorId String
+  creador   Usuario @relation("AccionCreador", fields: [creadorId], references: [id])
+
+  @@index([empresaId])
+  @@index([hallazgoId])
+  @@index([estado])
+  @@index([fechaCompromiso])
+  @@map("acciones_correctivas")
+}
