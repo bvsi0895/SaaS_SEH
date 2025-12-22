@@ -8,7 +8,7 @@ import { EmpresasModule } from './empresas/empresas.module';
 import { ChecklistsModule } from './checklists/checklists.module';
 import { InspeccionesModule } from './inspecciones/inspecciones.module';
 import { HallazgosModule } from './hallazgos/hallazgos.module';
-import { AccionesCorrectivas Module } from './acciones-correctivas/acciones-correctivas.module';
+import { AccionesCorrectivasModule } from './acciones-correctivas/acciones-correctivas.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportesModule } from './reportes/reportes.module';
 
@@ -22,8 +22,8 @@ import { ReportesModule } from './reportes/reportes.module';
 
     // Rate limiting (protección contra ataques de fuerza bruta)
     ThrottlerModule.forRoot([{
-      ttl: parseInt(process.env.RATE_LIMIT_TTL) || 60,
-      limit: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+      ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10),
+      limit: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
     }]),
 
     // Módulos de la aplicación
@@ -34,7 +34,7 @@ import { ReportesModule } from './reportes/reportes.module';
     ChecklistsModule,
     InspeccionesModule,
     HallazgosModule,
-    AccionesCorrectivas Module,
+    AccionesCorrectivasModule,
     DashboardModule,
     ReportesModule,
   ],

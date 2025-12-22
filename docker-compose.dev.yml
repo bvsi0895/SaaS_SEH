@@ -1,0 +1,48 @@
+version: '3.8'
+
+# Docker Compose para desarrollo
+# Uso: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: seh-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seh_user
+      POSTGRES_PASSWORD: seh_password_123
+      POSTGRES_DB: seh_db
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seh_user -d seh_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - seh-dev-network
+
+  # Adminer - Administrador de base de datos
+  adminer:
+    image: adminer:latest
+    container_name: seh-adminer-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - seh-dev-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  seh-dev-network:
+    driver: bridge

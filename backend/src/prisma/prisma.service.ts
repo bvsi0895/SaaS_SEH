@@ -34,23 +34,31 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   /**
    * Limpia la base de datos (útil para testing)
-   * ⚠️ SOLO USAR EN DESARROLLO/TESTING
+   * SOLO USAR EN DESARROLLO/TESTING
    */
   async cleanDatabase() {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('No se puede limpiar la base de datos en producción');
     }
 
-    const models = Reflect.ownKeys(this).filter(
-      (key) => key[0] !== '_' && key !== 'constructor',
-    );
+    const modelNames = [
+      'accionCorrectiva',
+      'hallazgo',
+      'inspeccionItem',
+      'inspeccion',
+      'checklistItem',
+      'checklist',
+      'usuario',
+      'empresa',
+    ];
 
     return Promise.all(
-      models.map((modelKey) => {
-        const model = this[modelKey];
+      modelNames.map((modelName) => {
+        const model = (this as Record<string, unknown>)[modelName] as { deleteMany?: () => Promise<unknown> };
         if (model && typeof model.deleteMany === 'function') {
           return model.deleteMany();
         }
+        return Promise.resolve();
       }),
     );
   }

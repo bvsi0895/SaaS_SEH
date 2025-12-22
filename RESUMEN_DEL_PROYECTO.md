@@ -486,3 +486,25 @@ Antes de empezar a programar, asegúrate de:
 Tienes toda la base necesaria para construir un sistema profesional de Seguridad e Higiene. La documentación es tu guía, el código de ejemplo es tu referencia, y la estructura está lista para que agregues funcionalidad.
 
 **¡Éxito con el desarrollo!** 🛡️
+
+  Funcionalidades implementadas:
+  - Autenticación con JWT (login, registro, refresh token)
+  - Dashboard con KPIs, gráficos de tendencias (Recharts)
+  - CRUD completo de Inspecciones con registro de items
+  - Gestión de Checklists con items arrastrables
+  - Listado y detalle de Hallazgos con nivel de riesgo
+  - Gestión de Acciones Correctivas con estados
+  - Administración de Usuarios (solo admin)
+  - Perfil de usuario con cambio de contraseña
+  - Navegación responsive con drawer
+  - Notificaciones con Snackbar
+  - PWA configurado
+
+  Para iniciar el frontend:
+  cd web
+  npm install
+  cp .env.example .env
+  npm run dev
+
+  El frontend estará disponible en http://localhost:5173 y se conectará al backend en http://localhost:3000.
+
