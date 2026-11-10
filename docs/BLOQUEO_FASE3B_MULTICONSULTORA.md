@@ -4,10 +4,13 @@ Fecha: 2026-11-10
 Rama: `feature/multitenant-seguridad`  
 Commit de diseño revisado: `feeba5a`
 
-## Estado
+## Estado histórico
 
-La implementación queda detenida antes de modificar el esquema Prisma, crear
-migraciones o ejecutar backfills. La demo existente no fue modificada.
+Este documento registra el bloqueo detectado antes de la decisión arquitectónica.
+El bloqueo fue resuelto conceptualmente por la decisión de Fase 3B: una empresa
+puede tener múltiples vínculos `OrganizacionEmpresa` y cada vínculo mantiene
+sus expedientes aislados por defecto. La implementación sigue pendiente de una
+fase posterior; no se modificaron Prisma, migraciones ni datos.
 
 Se verificó que Git estaba limpio al iniciar la revisión y que PostgreSQL de
 desarrollo (`seh-postgres-dev`, base `seh_db`) estaba saludable. Se generó un
@@ -96,23 +99,19 @@ La autorización debe validar la relación activa y el alcance del recurso en
 cada consulta. Un `empresaId` recibido por ruta o body debe seguir siendo un
 selector, nunca una concesión de permisos.
 
-## Decisiones requeridas antes de implementar
+## Decisiones que originaron el bloqueo
 
-1. Confirmar que una `Empresa` puede relacionarse con múltiples
-   organizaciones.
-2. Definir si la información operativa se comparte entre consultoras con
-   autorización explícita de la empresa o si cada relación necesita un ámbito
-   aislado.
-3. Definir quién crea, aprueba, suspende y revoca cada relación.
-4. Definir si un administrador de organización puede ver todos los recursos
-   de una empresa vinculada o sólo los recursos asignados a su organización y
-   a sus usuarios.
-5. Aprobar el modelo de relación y el plan de backfill antes de tocar la base.
+La decisión posterior confirmó los puntos 1 y 2 mediante `OrganizacionEmpresa`,
+aislamiento por defecto y acceso explícito. La definición operativa de altas,
+revocaciones, roles y backfill quedó documentada en:
+
+- `docs/ARQUITECTURA_MULTITENANT.md`
+- `docs/MATRIZ_PERMISOS_MULTITENANT.md`
+- `docs/PLAN_MIGRACIONES_MULTITENANT.md`
 
 ## Próximo paso verificable
 
-Actualizar la arquitectura y la matriz de permisos con la decisión aprobada,
-agregar casos de prueba de aislamiento entre dos consultoras sobre una misma
-empresa y recién después preparar una migración aditiva sobre la base de
-desarrollo respaldada.
+Agregar los casos de prueba de aislamiento entre dos consultoras sobre una
+misma empresa y, recién después, preparar una migración aditiva sobre la base
+de desarrollo respaldada.
 

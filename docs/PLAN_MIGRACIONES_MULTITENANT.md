@@ -1,55 +1,107 @@
 # Plan de migraciones multiempresa
 
-Este documento es un plan. No contiene ni aplica migraciones en la rama de
-diseño.
+Este documento define una migración aditiva para revisión. No contiene ni
+aplica migraciones en la rama de diseño.
 
 ## Principios
 
-- Migraciones aditivas y reversibles donde sea posible.
-- Sin `DROP`, `TRUNCATE`, eliminación de datos ni cambios de producción.
-- Backfill con conteos antes/después y transacciones pequeñas.
-- La demo continúa funcionando con contexto legacy durante la transición.
-- No convertir columnas a `NOT NULL` hasta verificar el backfill.
+- Usar exclusivamente la base local de desarrollo respaldada.
+- No ejecutar `DROP`, `TRUNCATE`, borrados de historial ni cambios en
+  producción.
+- Mantener `Usuario.empresaId` y `Usuario.rol` durante toda la transición.
+- Crear relaciones nuevas antes de hacerlas obligatorias.
+- Detener el backfill ante cualquier empresa, usuario o recurso sin ámbito
+  determinista.
+- Registrar conteos, errores, discrepancias y posibilidad de rollback en cada
+  etapa.
 
-## Secuencia
+## M0 — Preparación y validación
 
-### M0 — Preparación
+1. Crear respaldo de la base local y verificar que sea restaurable en una base
+   de desarrollo nueva.
+2. Capturar conteos de usuarios, empresas, checklists, inspecciones,
+   hallazgos, acciones, fotografías e informes.
+3. Identificar usuarios con `empresaId` nulo o inconsistencias de roles.
+4. Agregar pruebas de aislamiento entre dos organizaciones para una misma
+   empresa antes de activar el contexto nuevo.
 
-Respaldar la base de desarrollo, capturar conteos de empresas, usuarios,
-checklists, inspecciones, hallazgos y acciones, y agregar pruebas de aislamiento.
+## M1 — Estructura aditiva
 
-### M1 — Tablas nuevas
+Crear enums y tablas nuevas:
 
-Agregar `organizaciones`, `membresias_organizacion`, `accesos_empresa`,
-`accesos_establecimiento`, `establecimientos` y sus índices. Agregar enums
-nuevos sin cambiar los actuales.
+- `Organizacion`;
+- `OrganizacionMiembro`;
+- `OrganizacionEmpresa` con `UNIQUE(organizacionId, empresaId)`;
+- `Establecimiento` y su índice/clave de empresa;
+- `AccesoEmpresa` ligado a `OrganizacionEmpresa` y
+  `OrganizacionMiembro`;
+- `AccesoEstablecimiento`.
 
-### M2 — Backfill
+Agregar `organizacionEmpresaId` a los modelos privados que lo requieran,
+inicialmente nullable, con índices y claves foráneas. Para modelos que heredan
+ámbito desde `Inspeccion`, mantener esa herencia como contrato del servicio y
+evitar duplicar columnas innecesarias.
 
-Por cada `Empresa` existente: crear una organización `PYME`, asociarla,
-crear el establecimiento `Principal`, crear membresías de organización,
-crear accesos de empresa conservando el rol actual y asociar inspecciones al
-establecimiento principal. Mantener `Usuario.empresaId`.
+## M2 — Backfill determinista
 
-### M3 — Dual read
+Para cada `Empresa` existente:
 
-Resolver el contexto nuevo, conservar `empresaId` y `rol` en JWT y respuestas,
-y mantener los payloads actuales sin permitir empresas no autorizadas.
+1. Crear una organización inicial `PYME` con identificador estable y nombre
+   derivado, sólo si no existe.
+2. Crear exactamente un `OrganizacionEmpresa` inicial para esa organización y
+   empresa.
+3. Crear un `Establecimiento` `Principal` sólo cuando el modelo vigente no
+   tenga un establecimiento equivalente.
+4. Crear `OrganizacionMiembro` para los usuarios legacy de esa empresa,
+   conservando una regla explícita para elegir `OWNER`/`ADMIN_ORG` y dejando
+   inconsistencias en un reporte de revisión.
+5. Crear `AccesoEmpresa` por usuario con el rol operativo legacy.
+6. Asignar checklists e inspecciones al vínculo inicial mediante su
+   `empresaId`; si un registro no permite determinar el ámbito, no inventar
+   una asociación y detener ese registro para revisión.
+7. Completar `organizacionEmpresaId` en hallazgos, acciones, fotografías e
+   informes por la inspección autorizada.
 
-### M4 — Dual write
+El backfill no crea vínculos adicionales con consultoras. Esas relaciones se
+crean posteriormente mediante una acción administrativa explícita y nunca por
+coincidencia de `empresaId`.
 
-Las altas y cambios escriben relaciones nuevas y columnas legacy. Se registran
-discrepancias para reconciliación de sólo lectura.
+## M3 — Dual read
 
-### M5 — Endurecimiento
+Resolver el contexto nuevo y filtrar por `organizacionEmpresaId`. Mantener
+`empresaId` y `rol` en JWT y respuestas legacy, pero ignorarlos como autoridad.
+La demo debe continuar funcionando a través del vínculo inicial creado en M2.
 
-Hacer obligatorios los campos nuevos donde corresponda y retirar autoridad de
-`Usuario.empresaId` y `Usuario.rol`. No eliminarlos físicamente sin una fase
-posterior y aprobada.
+## M4 — Dual write
 
-## Validaciones y rollback
+Las altas y modificaciones escriben primero el ámbito nuevo y mantienen los
+campos legacy necesarios. Toda escritura verifica membresía, vínculo,
+`AccesoEmpresa` y establecimiento. Las discrepancias se registran sin borrar
+datos.
 
-Comparar conteos, validar acceso original de cada usuario, probar aislamiento
-entre organizaciones, reportes y fotografías, y verificar login/refresh en cada
-etapa. Antes de M5 el rollback consiste en desactivar el contexto nuevo y usar
-la ruta legacy; no se borra información nueva.
+## M5 — Endurecimiento
+
+Después de comparar conteos y completar las pruebas:
+
+- hacer obligatorio `organizacionEmpresaId` para datos privados nuevos;
+- prohibir repositorios que reciban sólo `empresaId` para autorizar;
+- rechazar tokens o contextos sin relación activa;
+- mantener los campos legacy sólo mientras exista compatibilidad comprobada;
+- retirar autoridad de `Usuario.empresaId` y `Usuario.rol` en una fase posterior
+  y aprobada, sin eliminar historial.
+
+## Validaciones, rollback y riesgos
+
+Cada etapa debe validar conteos, relaciones, accesos, reportes y fotografías.
+El rollback inicial consiste en desactivar la resolución de contexto nuevo y
+usar el camino legacy, sin eliminar las tablas ni datos agregados.
+
+Riesgos restantes:
+
+- elegir incorrectamente el miembro inicial de una organización durante el
+  backfill;
+- recursos históricos sin una inspección o empresa determinable;
+- informes o archivos servidos por rutas que hoy sólo reciben `empresaId`;
+- divergencias entre campos legacy y ámbito nuevo durante dual write;
+- necesidad de una decisión adicional si dos consultoras deben compartir un
+  expediente concreto mediante una autorización explícita.
