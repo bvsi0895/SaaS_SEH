@@ -17,6 +17,10 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const contextId = localStorage.getItem('activeOrganizacionEmpresaId');
+    if (contextId && config.headers) {
+      config.headers['X-Organizacion-Empresa-Id'] = contextId;
+    }
     if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
       delete config.headers['Content-Type'];
     }
@@ -55,6 +59,7 @@ apiClient.interceptors.response.use(
           // Refresh falló, limpiar tokens y redirigir a login
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('activeOrganizacionEmpresaId');
           window.location.href = '/login';
           return Promise.reject(error);
         }

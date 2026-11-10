@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ import Loading from '../../src/components/Loading';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, contextos, activeContextId, selectContext } = useAuth();
   const router = useRouter();
 
   const {
@@ -53,6 +53,21 @@ export default function HomeScreen() {
         <Text style={styles.greeting}>Hola, {user?.nombre}</Text>
         <Text style={styles.subGreeting}>Bienvenido al sistema SEH</Text>
       </View>
+
+      {contextos.length > 0 && (
+        <Card style={styles.contextCard}>
+          <Text style={styles.contextTitle}>Contexto activo</Text>
+          {contextos.map((context) => (
+            <Pressable
+              key={context.organizacionEmpresaId}
+              onPress={() => void selectContext(context.organizacionEmpresaId)}
+              style={[styles.contextOption, activeContextId === context.organizacionEmpresaId && styles.contextOptionActive]}
+            >
+              <Text style={styles.contextText}>{context.organizacionNombre || 'Organización'} · {context.empresaNombre || context.empresaId}</Text>
+            </Pressable>
+          ))}
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <Card style={styles.quickActions}>
@@ -143,6 +158,27 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     marginBottom: spacing.lg,
+  },
+  contextCard: {
+    marginBottom: spacing.lg,
+  },
+  contextTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  contextOption: {
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
+  },
+  contextOptionActive: {
+    backgroundColor: colors.lightGray,
+  },
+  contextText: {
+    color: colors.text,
+    fontSize: fontSize.sm,
   },
   sectionTitle: {
     fontSize: fontSize.lg,

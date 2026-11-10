@@ -18,6 +18,7 @@ import {
   MenuItem,
   useMediaQuery,
   useTheme,
+  Select,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -52,7 +53,7 @@ export default function MainLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const { user, logout } = useAuth();
+  const { user, logout, contextos, activeContextId, selectContext } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -194,6 +195,21 @@ export default function MainLayout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Sistema de Seguridad e Higiene
           </Typography>
+          {contextos.length > 0 && (
+            <Select
+              size="small"
+              value={activeContextId || ''}
+              onChange={(event) => void selectContext(event.target.value)}
+              sx={{ mr: 2, minWidth: 190, color: 'inherit', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.5)' } }}
+              aria-label="Contexto activo"
+            >
+              {contextos.map((context) => (
+                <MenuItem key={context.organizacionEmpresaId} value={context.organizacionEmpresaId}>
+                  {context.organizacionNombre || 'Organización'} · {context.empresaNombre || context.empresaId}
+                </MenuItem>
+              ))}
+            </Select>
+          )}
           <IconButton color="inherit" onClick={handleMenuOpen}>
             <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
               {user?.nombre?.charAt(0).toUpperCase()}

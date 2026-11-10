@@ -18,6 +18,10 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const contextId = await SecureStore.getItemAsync('activeOrganizacionEmpresaId');
+    if (contextId && config.headers) {
+      config.headers['X-Organizacion-Empresa-Id'] = contextId;
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -51,6 +55,7 @@ apiClient.interceptors.response.use(
         } catch {
           await SecureStore.deleteItemAsync('accessToken');
           await SecureStore.deleteItemAsync('refreshToken');
+          await SecureStore.deleteItemAsync('activeOrganizacionEmpresaId');
           return Promise.reject(error);
         }
       }

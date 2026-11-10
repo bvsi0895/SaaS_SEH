@@ -17,6 +17,18 @@ export interface Usuario {
   empresaId: string;
   createdAt: string;
   updatedAt: string;
+  organizacionId?: string;
+  organizacionEmpresaId?: string;
+}
+
+export interface ContextoAutorizado {
+  organizacionId: string;
+  organizacionEmpresaId: string;
+  empresaId: string;
+  organizacionMiembroId: string;
+  accesoEmpresaId: string;
+  organizacionNombre?: string;
+  empresaNombre?: string;
 }
 
 export interface Empresa {
