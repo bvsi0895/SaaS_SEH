@@ -2,8 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import * as express from 'express';
-import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,10 +25,6 @@ async function bootstrap() {
     origin: corsOrigins,
     credentials: true,
   });
-
-  // Servir archivos estáticos (para fotos subidas)
-  const uploadDir = process.env.UPLOAD_DIR || './uploads';
-  app.use('/uploads', express.static(join(process.cwd(), uploadDir)));
 
   // Swagger / OpenAPI documentation
   const config = new DocumentBuilder()

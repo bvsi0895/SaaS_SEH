@@ -9,7 +9,14 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -95,6 +102,42 @@ export class HallazgosController {
     @CurrentUser('empresaId') empresaId: string,
   ) {
     return this.hallazgosService.create(createHallazgoDto, empresaId);
+  }
+
+  @Post(':id/fotos')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+        const extension = /\.(jpe?g|png|webp)$/i.test(file.originalname);
+        callback(null, allowed.has(file.mimetype) && extension);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Subir fotografía de un hallazgo' })
+  async uploadPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('empresaId') empresaId: string,
+    @UploadedFile() file?: { buffer: Buffer; originalname: string },
+  ) {
+    if (!file) {
+      throw new BadRequestException('Se requiere una imagen JPG, PNG o WEBP');
+    }
+    return this.hallazgosService.addPhoto(id, empresaId, file);
+  }
+
+  @Get(':id/fotos/:filename')
+  @ApiOperation({ summary: 'Obtener fotografía autorizada de un hallazgo' })
+  async getPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('filename') filename: string,
+    @CurrentUser('empresaId') empresaId: string,
+    @Res() res: Response,
+  ) {
+    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId);
+    res.type(filename).send(photo);
   }
 
   @Put(':id')

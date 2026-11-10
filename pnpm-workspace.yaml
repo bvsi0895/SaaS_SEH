@@ -2,4 +2,6 @@ packages:
   - backend
   - web
   - mobile
+allowBuilds:
+  bcrypt: true
 storeDir: D:\.pnpm-store

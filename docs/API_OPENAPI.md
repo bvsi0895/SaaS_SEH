@@ -1,12 +1,12 @@
 # API OpenAPI — demo SEH
 
-La API usa el prefijo global `/api`.
+La API NestJS usa el prefijo global `/api`.
 
 - Swagger UI: `http://localhost:3000/api/docs`
 - Documento OpenAPI: `http://localhost:3000/api/docs-json`
 - Autenticación: `Authorization: Bearer <accessToken>`
 
-## Recorrido funcional
+## Recorrido funcional validado
 
 | Paso | Método | Ruta |
 |---|---|---|
@@ -16,9 +16,20 @@ La API usa el prefijo global `/api`.
 | Crear inspección | POST | `/api/inspecciones` |
 | Registrar respuesta | PATCH | `/api/inspecciones/:id/item` |
 | Crear hallazgo | POST | `/api/hallazgos` |
+| Subir fotografía | POST multipart `file` | `/api/hallazgos/:id/fotos` |
+| Descargar fotografía | GET | `/api/hallazgos/:id/fotos/:filename` |
 | Crear acción correctiva | POST | `/api/acciones-correctivas` |
 | Finalizar inspección | POST | `/api/inspecciones/:id/finalizar` |
 | Ver PDF | GET | `/api/reportes/inspecciones/:id/pdf` |
 | Descargar PDF | GET | `/api/reportes/inspecciones/:id/pdf/download` |
 
-Los payloads y respuestas completos se generan desde los DTOs NestJS y se exponen en Swagger. La demo requiere PostgreSQL local y datos creados mediante `pnpm --filter seh-backend prisma:seed`.
+Los payloads y respuestas completos se generan desde los DTOs NestJS y se
+exponen en Swagger. La demo requiere PostgreSQL local, migración aplicada y
+datos creados mediante `pnpm --filter seh-backend prisma:seed`.
+
+## Contratos de seguridad
+
+El registro público no recibe `empresaId` ni `rol`; el backend asigna la
+empresa configurada por el operador y fuerza `TECNICO`. El upload acepta sólo
+JPG, PNG o WEBP, con límite de 5 MiB, y las fotografías se descargan sólo con
+JWT y pertenencia a la misma empresa.

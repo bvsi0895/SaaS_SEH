@@ -34,8 +34,9 @@ backend/.env.*
 !backend/.env.example
 
 # Prisma
-backend/prisma/migrations/*.sql
-!backend/prisma/migrations/migration_lock.toml
+# Las migraciones SQL son código versionado; sólo se excluyen artefactos locales.
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
 
 # Web específico
 web/dist/

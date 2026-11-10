@@ -3,6 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { extname, join, basename } from 'path';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHallazgoDto, UpdateHallazgoDto } from './dto';
 import { NivelRiesgo, EstadoInspeccion } from '@prisma/client';
@@ -10,6 +13,34 @@ import { NivelRiesgo, EstadoInspeccion } from '@prisma/client';
 @Injectable()
 export class HallazgosService {
   constructor(private prisma: PrismaService) {}
+
+  private getUploadDir() {
+    return join(process.cwd(), process.env.UPLOAD_DIR || './uploads', 'hallazgos');
+  }
+
+  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }) {
+    const hallazgo = await this.findOne(id, empresaId);
+    const extension = extname(file.originalname).toLowerCase();
+    const filename = `${id}-${randomUUID()}${extension}`;
+    const uploadDir = this.getUploadDir();
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(join(uploadDir, filename), file.buffer, { flag: 'wx' });
+    const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
+    photos.push(`/api/hallazgos/${id}/fotos/${filename}`);
+    return this.prisma.hallazgo.update({
+      where: { id },
+      data: { fotosUrls: JSON.stringify(photos) },
+    });
+  }
+
+  async getPhoto(id: string, filename: string, empresaId: string) {
+    const hallazgo = await this.findOne(id, empresaId);
+    const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
+    if (!photos.some((photo) => basename(photo) === filename)) {
+      throw new NotFoundException('Foto no encontrada');
+    }
+    return readFile(join(this.getUploadDir(), basename(filename)));
+  }
 
   /**
    * Obtener todos los hallazgos de una empresa
