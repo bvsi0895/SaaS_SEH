@@ -2,3 +2,4 @@ packages:
   - backend
   - web
   - mobile
+storeDir: D:\.pnpm-store
