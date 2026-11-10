@@ -126,7 +126,6 @@ model Usuario {
   accionesAsignadas      AccionCorrectiva[]    @relation("AccionAsignada")
   accionesCreadoras      AccionCorrectiva[]    @relation("AccionCreador")
   membresiasOrganizacion OrganizacionMiembro[]
-  accesosEmpresa         AccesoEmpresa[]
 
   @@index([email])
   @@index([empresaId])
@@ -388,8 +387,6 @@ model AccesoEmpresa {
   organizacionEmpresa   OrganizacionEmpresa     @relation(fields: [organizacionEmpresaId, organizacionId, empresaId], references: [id, organizacionId, empresaId])
   organizacionMiembro   OrganizacionMiembro     @relation(fields: [organizacionMiembroId, organizacionId], references: [id, organizacionId])
   establecimientos      AccesoEstablecimiento[]
-  Usuario               Usuario?                @relation(fields: [usuarioId], references: [id])
-  usuarioId             String?
 
   @@unique([organizacionEmpresaId, organizacionMiembroId])
   @@index([organizacionMiembroId, activo])
