@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /workspace
 
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY backend/package.json backend/package.json
@@ -17,6 +18,7 @@ RUN pnpm --filter seh-backend build
 FROM node:20-alpine AS production
 
 WORKDIR /app
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 COPY --from=builder /workspace/backend/package.json ./package.json
