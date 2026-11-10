@@ -16,7 +16,10 @@ export interface ReporteMensualData {
   }>;
   hallazgos: Array<{ titulo: string; nivel: string; establecimiento?: string | null; fecha: Date }>;
   acciones: Array<{ descripcion: string; estado: string; fechaCompromiso: Date; establecimiento?: string | null }>;
-  fotos: number;
+  fotos: Array<{ buffer: Buffer; nombre: string }>;
+  incidenciasFotografias: number;
+  logo?: Buffer | null;
+  incidenciaLogo?: string;
 }
 
 export class PDFMensualGenerator {
@@ -25,6 +28,7 @@ export class PDFMensualGenerator {
       const doc = new PDFDocument({
         size: 'A4',
         margin: 48,
+        bufferPages: true,
         info: {
           Title: `Informe mensual - ${data.empresa.nombre}`,
           Author: data.organizacion.nombre,
@@ -41,9 +45,12 @@ export class PDFMensualGenerator {
       doc.fontSize(10).fillColor('#222').text(
         `Durante el período informado se realizaron ${data.inspecciones.length} inspección(es), ` +
         `se registraron ${data.hallazgos.length} hallazgo(s) y ${data.acciones.length} acción(es) correctiva(s). ` +
-        `Se adjuntaron ${data.fotos} fotografía(s) como evidencia.`,
+        `Se incrustaron ${data.fotos.length} fotografía(s) como evidencia.`,
         { lineGap: 3 },
       );
+      if (data.incidenciasFotografias > 0) {
+        doc.moveDown(0.4).fillColor('#9a6700').text(`Advertencia: ${data.incidenciasFotografias} evidencia(s) no pudieron incrustarse y fueron omitidas.`);
+      }
       doc.moveDown(0.8);
 
       this.section(doc, 'INSPECCIONES REALIZADAS');
@@ -83,15 +90,43 @@ export class PDFMensualGenerator {
         doc.fontSize(9).text(`${index + 1}. ${item.descripcion} — ${item.estado} — vencimiento ${this.date(item.fechaCompromiso)} — ${item.establecimiento || 'Sin establecimiento'}`);
       });
 
+      this.section(doc, 'EVIDENCIAS FOTOGRÁFICAS');
+      if (data.fotos.length === 0) {
+        doc.fontSize(10).fillColor('#555').text('No hay fotografías disponibles para este período.');
+      } else {
+        data.fotos.forEach((photo, index) => {
+          this.ensureSpace(doc, 150);
+          const top = doc.y;
+          doc.fontSize(9).fillColor('#222').text(`${index + 1}. ${photo.nombre}`);
+          try {
+            doc.image(photo.buffer, 55, doc.y + 4, { fit: [150, 105], align: 'center', valign: 'center' });
+            doc.y = top + 122;
+          } catch {
+            doc.fillColor('#9a6700').text('Imagen inválida: se omitió la miniatura.');
+            doc.y = top + 32;
+          }
+        });
+      }
+
       this.section(doc, 'RESPONSABLE TÉCNICO');
       doc.fontSize(10).text(`${data.responsable.nombre} ${data.responsable.apellido} — ${data.responsable.email}`);
       doc.moveDown(1);
+      if (data.incidenciaLogo) doc.fontSize(8).fillColor('#9a6700').text(`Advertencia de identidad: ${data.incidenciaLogo}`, { align: 'center' });
       doc.fontSize(8).fillColor('#666').text(`Generado el ${this.date(new Date())} por ${data.organizacion.nombre}`, { align: 'center' });
+      this.addPageNumbers(doc);
       doc.end();
     });
   }
 
   private header(doc: PDFKit.PDFDocument, data: ReporteMensualData) {
+    if (data.logo) {
+      try {
+        doc.image(data.logo, 257, 48, { fit: [80, 48], align: 'center', valign: 'center' });
+        doc.y = 105;
+      } catch {
+        // La incidencia se informa en el pie; el encabezado tipográfico sigue siendo válido.
+      }
+    }
     doc.fillColor('#1976d2').fontSize(20).font('Helvetica-Bold').text(data.organizacion.nombre, { align: 'center' });
     doc.font('Helvetica').fontSize(16).text('INFORME MENSUAL DE SEGURIDAD E HIGIENE', { align: 'center' });
     doc.moveDown(0.4).fillColor('#444').fontSize(11).text(`Empresa: ${data.empresa.nombre}${data.empresa.cuit ? ` — CUIT: ${data.empresa.cuit}` : ''}`, { align: 'center' });
@@ -111,7 +146,18 @@ export class PDFMensualGenerator {
   }
 
   private ensureSpace(doc: PDFKit.PDFDocument, height: number) {
-    if (doc.y + height > 745) doc.addPage();
+    if (doc.y + height > 735) doc.addPage();
+  }
+
+  private addPageNumbers(doc: PDFKit.PDFDocument) {
+    const range = doc.bufferedPageRange();
+    for (let index = range.start; index < range.start + range.count; index += 1) {
+      doc.switchToPage(index);
+      doc.strokeColor('#d0d7de').lineWidth(0.5).moveTo(48, 785).lineTo(547, 785).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor('#666')
+        .text('SEH — Informe profesional', 48, 793, { width: 250 })
+        .text(`Página ${index + 1} de ${range.count}`, 347, 793, { width: 200, align: 'right' });
+    }
   }
 
   private date(value: Date): string {

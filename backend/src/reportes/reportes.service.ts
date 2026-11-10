@@ -3,13 +3,90 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PDFInspeccionGenerator } from './generators/pdf-inspeccion.generator';
 import { PDFMensualGenerator } from './generators/pdf-mensual.generator';
 import { EstadoInspeccion } from '@prisma/client';
+import { readFile } from 'fs/promises';
+import { basename, extname, relative, resolve } from 'path';
+import { HallazgosService } from '../hallazgos/hallazgos.service';
 
 @Injectable()
 export class ReportesService {
   private pdfGenerator = new PDFInspeccionGenerator();
   private monthlyPdfGenerator = new PDFMensualGenerator();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private hallazgosService: HallazgosService) {}
+
+  private isSupportedImage(buffer: Buffer): boolean {
+    return (
+      (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) ||
+      (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+      (buffer.length >= 12 && buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP')
+    );
+  }
+
+  private async loadConfiguredLogo(logoUrl?: string | null): Promise<{ buffer?: Buffer; incident?: string }> {
+    if (!logoUrl) return {};
+    const maxLogoBytes = 1_500_000;
+    try {
+      let buffer: Buffer;
+      if (logoUrl.startsWith('data:image/')) {
+        const match = logoUrl.match(/^data:image\/(png|jpeg|webp);base64,(.+)$/);
+        if (!match) return { incident: 'el logo configurado no tiene un formato data:image permitido' };
+        buffer = Buffer.from(match[2], 'base64');
+      } else {
+        if (/^https?:\/\//i.test(logoUrl) || /^file:/i.test(logoUrl)) {
+          return { incident: 'el origen remoto del logo fue rechazado por seguridad' };
+        }
+        const uploadRoot = resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
+        const candidate = resolve(process.cwd(), logoUrl.replace(/^[/\\]+/, ''));
+        const pathRelativeToUploads = relative(uploadRoot, candidate);
+        if (pathRelativeToUploads.startsWith('..') || pathRelativeToUploads.includes(':')) {
+          return { incident: 'el logo no pertenece al almacenamiento local permitido' };
+        }
+        buffer = await readFile(candidate);
+      }
+      if (buffer.length === 0 || buffer.length > maxLogoBytes || !this.isSupportedImage(buffer)) {
+        return { incident: 'el logo no es una imagen válida o supera el tamaño permitido' };
+      }
+      return { buffer };
+    } catch {
+      return { incident: 'el logo configurado no está disponible localmente' };
+    }
+  }
+
+  private async loadReportPhotos(
+    inspections: Array<{ hallazgos: Array<{ id: string; fotosUrls: string | null }> }>,
+    empresaId: string,
+    organizacionEmpresaId: string,
+  ): Promise<{ fotos: Array<{ buffer: Buffer; nombre: string }>; incidencias: number }> {
+    const fotos: Array<{ buffer: Buffer; nombre: string }> = [];
+    let incidencias = 0;
+    let totalBytes = 0;
+    const maxPhotos = 12;
+    const maxPhotoBytes = 2_000_000;
+    const maxTotalBytes = 8_000_000;
+    for (const inspection of inspections) {
+      for (const hallazgo of inspection.hallazgos) {
+        let urls: string[] = [];
+        try { urls = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : []; } catch { incidencias += 1; continue; }
+        for (const url of urls) {
+          if (fotos.length >= maxPhotos) { incidencias += 1; continue; }
+          const filename = basename(url);
+          if (!/\.(jpe?g|png|webp)$/i.test(extname(filename))) { incidencias += 1; continue; }
+          try {
+            const buffer = await this.hallazgosService.readPhotoForReport(hallazgo.id, filename, empresaId, organizacionEmpresaId);
+            if (!this.isSupportedImage(buffer) || buffer.length > maxPhotoBytes || totalBytes + buffer.length > maxTotalBytes) {
+              incidencias += 1;
+              continue;
+            }
+            fotos.push({ buffer, nombre: filename });
+            totalBytes += buffer.length;
+          } catch {
+            incidencias += 1;
+          }
+        }
+      }
+    }
+    return { fotos, incidencias };
+  }
 
   private async resolveEstablishmentScope(
     accesoEmpresaId: string,
@@ -174,7 +251,7 @@ export class ReportesService {
           establecimiento: { select: { nombre: true } },
           checklist: { select: { nombre: true } },
           usuario: { select: { nombre: true, apellido: true, email: true } },
-          hallazgos: { select: { titulo: true, nivelRiesgo: true, createdAt: true, fotosUrls: true } },
+          hallazgos: { select: { id: true, titulo: true, nivelRiesgo: true, createdAt: true, fotosUrls: true } },
         },
         orderBy: { fechaHoraInicio: 'asc' },
       }),
@@ -202,9 +279,8 @@ export class ReportesService {
       establecimiento: inspection.establecimiento?.nombre,
       fecha: hallazgo.createdAt,
     })));
-    const fotos = inspections.reduce((total, inspection) => total + inspection.hallazgos.reduce((count, item) => {
-      try { return count + (item.fotosUrls ? (JSON.parse(item.fotosUrls) as string[]).length : 0); } catch { return count; }
-    }, 0), 0);
+    const photoResult = await this.loadReportPhotos(inspections, params.empresaId, params.organizacionEmpresaId);
+    const logoResult = await this.loadConfiguredLogo(relation.organizacion.logoUrl);
 
     return this.monthlyPdfGenerator.generate({
       organizacion: relation.organizacion,
@@ -227,7 +303,10 @@ export class ReportesService {
         fechaCompromiso: action.fechaCompromiso,
         establecimiento: action.hallazgo.inspeccion.establecimiento?.nombre,
       })),
-      fotos,
+      fotos: photoResult.fotos,
+      incidenciasFotografias: photoResult.incidencias,
+      logo: logoResult.buffer,
+      incidenciaLogo: logoResult.incident,
     });
   }
 

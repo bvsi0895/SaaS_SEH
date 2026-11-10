@@ -42,6 +42,11 @@ export class HallazgosService {
     return readFile(join(this.getUploadDir(), basename(filename)));
   }
 
+  /** Lee una evidencia para procesos internos ya autorizados, sin exponer una URL pública. */
+  async readPhotoForReport(id: string, filename: string, empresaId: string, organizacionEmpresaId: string) {
+    return this.getPhoto(id, filename, empresaId, organizacionEmpresaId);
+  }
+
   /**
    * Obtener todos los hallazgos de una empresa
    */
