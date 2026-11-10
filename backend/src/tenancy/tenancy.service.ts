@@ -22,9 +22,8 @@ export class TenancyService {
         activo: true,
         organizacionMiembro: { usuarioId, activa: true, organizacion: { activa: true } },
         organizacionEmpresa: {
-          empresaId: legacyEmpresaId,
           estado: EstadoRelacionEmpresa.ACTIVA,
-          ...(requestedOrganizacionEmpresaId && { id: requestedOrganizacionEmpresaId }),
+          ...(requestedOrganizacionEmpresaId ? { id: requestedOrganizacionEmpresaId } : { empresaId: legacyEmpresaId }),
         },
       },
       select: {

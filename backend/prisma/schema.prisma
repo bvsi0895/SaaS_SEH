@@ -312,6 +312,10 @@ model Organizacion {
   id            String                @id @default(uuid())
   nombre        String
   tipo          TipoOrganizacion
+  logoUrl       String?
+  emailContacto String?
+  telefono      String?
+  direccion     String?
   activa        Boolean               @default(true)
   miembros      OrganizacionMiembro[]
   empresas      OrganizacionEmpresa[]
@@ -365,6 +369,7 @@ model Establecimiento {
   nombre       String
   codigo       String?
   direccion    String?
+  sectores     String?
   activo       Boolean                 @default(true)
   empresa      Empresa                 @relation(fields: [empresaId], references: [id])
   accesos      AccesoEstablecimiento[]

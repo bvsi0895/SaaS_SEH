@@ -12,6 +12,7 @@ import { AccionesCorrectivasModule } from './acciones-correctivas/acciones-corre
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { TenancyModule } from './tenancy/tenancy.module';
+import { AdministracionModule } from './administracion/administracion.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TenancyModule } from './tenancy/tenancy.module';
     DashboardModule,
     ReportesModule,
     TenancyModule,
+    AdministracionModule,
   ],
 })
 export class AppModule {}
