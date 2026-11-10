@@ -23,6 +23,7 @@
     "test:multitenant:e2e": "ts-node prisma/verify-multitenant-e2e.ts",
     "test:administracion:e2e": "ts-node prisma/verify-admin-e2e.ts",
     "test:revocacion:e2e": "ts-node prisma/verify-revocation-e2e.ts",
+    "test:informes:e2e": "ts-node prisma/verify-informes-e2e.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

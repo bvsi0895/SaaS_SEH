@@ -78,6 +78,17 @@ export class AuthController {
     return this.tenancy.listForUser(usuarioId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('establecimientos')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar establecimientos autorizados del contexto activo' })
+  async getEstablishments(
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+    @CurrentUser('empresaId') empresaId: string,
+  ) {
+    return this.tenancy.listEstablishmentsForAccess(accesoEmpresaId, empresaId);
+  }
+
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)

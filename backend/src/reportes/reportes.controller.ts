@@ -87,6 +87,45 @@ export class ReportesController {
     }, organizacionEmpresaId);
   }
 
+  @Get('mensual.pdf')
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @ApiOperation({ summary: 'Generar informe mensual profesional en PDF' })
+  @ApiProduces('application/pdf')
+  @ApiQuery({ name: 'fechaDesde', required: true, description: 'Fecha inicial ISO-8601' })
+  @ApiQuery({ name: 'fechaHasta', required: true, description: 'Fecha final ISO-8601' })
+  @ApiQuery({ name: 'establecimientoId', required: false })
+  @ApiResponse({ status: 200, description: 'Informe mensual PDF' })
+  async getReporteMensualPDF(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+    @Query('fechaDesde') fechaDesde: string,
+    @Query('fechaHasta') fechaHasta: string,
+    @Query('establecimientoId') establecimientoId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const desde = new Date(fechaDesde);
+    const hasta = new Date(fechaHasta);
+    if (Number.isNaN(desde.getTime()) || Number.isNaN(hasta.getTime()) || desde > hasta) {
+      res.status(400).json({ message: 'El período informado no es válido' });
+      return;
+    }
+    const pdfBuffer = await this.reportesService.generarReporteMensualPDF({
+      empresaId,
+      organizacionEmpresaId,
+      accesoEmpresaId,
+      establecimientoId,
+      fechaDesde: desde,
+      fechaHasta: hasta,
+    });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="informe-mensual-${fechaDesde.slice(0, 10)}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
+  }
+
   @Get('hallazgos')
   @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Generar reporte de hallazgos' })

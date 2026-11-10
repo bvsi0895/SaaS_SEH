@@ -68,6 +68,22 @@ export class TenancyService {
     }));
   }
 
+  async listEstablishmentsForAccess(accesoEmpresaId: string, empresaId: string) {
+    const scoped = await this.prisma.accesoEstablecimiento.findMany({
+      where: { accesoEmpresaId, establecimiento: { empresaId } },
+      select: { establecimientoId: true },
+    });
+    return this.prisma.establecimiento.findMany({
+      where: {
+        empresaId,
+        ...(scoped.length > 0 ? { id: { in: scoped.map((item) => item.establecimientoId) } } : {}),
+        activo: true,
+      },
+      select: { id: true, nombre: true, codigo: true, direccion: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
   assertResource(organizacionEmpresaId: string | null | undefined, context: TenantContext): void {
     if (!organizacionEmpresaId || organizacionEmpresaId !== context.organizacionEmpresaId) {
       throw new NotFoundException('Recurso no encontrado');
