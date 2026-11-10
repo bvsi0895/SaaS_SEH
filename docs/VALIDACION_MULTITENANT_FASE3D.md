@@ -8,7 +8,7 @@ Base de trabajo: `da8418e`
 
 La validación HTTP real contra el backend y PostgreSQL local demostró aislamiento entre dos organizaciones vinculadas a la misma empresa: login, contextos, checklists, inspecciones, hallazgos, fotografía, PDF y accesos cruzados rechazados.
 
-La fase no se declara cerrada todavía: quedan pendientes una ejecución final de la suite completa y una revisión específica de los endpoints administrativos que todavía exponen la entidad compartida `Empresa` por diseño legacy.
+La fase no se declara cerrada todavía: queda pendiente una revisión específica de los endpoints administrativos que todavía exponen la entidad compartida `Empresa` por diseño legacy.
 
 ## Cambios realizados
 
@@ -67,7 +67,7 @@ El `finally` elimina los registros temporales. La comprobación posterior devolv
 | Prisma generate | Aprobado |
 | Migraciones en base nueva | Aprobado |
 | E2E HTTP multiempresa | Aprobado |
-| Suite backend completa | Pendiente de ejecución final tras los últimos cambios |
+| Suite backend completa | Aprobada: 3 suites, 7 tests |
 
 ## Riesgos y pendientes
 
