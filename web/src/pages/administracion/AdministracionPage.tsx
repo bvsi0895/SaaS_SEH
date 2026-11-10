@@ -70,7 +70,7 @@ export default function AdministracionPage() {
 
   return <Box>
     <PageHeader title="Administración de consultora" subtitle="Organización, empresas-clientes, establecimientos y técnicos" />
-    <Card sx={{ mb: 3 }}><Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto"><Tab label="Organización" /><Tab label="Empresas-clientes" /><Tab label="Establecimientos" /><Tab label="Técnicos y accesos" /></Tabs></Card>
+    <Card sx={{ mb: 3 }}><Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto" sx={{ '& .MuiTab-root': { scrollMarginTop: '80px' } }}><Tab label="Organización" /><Tab label="Empresas-clientes" /><Tab label="Establecimientos" /><Tab label="Técnicos y accesos" /></Tabs></Card>
 
     {tab === 0 && <Card><CardContent><Typography variant="h6" sx={{ mb: 2 }}>Datos comerciales</Typography><Grid container spacing={2}>{[['nombre','Nombre'],['emailContacto','Email de contacto'],['telefono','Teléfono'],['direccion','Dirección'],['logoUrl','URL del logo']].map(([key, label]) => <Grid item xs={12} md={6} key={key}><TextField {...field} label={label} value={orgForm[key as keyof typeof orgForm]} onChange={(e) => setOrgForm({ ...orgForm, [key]: e.target.value })} /></Grid>)}</Grid><Button sx={{ mt: 2 }} variant="contained" onClick={() => saveOrg.mutate()}>Guardar organización</Button></CardContent></Card>}
 
