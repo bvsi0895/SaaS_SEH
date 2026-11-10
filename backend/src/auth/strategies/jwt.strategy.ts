@@ -3,12 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenancyService } from '../../tenancy/tenancy.service';
 
 export interface JwtPayload {
   sub: string; // userId
   email: string;
   empresaId: string;
   rol: string;
+  organizacionEmpresaId?: string;
 }
 
 /**
@@ -20,6 +22,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    private tenancy: TenancyService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -57,6 +60,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Retornar usuario sin password
     const { password, refreshToken, ...result } = usuario;
-    return result;
+    const context = await this.tenancy.resolveForUser(
+      usuario.id,
+      usuario.empresaId,
+      payload.organizacionEmpresaId,
+    );
+    return { ...result, ...context };
   }
 }

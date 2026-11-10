@@ -11,6 +11,7 @@ import { HallazgosModule } from './hallazgos/hallazgos.module';
 import { AccionesCorrectivasModule } from './acciones-correctivas/acciones-correctivas.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { TenancyModule } from './tenancy/tenancy.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ReportesModule } from './reportes/reportes.module';
     AccionesCorrectivasModule,
     DashboardModule,
     ReportesModule,
+    TenancyModule,
   ],
 })
 export class AppModule {}

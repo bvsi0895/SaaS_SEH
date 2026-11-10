@@ -19,10 +19,11 @@ export class ChecklistsService {
   /**
    * Obtener todos los checklists de una empresa
    */
-  async findAll(empresaId: string, filters?: { tipo?: TipoChecklist; activo?: boolean }) {
+  async findAll(empresaId: string, filters?: { tipo?: TipoChecklist; activo?: boolean }, organizacionEmpresaId?: string) {
     return this.prisma.checklist.findMany({
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         ...(filters?.tipo && { tipo: filters.tipo }),
         ...(filters?.activo !== undefined && { activo: filters.activo }),
       },
@@ -41,7 +42,7 @@ export class ChecklistsService {
   /**
    * Obtener checklist por ID
    */
-  async findOne(id: string, empresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string) {
     const checklist = await this.prisma.checklist.findUnique({
       where: { id },
       include: {
@@ -61,6 +62,9 @@ export class ChecklistsService {
     if (empresaId && checklist.empresaId !== empresaId) {
       throw new NotFoundException('Checklist no encontrado');
     }
+    if (organizacionEmpresaId && checklist.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Checklist no encontrado');
+    }
 
     return checklist;
   }
@@ -68,13 +72,14 @@ export class ChecklistsService {
   /**
    * Crear nuevo checklist
    */
-  async create(empresaId: string, createChecklistDto: CreateChecklistDto) {
+  async create(empresaId: string, createChecklistDto: CreateChecklistDto, organizacionEmpresaId?: string) {
     const { items, ...checklistData } = createChecklistDto;
 
     return this.prisma.checklist.create({
       data: {
         ...checklistData,
         empresaId,
+        organizacionEmpresaId,
         items: items
           ? {
               create: items.map((item) => ({
@@ -96,8 +101,8 @@ export class ChecklistsService {
   /**
    * Actualizar checklist
    */
-  async update(id: string, updateChecklistDto: UpdateChecklistDto, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async update(id: string, updateChecklistDto: UpdateChecklistDto, empresaId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionEmpresaId);
 
     return this.prisma.checklist.update({
       where: { id },
@@ -113,8 +118,8 @@ export class ChecklistsService {
   /**
    * Agregar item a checklist
    */
-  async addItem(checklistId: string, createItemDto: CreateChecklistItemDto, empresaId?: string) {
-    await this.findOne(checklistId, empresaId);
+  async addItem(checklistId: string, createItemDto: CreateChecklistItemDto, empresaId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(checklistId, empresaId, organizacionEmpresaId);
 
     return this.prisma.checklistItem.create({
       data: {
@@ -176,8 +181,8 @@ export class ChecklistsService {
   /**
    * Duplicar checklist
    */
-  async duplicate(id: string, empresaId: string) {
-    const original = await this.findOne(id, empresaId);
+  async duplicate(id: string, empresaId: string, organizacionEmpresaId?: string) {
+    const original = await this.findOne(id, empresaId, organizacionEmpresaId);
 
     return this.prisma.checklist.create({
       data: {
@@ -185,6 +190,7 @@ export class ChecklistsService {
         descripcion: original.descripcion,
         tipo: original.tipo,
         empresaId,
+        organizacionEmpresaId,
         items: {
           create: original.items.map((item) => ({
             descripcion: item.descripcion,
@@ -204,8 +210,8 @@ export class ChecklistsService {
   /**
    * Desactivar checklist (soft delete)
    */
-  async deactivate(id: string, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async deactivate(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionEmpresaId);
 
     return this.prisma.checklist.update({
       where: { id },
@@ -216,8 +222,8 @@ export class ChecklistsService {
   /**
    * Reactivar checklist
    */
-  async activate(id: string, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async activate(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionEmpresaId);
 
     return this.prisma.checklist.update({
       where: { id },

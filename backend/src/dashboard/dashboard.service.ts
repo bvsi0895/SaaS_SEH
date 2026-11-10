@@ -9,7 +9,7 @@ export class DashboardService {
   /**
    * Obtener resumen general del dashboard
    */
-  async getResumen(empresaId: string, filtros?: { fechaDesde?: Date; fechaHasta?: Date }) {
+  async getResumen(empresaId: string, filtros?: { fechaDesde?: Date; fechaHasta?: Date }, organizacionEmpresaId?: string) {
     const whereDate = {
       ...(filtros?.fechaDesde && { fechaHoraInicio: { gte: filtros.fechaDesde } }),
       ...(filtros?.fechaHasta && { fechaHoraInicio: { lte: filtros.fechaHasta } }),
@@ -27,40 +27,41 @@ export class DashboardService {
     ] = await Promise.all([
       // Total inspecciones
       this.prisma.inspeccion.count({
-        where: { empresaId, ...whereDate },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...whereDate },
       }),
       // Inspecciones completadas
       this.prisma.inspeccion.count({
-        where: { empresaId, estado: EstadoInspeccion.COMPLETADA, ...whereDate },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), estado: EstadoInspeccion.COMPLETADA, ...whereDate },
       }),
       // Inspecciones en progreso
       this.prisma.inspeccion.count({
-        where: { empresaId, estado: EstadoInspeccion.EN_PROGRESO },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), estado: EstadoInspeccion.EN_PROGRESO },
       }),
       // Total hallazgos
       this.prisma.hallazgo.count({
-        where: { inspeccion: { empresaId, ...whereDate } },
+        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...whereDate } },
       }),
       // Hallazgos por nivel
       this.prisma.hallazgo.groupBy({
         by: ['nivelRiesgo'],
         _count: true,
-        where: { inspeccion: { empresaId, ...whereDate } },
+        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...whereDate } },
       }),
       // Total acciones
       this.prisma.accionCorrectiva.count({
-        where: { empresaId },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
       }),
       // Acciones por estado
       this.prisma.accionCorrectiva.groupBy({
         by: ['estado'],
         _count: true,
-        where: { empresaId },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
       }),
       // Acciones vencidas
       this.prisma.accionCorrectiva.count({
         where: {
           empresaId,
+          ...(organizacionEmpresaId && { organizacionEmpresaId }),
           fechaCompromiso: { lt: new Date() },
           estado: { in: [EstadoAccion.PENDIENTE, EstadoAccion.EN_PROGRESO] },
         },
@@ -97,12 +98,14 @@ export class DashboardService {
   async getTendencias(
     empresaId: string,
     periodo: 'semana' | 'mes' | 'trimestre' = 'mes',
+    organizacionEmpresaId?: string,
   ) {
     const fechaInicio = this.getFechaInicio(periodo);
 
     const inspecciones = await this.prisma.inspeccion.findMany({
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         fechaHoraInicio: { gte: fechaInicio },
       },
       select: {
@@ -114,7 +117,7 @@ export class DashboardService {
 
     const hallazgos = await this.prisma.hallazgo.findMany({
       where: {
-        inspeccion: { empresaId },
+        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
         createdAt: { gte: fechaInicio },
       },
       select: {
@@ -133,7 +136,7 @@ export class DashboardService {
   /**
    * Obtener top sectores con más hallazgos
    */
-  async getTopSectores(empresaId: string, limit: number = 5) {
+  async getTopSectores(empresaId: string, limit: number = 5, organizacionEmpresaId?: string) {
     const result = await this.prisma.inspeccion.groupBy({
       by: ['sector'],
       _count: {
@@ -141,6 +144,7 @@ export class DashboardService {
       },
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         hallazgos: { some: {} },
       },
       orderBy: {
@@ -156,7 +160,7 @@ export class DashboardService {
       result.map(async (item) => {
         const hallazgos = await this.prisma.hallazgo.count({
           where: {
-            inspeccion: { empresaId, sector: item.sector },
+            inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), sector: item.sector },
           },
         });
         return {
@@ -173,10 +177,10 @@ export class DashboardService {
   /**
    * Obtener resumen de actividad reciente
    */
-  async getActividadReciente(empresaId: string, limit: number = 10) {
+  async getActividadReciente(empresaId: string, limit: number = 10, organizacionEmpresaId?: string) {
     const [inspecciones, hallazgos, acciones] = await Promise.all([
       this.prisma.inspeccion.findMany({
-        where: { empresaId },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
         select: {
           id: true,
           sector: true,
@@ -189,7 +193,7 @@ export class DashboardService {
         take: limit,
       }),
       this.prisma.hallazgo.findMany({
-        where: { inspeccion: { empresaId } },
+        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } },
         select: {
           id: true,
           titulo: true,
@@ -201,7 +205,7 @@ export class DashboardService {
         take: limit,
       }),
       this.prisma.accionCorrectiva.findMany({
-        where: { empresaId },
+        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
         select: {
           id: true,
           descripcion: true,
@@ -224,7 +228,7 @@ export class DashboardService {
   /**
    * Obtener KPIs principales
    */
-  async getKPIs(empresaId: string) {
+  async getKPIs(empresaId: string, organizacionEmpresaId?: string) {
     const now = new Date();
     const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
     const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -234,6 +238,7 @@ export class DashboardService {
       this.prisma.inspeccion.count({
         where: {
           empresaId,
+          ...(organizacionEmpresaId && { organizacionEmpresaId }),
           fechaHoraInicio: { gte: inicioMes },
           estado: EstadoInspeccion.COMPLETADA,
         },
@@ -241,6 +246,7 @@ export class DashboardService {
       this.prisma.inspeccion.count({
         where: {
           empresaId,
+          ...(organizacionEmpresaId && { organizacionEmpresaId }),
           fechaHoraInicio: { gte: inicioMesAnterior, lt: inicioMes },
           estado: EstadoInspeccion.COMPLETADA,
         },
@@ -251,6 +257,7 @@ export class DashboardService {
     const accionesResueltas = await this.prisma.accionCorrectiva.findMany({
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         estado: EstadoAccion.RESUELTA,
         fechaCierre: { not: null },
       },
@@ -275,12 +282,12 @@ export class DashboardService {
     const [hallazgosCriticos, hallazgosTotal] = await Promise.all([
       this.prisma.hallazgo.count({
         where: {
-          inspeccion: { empresaId },
+          inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
           nivelRiesgo: { in: [NivelRiesgo.CRITICO, NivelRiesgo.ALTO] },
         },
       }),
       this.prisma.hallazgo.count({
-        where: { inspeccion: { empresaId } },
+        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } },
       }),
     ]);
 

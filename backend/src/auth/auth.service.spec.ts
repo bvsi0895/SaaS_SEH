@@ -20,7 +20,8 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new AuthService(prisma as never, jwtService as never, configService as never);
+    const tenancy = { resolveForUser: jest.fn().mockResolvedValue({ organizacionEmpresaId: 'context-1' }) };
+    service = new AuthService(prisma as never, jwtService as never, configService as never, tenancy as never);
     configService.get.mockImplementation((key: string) => {
       const values: Record<string, string> = {
         JWT_SECRET: 'test-secret',

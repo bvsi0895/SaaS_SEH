@@ -49,6 +49,7 @@ export class HallazgosController {
   @ApiResponse({ status: 200, description: 'Lista de hallazgos' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('nivelRiesgo') nivelRiesgo?: NivelRiesgo,
     @Query('inspeccionId') inspeccionId?: string,
     @Query('conAccionesCorrectivas') conAccionesCorrectivas?: boolean,
@@ -61,7 +62,7 @@ export class HallazgosController {
       conAccionesCorrectivas,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('estadisticas')
@@ -72,6 +73,7 @@ export class HallazgosController {
   @ApiResponse({ status: 200, description: 'Estadísticas de hallazgos' })
   async getEstadisticas(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
   ) {
@@ -79,6 +81,7 @@ export class HallazgosController {
       empresaId,
       fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta ? new Date(fechaHasta) : undefined,
+      organizacionEmpresaId,
     );
   }
 
@@ -89,8 +92,9 @@ export class HallazgosController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.hallazgosService.findOne(id, empresaId);
+    return this.hallazgosService.findOne(id, empresaId, organizacionEmpresaId);
   }
 
   @Post()
@@ -100,8 +104,9 @@ export class HallazgosController {
   async create(
     @Body() createHallazgoDto: CreateHallazgoDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.hallazgosService.create(createHallazgoDto, empresaId);
+    return this.hallazgosService.create(createHallazgoDto, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/fotos')
@@ -120,12 +125,13 @@ export class HallazgosController {
   async uploadPhoto(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @UploadedFile() file?: { buffer: Buffer; originalname: string },
   ) {
     if (!file) {
       throw new BadRequestException('Se requiere una imagen JPG, PNG o WEBP');
     }
-    return this.hallazgosService.addPhoto(id, empresaId, file);
+    return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId);
   }
 
   @Get(':id/fotos/:filename')
@@ -134,9 +140,10 @@ export class HallazgosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('filename') filename: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Res() res: Response,
   ) {
-    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId);
+    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId, organizacionEmpresaId);
     res.type(filename).send(photo);
   }
 
@@ -148,8 +155,9 @@ export class HallazgosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateHallazgoDto: UpdateHallazgoDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.hallazgosService.update(id, updateHallazgoDto, empresaId);
+    return this.hallazgosService.update(id, updateHallazgoDto, empresaId, organizacionEmpresaId);
   }
 
   @Delete(':id')
@@ -159,7 +167,8 @@ export class HallazgosController {
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.hallazgosService.remove(id, empresaId);
+    return this.hallazgosService.remove(id, empresaId, organizacionEmpresaId);
   }
 }

@@ -42,6 +42,7 @@ export class AccionesCorrectivasController {
   @ApiResponse({ status: 200, description: 'Lista de acciones correctivas' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: EstadoAccion,
     @Query('responsableId') responsableId?: string,
     @Query('hallazgoId') hallazgoId?: string,
@@ -52,7 +53,7 @@ export class AccionesCorrectivasController {
       responsableId,
       hallazgoId,
       vencidas,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('me')
@@ -62,17 +63,21 @@ export class AccionesCorrectivasController {
   async findMine(
     @CurrentUser('id') usuarioId: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: EstadoAccion,
   ) {
-    return this.accionesCorrectivasService.findMine(usuarioId, empresaId, { estado });
+    return this.accionesCorrectivasService.findMine(usuarioId, empresaId, { estado }, organizacionEmpresaId);
   }
 
   @Get('estadisticas')
   @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Obtener estadísticas de acciones correctivas' })
   @ApiResponse({ status: 200, description: 'Estadísticas' })
-  async getEstadisticas(@CurrentUser('empresaId') empresaId: string) {
-    return this.accionesCorrectivasService.getEstadisticas(empresaId);
+  async getEstadisticas(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+  ) {
+    return this.accionesCorrectivasService.getEstadisticas(empresaId, organizacionEmpresaId);
   }
 
   @Get(':id')
@@ -82,8 +87,9 @@ export class AccionesCorrectivasController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.findOne(id, empresaId);
+    return this.accionesCorrectivasService.findOne(id, empresaId, organizacionEmpresaId);
   }
 
   @Post()
@@ -94,8 +100,9 @@ export class AccionesCorrectivasController {
     @Body() createDto: CreateAccionCorrectivaDto,
     @CurrentUser('id') creadorId: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.create(createDto, creadorId, empresaId);
+    return this.accionesCorrectivasService.create(createDto, creadorId, empresaId, organizacionEmpresaId);
   }
 
   @Put(':id')
@@ -106,8 +113,9 @@ export class AccionesCorrectivasController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateAccionCorrectivaDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.update(id, updateDto, empresaId);
+    return this.accionesCorrectivasService.update(id, updateDto, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/iniciar')
@@ -116,8 +124,9 @@ export class AccionesCorrectivasController {
   async iniciar(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.iniciar(id, empresaId);
+    return this.accionesCorrectivasService.iniciar(id, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/cerrar')
@@ -127,8 +136,9 @@ export class AccionesCorrectivasController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() cerrarDto: CerrarAccionDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.cerrar(id, cerrarDto, empresaId);
+    return this.accionesCorrectivasService.cerrar(id, cerrarDto, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/reabrir')
@@ -138,7 +148,8 @@ export class AccionesCorrectivasController {
   async reabrir(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.accionesCorrectivasService.reabrir(id, empresaId);
+    return this.accionesCorrectivasService.reabrir(id, empresaId, organizacionEmpresaId);
   }
 }

@@ -19,11 +19,15 @@ import { LoginDto, RegisterDto, AuthResponseDto, RefreshTokenDto } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { TenancyService } from '../tenancy/tenancy.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly tenancy: TenancyService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -64,6 +68,14 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'No autenticado' })
   async getProfile(@CurrentUser() user: any) {
     return user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('contextos')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar contextos multiempresa autorizados' })
+  async getContexts(@CurrentUser('id') usuarioId: string) {
+    return this.tenancy.listForUser(usuarioId);
   }
 
   @Public()

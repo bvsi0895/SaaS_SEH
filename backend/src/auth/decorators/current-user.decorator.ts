@@ -7,7 +7,7 @@ import { Usuario } from '@prisma/client';
  * Uso parcial: @CurrentUser('id') userId: string
  */
 export const CurrentUser = createParamDecorator(
-  (data: keyof Usuario | undefined, ctx: ExecutionContext) => {
+  (data: keyof Usuario | string | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     const user = request.user as Usuario;
 
@@ -16,6 +16,6 @@ export const CurrentUser = createParamDecorator(
     }
 
     // Si se especifica una propiedad, retornar solo esa
-    return data ? user[data] : user;
+    return data ? (user as Record<string, unknown>)[data] : user;
   },
 );

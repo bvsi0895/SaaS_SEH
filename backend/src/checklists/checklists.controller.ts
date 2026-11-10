@@ -45,10 +45,11 @@ export class ChecklistsController {
   @ApiResponse({ status: 200, description: 'Lista de checklists' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('tipo') tipo?: TipoChecklist,
     @Query('activo') activo?: boolean,
   ) {
-    return this.checklistsService.findAll(empresaId, { tipo, activo });
+    return this.checklistsService.findAll(empresaId, { tipo, activo }, organizacionEmpresaId);
   }
 
   @Get(':id')
@@ -58,8 +59,9 @@ export class ChecklistsController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.findOne(id, empresaId);
+    return this.checklistsService.findOne(id, empresaId, organizacionEmpresaId);
   }
 
   @Post()
@@ -69,8 +71,9 @@ export class ChecklistsController {
   async create(
     @Body() createChecklistDto: CreateChecklistDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.create(empresaId, createChecklistDto);
+    return this.checklistsService.create(empresaId, createChecklistDto, organizacionEmpresaId);
   }
 
   @Put(':id')
@@ -81,8 +84,9 @@ export class ChecklistsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateChecklistDto: UpdateChecklistDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.update(id, updateChecklistDto, empresaId);
+    return this.checklistsService.update(id, updateChecklistDto, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/items')
@@ -93,8 +97,9 @@ export class ChecklistsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() createItemDto: CreateChecklistItemDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.addItem(id, createItemDto, empresaId);
+    return this.checklistsService.addItem(id, createItemDto, empresaId, organizacionEmpresaId);
   }
 
   @Put('items/:itemId')
@@ -124,8 +129,9 @@ export class ChecklistsController {
   async duplicate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.duplicate(id, empresaId);
+    return this.checklistsService.duplicate(id, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/deactivate')
@@ -135,8 +141,9 @@ export class ChecklistsController {
   async deactivate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.deactivate(id, empresaId);
+    return this.checklistsService.deactivate(id, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/activate')
@@ -146,8 +153,9 @@ export class ChecklistsController {
   async activate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.activate(id, empresaId);
+    return this.checklistsService.activate(id, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/reorder')

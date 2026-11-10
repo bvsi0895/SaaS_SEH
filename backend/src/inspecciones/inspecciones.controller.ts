@@ -50,6 +50,7 @@ export class InspeccionesController {
   @ApiResponse({ status: 200, description: 'Lista de inspecciones' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: EstadoInspeccion,
     @Query('usuarioId') usuarioId?: string,
     @Query('checklistId') checklistId?: string,
@@ -64,7 +65,7 @@ export class InspeccionesController {
       sector,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('me')
@@ -74,9 +75,10 @@ export class InspeccionesController {
   async findMine(
     @CurrentUser('id') usuarioId: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: EstadoInspeccion,
   ) {
-    return this.inspeccionesService.findMine(usuarioId, empresaId, { estado });
+    return this.inspeccionesService.findMine(usuarioId, empresaId, { estado }, organizacionEmpresaId);
   }
 
   @Get(':id')
@@ -86,8 +88,9 @@ export class InspeccionesController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.findOne(id, empresaId);
+    return this.inspeccionesService.findOne(id, empresaId, organizacionEmpresaId);
   }
 
   @Get(':id/resumen')
@@ -96,8 +99,9 @@ export class InspeccionesController {
   async getResumen(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.getResumen(id, empresaId);
+    return this.inspeccionesService.getResumen(id, empresaId, organizacionEmpresaId);
   }
 
   @Post()
@@ -108,8 +112,9 @@ export class InspeccionesController {
     @Body() createInspeccionDto: CreateInspeccionDto,
     @CurrentUser('id') usuarioId: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId);
+    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId, organizacionEmpresaId);
   }
 
   @Put(':id')
@@ -119,8 +124,9 @@ export class InspeccionesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateInspeccionDto: UpdateInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId);
+    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/item')
@@ -130,8 +136,9 @@ export class InspeccionesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() registrarItemDto: RegistrarItemDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId);
+    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId);
   }
 
   @Patch(':id/items')
@@ -141,8 +148,9 @@ export class InspeccionesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() registrarDto: RegistrarMultiplesItemsDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId);
+    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/finalizar')
@@ -153,8 +161,9 @@ export class InspeccionesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() finalizarDto: FinalizarInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId);
+    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/cancelar')
@@ -163,7 +172,8 @@ export class InspeccionesController {
   async cancelar(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.inspeccionesService.cancelar(id, empresaId);
+    return this.inspeccionesService.cancelar(id, empresaId, organizacionEmpresaId);
   }
 }

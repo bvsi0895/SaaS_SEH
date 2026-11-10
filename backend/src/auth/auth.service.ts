@@ -7,10 +7,12 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto, AuthResponseDto } from './dto';
 import { JwtPayload } from './strategies/jwt.strategy';
-import { Rol } from '@prisma/client';
+import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
+import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +20,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private tenancy: TenancyService,
   ) {}
 
   /**
@@ -100,7 +103,8 @@ export class AuthService {
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const empresaId = this.configService.get<string>('PUBLIC_REGISTRATION_EMPRESA_ID');
-    if (!empresaId) {
+    const organizacionEmpresaId = this.configService.get<string>('PUBLIC_REGISTRATION_ORGANIZACION_EMPRESA_ID');
+    if (!empresaId || !organizacionEmpresaId) {
       throw new BadRequestException('El registro público no está habilitado');
     }
 
@@ -114,15 +118,16 @@ export class AuthService {
     }
 
     // Verificar que la empresa existe y está activa
-    const empresa = await this.prisma.empresa.findUnique({
-      where: { id: empresaId },
+    const defaultContext = await this.prisma.organizacionEmpresa.findUnique({
+      where: { id: organizacionEmpresaId },
+      include: { empresa: true },
     });
 
-    if (!empresa) {
+    if (!defaultContext || defaultContext.empresaId !== empresaId) {
       throw new BadRequestException('Empresa no encontrada');
     }
 
-    if (!empresa.activa) {
+    if (!defaultContext.empresa.activa || defaultContext.estado !== EstadoRelacionEmpresa.ACTIVA) {
       throw new BadRequestException('Empresa desactivada');
     }
 
@@ -138,6 +143,28 @@ export class AuthService {
         apellido: registerDto.apellido,
         rol: Rol.TECNICO,
         empresaId,
+      },
+    });
+
+    const membership = await this.prisma.organizacionMiembro.create({
+      data: {
+        id: randomUUID(),
+        organizacionId: defaultContext.organizacionId,
+        usuarioId: usuario.id,
+        rol: RolOrganizacion.AUDITOR_ORGANIZACION,
+        activa: true,
+      },
+    });
+
+    await this.prisma.accesoEmpresa.create({
+      data: {
+        id: randomUUID(),
+        organizacionEmpresaId: defaultContext.id,
+        organizacionMiembroId: membership.id,
+        organizacionId: defaultContext.organizacionId,
+        empresaId,
+        rol: Rol.TECNICO,
+        activo: true,
       },
     });
 
@@ -212,11 +239,13 @@ export class AuthService {
    * Generar access token y refresh token
    */
   private async generateTokens(usuario: { id: string; email: string; empresaId: string; rol: string }) {
+    const context = await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
     const payload: JwtPayload = {
       sub: usuario.id,
       email: usuario.email,
       empresaId: usuario.empresaId,
       rol: usuario.rol,
+      organizacionEmpresaId: context.organizacionEmpresaId,
     };
 
     const [accessToken, refreshToken] = await Promise.all([

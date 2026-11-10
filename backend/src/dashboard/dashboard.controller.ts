@@ -28,13 +28,14 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Resumen del dashboard' })
   async getResumen(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
   ) {
     return this.dashboardService.getResumen(empresaId, {
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('tendencias')
@@ -44,9 +45,10 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Tendencias' })
   async getTendencias(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('periodo') periodo?: 'semana' | 'mes' | 'trimestre',
   ) {
-    return this.dashboardService.getTendencias(empresaId, periodo);
+    return this.dashboardService.getTendencias(empresaId, periodo, organizacionEmpresaId);
   }
 
   @Get('top-sectores')
@@ -56,9 +58,10 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Top sectores' })
   async getTopSectores(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('limit') limit?: number,
   ) {
-    return this.dashboardService.getTopSectores(empresaId, limit || 5);
+    return this.dashboardService.getTopSectores(empresaId, limit || 5, organizacionEmpresaId);
   }
 
   @Get('actividad-reciente')
@@ -68,16 +71,20 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Actividad reciente' })
   async getActividadReciente(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('limit') limit?: number,
   ) {
-    return this.dashboardService.getActividadReciente(empresaId, limit || 10);
+    return this.dashboardService.getActividadReciente(empresaId, limit || 10, organizacionEmpresaId);
   }
 
   @Get('kpis')
   @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Obtener KPIs principales' })
   @ApiResponse({ status: 200, description: 'KPIs' })
-  async getKPIs(@CurrentUser('empresaId') empresaId: string) {
-    return this.dashboardService.getKPIs(empresaId);
+  async getKPIs(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+  ) {
+    return this.dashboardService.getKPIs(empresaId, organizacionEmpresaId);
   }
 }

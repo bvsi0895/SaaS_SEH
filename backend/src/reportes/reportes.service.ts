@@ -11,7 +11,7 @@ export class ReportesService {
   /**
    * Generar PDF de una inspección
    */
-  async generarPDFInspeccion(inspeccionId: string, empresaId?: string): Promise<Buffer> {
+  async generarPDFInspeccion(inspeccionId: string, empresaId?: string, organizacionEmpresaId?: string): Promise<Buffer> {
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: inspeccionId },
       include: {
@@ -51,6 +51,9 @@ export class ReportesService {
     if (empresaId && inspeccion.empresaId !== empresaId) {
       throw new NotFoundException('Inspección no encontrada');
     }
+    if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Inspección no encontrada');
+    }
 
     return this.pdfGenerator.generate(inspeccion);
   }
@@ -61,10 +64,12 @@ export class ReportesService {
   async generarReporteConsolidado(
     empresaId: string,
     filtros: { fechaDesde?: Date; fechaHasta?: Date },
+    organizacionEmpresaId?: string,
   ) {
     const inspecciones = await this.prisma.inspeccion.findMany({
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         estado: 'COMPLETADA',
         ...(filtros.fechaDesde && { fechaHoraInicio: { gte: filtros.fechaDesde } }),
         ...(filtros.fechaHasta && { fechaHoraInicio: { lte: filtros.fechaHasta } }),
@@ -101,10 +106,11 @@ export class ReportesService {
   async generarReporteHallazgos(
     empresaId: string,
     filtros: { fechaDesde?: Date; fechaHasta?: Date; nivelRiesgo?: string },
+    organizacionEmpresaId?: string,
   ) {
     const hallazgos = await this.prisma.hallazgo.findMany({
       where: {
-        inspeccion: { empresaId },
+        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
         ...(filtros.fechaDesde && { createdAt: { gte: filtros.fechaDesde } }),
         ...(filtros.fechaHasta && { createdAt: { lte: filtros.fechaHasta } }),
         ...(filtros.nivelRiesgo && { nivelRiesgo: filtros.nivelRiesgo as any }),
@@ -165,10 +171,12 @@ export class ReportesService {
   async generarReporteAcciones(
     empresaId: string,
     filtros: { estado?: string; responsableId?: string },
+    organizacionEmpresaId?: string,
   ) {
     const acciones = await this.prisma.accionCorrectiva.findMany({
       where: {
         empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
         ...(filtros.estado && { estado: filtros.estado as any }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
       },

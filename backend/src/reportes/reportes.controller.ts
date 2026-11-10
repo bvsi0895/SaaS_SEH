@@ -34,9 +34,10 @@ export class ReportesController {
   async getPDFInspeccion(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId);
+    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -54,9 +55,10 @@ export class ReportesController {
   async downloadPDFInspeccion(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId);
+    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -75,13 +77,14 @@ export class ReportesController {
   @ApiResponse({ status: 200, description: 'Reporte consolidado' })
   async getReporteConsolidado(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
   ) {
     return this.reportesService.generarReporteConsolidado(empresaId, {
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('hallazgos')
@@ -93,6 +96,7 @@ export class ReportesController {
   @ApiResponse({ status: 200, description: 'Reporte de hallazgos' })
   async getReporteHallazgos(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
     @Query('nivelRiesgo') nivelRiesgo?: string,
@@ -101,7 +105,7 @@ export class ReportesController {
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
       nivelRiesgo,
-    });
+    }, organizacionEmpresaId);
   }
 
   @Get('acciones-correctivas')
@@ -112,12 +116,13 @@ export class ReportesController {
   @ApiResponse({ status: 200, description: 'Reporte de acciones correctivas' })
   async getReporteAcciones(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: string,
     @Query('responsableId') responsableId?: string,
   ) {
     return this.reportesService.generarReporteAcciones(empresaId, {
       estado,
       responsableId,
-    });
+    }, organizacionEmpresaId);
   }
 }

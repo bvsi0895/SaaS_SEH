@@ -18,8 +18,8 @@ export class HallazgosService {
     return join(process.cwd(), process.env.UPLOAD_DIR || './uploads', 'hallazgos');
   }
 
-  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }) {
-    const hallazgo = await this.findOne(id, empresaId);
+  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
     const extension = extname(file.originalname).toLowerCase();
     const filename = `${id}-${randomUUID()}${extension}`;
     const uploadDir = this.getUploadDir();
@@ -33,8 +33,8 @@ export class HallazgosService {
     });
   }
 
-  async getPhoto(id: string, filename: string, empresaId: string) {
-    const hallazgo = await this.findOne(id, empresaId);
+  async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
     const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
     if (!photos.some((photo) => basename(photo) === filename)) {
       throw new NotFoundException('Foto no encontrada');
@@ -54,10 +54,11 @@ export class HallazgosService {
       fechaDesde?: Date;
       fechaHasta?: Date;
     },
+    organizacionEmpresaId?: string,
   ) {
     return this.prisma.hallazgo.findMany({
       where: {
-        inspeccion: { empresaId },
+        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
         ...(filters?.nivelRiesgo && { nivelRiesgo: filters.nivelRiesgo }),
         ...(filters?.inspeccionId && { inspeccionId: filters.inspeccionId }),
         ...(filters?.conAccionesCorrectivas !== undefined && {
@@ -89,7 +90,7 @@ export class HallazgosService {
   /**
    * Obtener hallazgo por ID
    */
-  async findOne(id: string, empresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string) {
     const hallazgo = await this.prisma.hallazgo.findUnique({
       where: { id },
       include: {
@@ -100,6 +101,7 @@ export class HallazgosService {
             fechaHoraInicio: true,
             estado: true,
             empresaId: true,
+            organizacionEmpresaId: true,
             checklist: { select: { id: true, nombre: true } },
             usuario: { select: { id: true, nombre: true, apellido: true } },
           },
@@ -120,6 +122,9 @@ export class HallazgosService {
     if (empresaId && hallazgo.inspeccion.empresaId !== empresaId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
+    if (organizacionEmpresaId && hallazgo.inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
 
     return hallazgo;
   }
@@ -127,7 +132,7 @@ export class HallazgosService {
   /**
    * Crear nuevo hallazgo
    */
-  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string) {
+  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string) {
     // Verificar que la inspección existe
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: createHallazgoDto.inspeccionId },
@@ -138,6 +143,9 @@ export class HallazgosService {
     }
 
     if (empresaId && inspeccion.empresaId !== empresaId) {
+      throw new NotFoundException('Inspección no encontrada');
+    }
+    if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
       throw new NotFoundException('Inspección no encontrada');
     }
 
@@ -170,8 +178,8 @@ export class HallazgosService {
   /**
    * Actualizar hallazgo
    */
-  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId);
+  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
 
     // Solo editar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
@@ -194,8 +202,8 @@ export class HallazgosService {
   /**
    * Eliminar hallazgo
    */
-  async remove(id: string, empresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId);
+  async remove(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
 
     // Solo eliminar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
@@ -221,9 +229,9 @@ export class HallazgosService {
   /**
    * Obtener estadísticas de hallazgos
    */
-  async getEstadisticas(empresaId: string, fechaDesde?: Date, fechaHasta?: Date) {
+  async getEstadisticas(empresaId: string, fechaDesde?: Date, fechaHasta?: Date, organizacionEmpresaId?: string) {
     const whereClause = {
-      inspeccion: { empresaId },
+      inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
       ...(fechaDesde && { createdAt: { gte: fechaDesde } }),
       ...(fechaHasta && { createdAt: { lte: fechaHasta } }),
     };
