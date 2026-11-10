@@ -114,3 +114,20 @@ límites de memoria y paginación; las ausentes se informan sin bloquear el PDF.
 La prueba visual real confirmó dashboard y descarga en el escritorio disponible,
 pero no se pudo fijar exactamente 390×844 ni 1440×900 porque no hay Playwright
 instalado y el navegador integrado no expone emulación de viewport.
+
+## Fase 6A — Preparación de demo online
+
+Se creó `feature/demo-online` desde `d17b866`. Se incorporaron un seed ficticio
+idempotente, configuración Docker con pnpm y lockfile, variables de demo sin
+secretos, healthcheck `/api/health`, volumen dedicado para evidencias y la
+documentación operativa de `docs/DEMO_ONLINE.md`.
+
+Validación ejecutada: backend build, web build, mobile typecheck, Jest (4
+suites y 9 tests), seed demo en dos ejecuciones, configuración Compose,
+healthcheck local y E2E multiempresa, administración, revocación e informes:
+todo OK. La validación exacta de viewport `390×844` y `1440×900` sigue
+pendiente porque el entorno no dispone de Playwright ni emulación equivalente.
+Los Dockerfiles de backend y web también se construyeron correctamente; Vite
+mantiene únicamente el warning de chunk grande. No se realizó deploy público.
+El detalle está en
+`docs/VALIDACION_FASE6A.md`.
