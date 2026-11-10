@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto } from './dto';
+import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto, AdminChangePasswordDto } from './dto';
 import { Rol } from '@prisma/client';
 
 @Injectable()
@@ -184,6 +184,16 @@ export class UsuariosService {
       data: { password: hashedPassword },
     });
 
+    return { message: 'Contraseña actualizada exitosamente' };
+  }
+
+  async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto) {
+    await this.findOne(id, empresaId);
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.usuario.update({
+      where: { id },
+      data: { password: hashedPassword, refreshToken: null },
+    });
     return { message: 'Contraseña actualizada exitosamente' };
   }
 

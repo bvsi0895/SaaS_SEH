@@ -10,7 +10,6 @@ import {
   InputAdornment,
   IconButton,
   Alert,
-  Divider,
 } from '@mui/material';
 import {
   Visibility,
@@ -18,7 +17,6 @@ import {
   Email,
   Lock,
   Person,
-  Business,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import type { RegisterData } from '../../types';
@@ -190,43 +188,6 @@ export default function RegisterPage() {
           required: 'Confirma tu contrasena',
           validate: (value) =>
             value === password || 'Las contrasenas no coinciden',
-        })}
-      />
-
-      <Divider sx={{ my: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          Datos de la empresa (opcional)
-        </Typography>
-      </Divider>
-
-      <TextField
-        fullWidth
-        label="Nombre de la empresa"
-        margin="normal"
-        error={!!errors.empresaNombre}
-        helperText={errors.empresaNombre?.message}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Business color="action" />
-            </InputAdornment>
-          ),
-        }}
-        {...register('empresaNombre')}
-      />
-
-      <TextField
-        fullWidth
-        label="CUIT de la empresa"
-        margin="normal"
-        placeholder="XX-XXXXXXXX-X"
-        error={!!errors.empresaCuit}
-        helperText={errors.empresaCuit?.message}
-        {...register('empresaCuit', {
-          pattern: {
-            value: /^\d{2}-\d{8}-\d{1}$/,
-            message: 'Formato de CUIT invalido (XX-XXXXXXXX-X)',
-          },
         })}
       />
 

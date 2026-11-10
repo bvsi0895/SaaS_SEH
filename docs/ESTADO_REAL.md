@@ -34,12 +34,23 @@ Las variables detectadas son `DATABASE_URL`, secretos JWT, configuración de COR
 - Se agregó `GET /usuarios/tecnicos`, usado por el selector de responsables del web.
 - La pantalla de perfil ahora usa `PATCH /usuarios/me/password`, que es el contrato backend existente.
 
+## Validación de instalación y builds
+
+- `pnpm install --offline --ignore-scripts --frozen-lockfile` confirmó que el lockfile resuelve y que el store local contiene los paquetes.
+- El store está en `F:\.pnpm-store\v11`; no hubo descargas durante las pruebas.
+- La instalación global quedó interrumpida durante el enlazado de `node_modules` (51/1.597 paquetes en la última ejecución). La instalación filtrada del backend alcanzó 815/815 paquetes del virtual store, pero no creó enlaces utilizables de `backend/node_modules/.bin` mientras el workspace raíz quedó incompleto.
+- No se ejecutaron builds/typechecks verificables: los comandos de pnpm desde la raíz vuelven a preparar el workspace completo antes de ejecutar scripts.
+
 ## Bloqueos pendientes
 
-- El formulario web de registro no envía `empresaId`, pero `RegisterDto` lo exige y además valida UUID. Los campos `empresaNombre` y `empresaCuit` del formulario no son aceptados por el backend. Resolverlo requiere una decisión de negocio sobre alta de empresa; no se inventó esa lógica.
-- El cambio de contraseña administrativa de la pantalla de usuarios llama una ruta inexistente (`/usuarios/:id/password`) y requiere definir el contrato/permiso antes de implementarlo.
-- La compilación final queda pendiente de que termine la instalación de los 1.597 paquetes del workspace; no se declara éxito sin esa verificación.
+- El registro público no recibe `empresaId` ni `rol`: usa `PUBLIC_REGISTRATION_EMPRESA_ID` del servidor y asigna `TECNICO`. Si la variable no está configurada, el endpoint queda deshabilitado.
+- El cambio de contraseña administrativa usa `PATCH /usuarios/:id/password`, protegido para `ADMIN_EMPRESA`, limitado a la misma empresa e invalidando refresh tokens.
+- La compilación final queda pendiente de completar el enlazado de los 1.597 paquetes del workspace; no se declara éxito sin esa verificación.
 
 ## Base de datos
 
 No se ejecutaron migraciones, seeds, resets ni operaciones destructivas.
+
+## Siguiente verificación
+
+Completar el enlazado global en una unidad local o con la exclusión de antivirus aplicada al workspace/store; luego ejecutar los builds y typechecks desde este mismo checkout.

@@ -2,13 +2,9 @@ import {
   IsEmail,
   IsString,
   MinLength,
-  IsUUID,
-  IsEnum,
-  IsOptional,
   Matches,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Rol } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({
@@ -46,19 +42,4 @@ export class RegisterDto {
   @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
   apellido: string;
 
-  @ApiProperty({
-    example: '550e8400-e29b-41d4-a716-446655440000',
-    description: 'ID de la empresa',
-  })
-  @IsUUID('4', { message: 'El ID de empresa debe ser un UUID válido' })
-  empresaId: string;
-
-  @ApiPropertyOptional({
-    enum: Rol,
-    default: Rol.TECNICO,
-    description: 'Rol del usuario en el sistema',
-  })
-  @IsOptional()
-  @IsEnum(Rol, { message: 'El rol debe ser uno de: ADMIN_EMPRESA, SUPERVISOR, TECNICO' })
-  rol?: Rol;
 }

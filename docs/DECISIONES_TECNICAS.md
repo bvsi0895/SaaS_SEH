@@ -14,7 +14,7 @@ NestJS ya genera el documento OpenAPI en `/api/docs`. La decisión es usar ese d
 
 ## Registro
 
-No se altera el flujo de registro para crear empresas automáticamente: eso sería una nueva decisión funcional. El bloqueo se documenta para que el producto defina si el registro recibe un `empresaId` existente o si crea una empresa mediante un flujo separado.
+El registro público no acepta `empresaId` ni `rol`. El servidor usa `PUBLIC_REGISTRATION_EMPRESA_ID` y asigna `TECNICO`; sin esa variable el endpoint responde que el registro está deshabilitado. Así no se habilita selección arbitraria de empresas ni escalamiento a roles privilegiados.
 
 ## Seguridad
 

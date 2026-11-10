@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto, AuthResponseDto } from './dto';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { Rol } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -98,6 +99,11 @@ export class AuthService {
    * Registrar nuevo usuario
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+    const empresaId = this.configService.get<string>('PUBLIC_REGISTRATION_EMPRESA_ID');
+    if (!empresaId) {
+      throw new BadRequestException('El registro público no está habilitado');
+    }
+
     // Verificar que el email no existe
     const existingUser = await this.prisma.usuario.findUnique({
       where: { email: registerDto.email.toLowerCase() },
@@ -109,7 +115,7 @@ export class AuthService {
 
     // Verificar que la empresa existe y está activa
     const empresa = await this.prisma.empresa.findUnique({
-      where: { id: registerDto.empresaId },
+      where: { id: empresaId },
     });
 
     if (!empresa) {
@@ -130,8 +136,8 @@ export class AuthService {
         password: hashedPassword,
         nombre: registerDto.nombre,
         apellido: registerDto.apellido,
-        rol: registerDto.rol || 'TECNICO',
-        empresaId: registerDto.empresaId,
+        rol: Rol.TECNICO,
+        empresaId,
       },
     });
 

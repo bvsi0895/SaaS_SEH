@@ -20,6 +20,7 @@
 - Completar instalación desde lockfile.
 - Ejecutar build de backend y web, y typecheck de mobile.
 - Corregir errores de compilación sin cambiar reglas de negocio.
+- Si pnpm vuelve a bloquearse en el enlazado, mover temporalmente el checkout o el store a una unidad local autorizada; no cambiar de gestor.
 - Agregar pruebas unitarias o de integración donde el entorno permita una base de datos de prueba.
 
 ## D4 — Contratos API

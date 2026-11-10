@@ -126,8 +126,6 @@ export interface RegisterData {
   password: string;
   nombre: string;
   apellido: string;
-  empresaCuit?: string;
-  empresaNombre?: string;
 }
 
 export interface AuthResponse {

@@ -19,7 +19,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
-import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto } from './dto';
+import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto, AdminChangePasswordDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -102,6 +102,17 @@ export class UsuariosController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.usuariosService.changePassword(userId, changePasswordDto);
+  }
+
+  @Patch(':id/password')
+  @Roles(Rol.ADMIN_EMPRESA)
+  @ApiOperation({ summary: 'Cambiar contraseña de un usuario de la empresa' })
+  async adminChangePassword(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('empresaId') empresaId: string,
+    @Body() dto: AdminChangePasswordDto,
+  ) {
+    return this.usuariosService.adminChangePassword(id, empresaId, dto);
   }
 
   @Patch(':id/deactivate')
