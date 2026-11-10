@@ -15,9 +15,9 @@ incluido en `AccesoEstablecimiento`.
 
 El PDF incluye consultora, empresa, período, establecimientos incluidos,
 inspecciones completadas, hallazgos agrupados por nivel de riesgo, acciones
-correctivas por estado, resumen ejecutivo, responsable técnico y cantidad de
-fotografías asociadas. Un período sin inspecciones también produce un informe
-válido y explícito.
+correctivas por estado, resumen ejecutivo, responsable técnico, numeración de
+páginas y miniaturas proporcionales de fotografías autorizadas. Un período sin
+inspecciones también produce un informe válido y explícito.
 
 El dashboard mantiene los KPIs y tendencias existentes y acepta
 `establecimientoId` en resumen, tendencias, sectores, actividad y KPIs. La
@@ -36,12 +36,14 @@ y permite descargar el informe mensual del contexto actual.
 
 ## Limitaciones conocidas
 
-El campo `logoUrl` de la organización ya forma parte del modelo, pero la
-infraestructura existente no define todavía un almacenamiento de logos. El
-informe usa la identidad comercial textual y queda pendiente incrustar el
-binario del logo cuando exista un origen local seguro. Las fotografías se
-contabilizan como evidencias asociadas; su descarga continúa protegida por el
-endpoint autenticado de hallazgos y no se expone una URL pública desde el PDF.
+El logo se incrusta sólo si `logoUrl` apunta a un archivo bajo el almacenamiento
+local `uploads` o a un `data:image` permitido y acotado. Si falta o es inválido,
+se conserva el encabezado tipográfico y se informa la incidencia. Las URLs
+HTTP/HTTPS y `file:` son rechazadas; no se realizan solicitudes salientes.
+
+Las fotografías se leen mediante el servicio protegido de hallazgos, nunca
+desde una URL remota. Se limitan a 12 imágenes, 2 MB por imagen y 8 MB totales;
+una foto ausente, inválida o excedente se omite y se informa en el PDF.
 
 ## Verificación
 
@@ -50,5 +52,9 @@ endpoint autenticado de hallazgos y no se expone una URL pública desde el PDF.
 - PDF con el período completo de desarrollo.
 - PDF de período sin inspecciones.
 - PDF filtrado por establecimiento autorizado.
+- PDF con logo local y PDF sin logo.
+- PDF con logo remoto rechazado sin interrumpir la generación.
+- PDF con múltiples establecimientos y fotografías válidas e inválidas en la
+  suite del generador.
 - Rechazo de establecimiento inexistente.
 - Rechazo de contexto inválido.

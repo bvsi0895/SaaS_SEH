@@ -22,6 +22,8 @@ La API NestJS usa el prefijo global `/api`.
 | Finalizar inspección | POST | `/api/inspecciones/:id/finalizar` |
 | Ver PDF | GET | `/api/reportes/inspecciones/:id/pdf` |
 | Descargar PDF | GET | `/api/reportes/inspecciones/:id/pdf/download` |
+| Informe mensual profesional | GET | `/api/reportes/mensual.pdf?fechaDesde=<ISO>&fechaHasta=<ISO>&establecimientoId=<opcional>` |
+| Establecimientos autorizados | GET | `/api/auth/establecimientos` |
 
 Los payloads y respuestas completos se generan desde los DTOs NestJS y se
 exponen en Swagger. La demo requiere PostgreSQL local, migración aplicada y
@@ -33,3 +35,7 @@ El registro público no recibe `empresaId` ni `rol`; el backend asigna la
 empresa configurada por el operador y fuerza `TECNICO`. El upload acepta sólo
 JPG, PNG o WEBP, con límite de 5 MiB, y las fotografías se descargan sólo con
 JWT y pertenencia a la misma empresa.
+
+El informe mensual valida además `organizacionEmpresaId` y las restricciones de
+`AccesoEstablecimiento`. Los logos sólo se leen desde almacenamiento local
+permitido o `data:image` acotado; no se descargan URLs remotas.

@@ -108,7 +108,9 @@ Validaciones de esta fase:
   establecimiento autorizado, establecimiento inválido y contexto inválido;
 - regresiones de administración, aislamiento multiempresa y revocación: OK.
 
-Limitaciones honestas: el PDF identifica comercialmente a la consultora pero
-todavía no incrusta el binario de `logoUrl`; las fotografías se contabilizan y
-siguen protegidas por sus endpoints autenticados. No se realizó en esta fase
-una nueva prueba visual de viewport móvil exacto 390×844.
+El PDF ahora incrusta logos locales permitidos o usa encabezado tipográfico si
+no hay logo. Las fotografías autorizadas se incrustan como miniaturas con
+límites de memoria y paginación; las ausentes se informan sin bloquear el PDF.
+La prueba visual real confirmó dashboard y descarga en el escritorio disponible,
+pero no se pudo fijar exactamente 390×844 ni 1440×900 porque no hay Playwright
+instalado y el navegador integrado no expone emulación de viewport.
