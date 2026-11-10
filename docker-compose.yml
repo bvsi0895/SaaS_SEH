@@ -10,8 +10,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-seh_demo}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seh_user} -d ${POSTGRES_DB:-seh_demo}"]
       interval: 10s
@@ -19,6 +17,12 @@ services:
       retries: 5
     networks:
       - seh-network
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   # Backend NestJS
   backend:
@@ -38,8 +42,6 @@ services:
       STORAGE_TYPE: local
       UPLOAD_DIR: ./uploads
       PORT: 3000
-    ports:
-      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +55,12 @@ services:
       - seh-network
     volumes:
       - seh_uploads:/app/uploads
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   # Frontend Web React
   web:
@@ -64,11 +72,22 @@ services:
     container_name: seh-web
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:${WEB_HOST_PORT:-8080}:80"
     depends_on:
       - backend
     networks:
       - seh-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   # Adminer - Administrador de base de datos (opcional, para desarrollo)
   adminer:
@@ -76,7 +95,7 @@ services:
     container_name: seh-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:18080:8080"
     depends_on:
       - postgres
     networks:

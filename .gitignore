@@ -9,6 +9,11 @@ node_modules/
 
 # Testing
 coverage/
+
+# Respaldos locales de desarrollo/demo (nunca versionar)
+backups/
+test-results/
+playwright-report/
 *.lcov
 .nyc_output
 

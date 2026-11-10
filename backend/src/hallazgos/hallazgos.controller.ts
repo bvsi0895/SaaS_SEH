@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -90,7 +89,7 @@ export class HallazgosController {
   @ApiResponse({ status: 200, description: 'Hallazgo encontrado' })
   @ApiResponse({ status: 404, description: 'Hallazgo no encontrado' })
   async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
@@ -123,7 +122,7 @@ export class HallazgosController {
   )
   @ApiOperation({ summary: 'Subir fotografía de un hallazgo' })
   async uploadPhoto(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @UploadedFile() file?: { buffer: Buffer; originalname: string },
@@ -137,7 +136,7 @@ export class HallazgosController {
   @Get(':id/fotos/:filename')
   @ApiOperation({ summary: 'Obtener fotografía autorizada de un hallazgo' })
   async getPhoto(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Param('filename') filename: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -152,7 +151,7 @@ export class HallazgosController {
   @ApiResponse({ status: 200, description: 'Hallazgo actualizado' })
   @ApiResponse({ status: 400, description: 'Inspección finalizada' })
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() updateHallazgoDto: UpdateHallazgoDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -165,7 +164,7 @@ export class HallazgosController {
   @ApiResponse({ status: 200, description: 'Hallazgo eliminado' })
   @ApiResponse({ status: 400, description: 'No se puede eliminar' })
   async remove(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {

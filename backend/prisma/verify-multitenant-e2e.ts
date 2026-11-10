@@ -99,7 +99,8 @@ async function main() {
     const hallazgoB = await json('/hallazgos', { method: 'POST', headers: { ...headersB, 'Content-Type': 'application/json' }, body: JSON.stringify({ inspeccionId: inspectionB.id, titulo: 'Hallazgo B', descripcion: 'Hallazgo aislado de B', nivelRiesgo: 'MEDIO', ubicacionTexto: 'Sector B' }) }, 201);
 
     const form = new FormData();
-    form.append('file', new Blob([Buffer.from('fake-png')], { type: 'image/png' }), 'e2e.png');
+    const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    form.append('file', new Blob([onePixelPng], { type: 'image/png' }), 'e2e.png');
     const photo = await json(`/hallazgos/${hallazgoA.id}/fotos`, { method: 'POST', headers: authHeaders(loginA.accessToken, ids.linkA), body: form }, 201);
     const filename = JSON.parse(photo.fotosUrls).map((value: string) => value.split('/').pop()).pop();
     await request(`/hallazgos/${hallazgoA.id}/fotos/${filename}`, { headers: headersA });

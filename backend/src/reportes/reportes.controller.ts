@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import {
   ApiTags,
@@ -32,7 +32,7 @@ export class ReportesController {
   })
   @ApiResponse({ status: 404, description: 'Inspección no encontrada' })
   async getPDFInspeccion(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Res() res: Response,
@@ -53,7 +53,7 @@ export class ReportesController {
   @ApiProduces('application/pdf')
   @ApiResponse({ status: 200, description: 'PDF descargado' })
   async downloadPDFInspeccion(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Res() res: Response,

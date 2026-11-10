@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -86,7 +85,7 @@ export class InspeccionesController {
   @ApiResponse({ status: 200, description: 'Inspección encontrada' })
   @ApiResponse({ status: 404, description: 'Inspección no encontrada' })
   async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
@@ -97,7 +96,7 @@ export class InspeccionesController {
   @ApiOperation({ summary: 'Obtener resumen de inspección' })
   @ApiResponse({ status: 200, description: 'Resumen de inspección' })
   async getResumen(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
@@ -121,7 +120,7 @@ export class InspeccionesController {
   @ApiOperation({ summary: 'Actualizar inspección' })
   @ApiResponse({ status: 200, description: 'Inspección actualizada' })
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() updateInspeccionDto: UpdateInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -133,7 +132,7 @@ export class InspeccionesController {
   @ApiOperation({ summary: 'Registrar cumplimiento de un item' })
   @ApiResponse({ status: 200, description: 'Item actualizado' })
   async registrarItem(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() registrarItemDto: RegistrarItemDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -145,7 +144,7 @@ export class InspeccionesController {
   @ApiOperation({ summary: 'Registrar múltiples items de una vez' })
   @ApiResponse({ status: 200, description: 'Items actualizados' })
   async registrarMultiplesItems(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() registrarDto: RegistrarMultiplesItemsDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -158,7 +157,7 @@ export class InspeccionesController {
   @ApiResponse({ status: 200, description: 'Inspección finalizada' })
   @ApiResponse({ status: 400, description: 'Inspección ya finalizada' })
   async finalizar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() finalizarDto: FinalizarInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
@@ -170,7 +169,7 @@ export class InspeccionesController {
   @ApiOperation({ summary: 'Cancelar inspección' })
   @ApiResponse({ status: 200, description: 'Inspección cancelada' })
   async cancelar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
