@@ -176,8 +176,10 @@ pero no son autoridad. El contexto nuevo debe incluir
 `organizacionId`, `organizacionEmpresaId` y, si corresponde,
 `establecimientoId`; el servidor vuelve a validarlos en cada operación sensible.
 
-Endpoints de contexto previstos: `GET /api/contextos`,
-`POST /api/contextos/empresa` y `POST /api/contextos/establecimiento`.
+Endpoint disponible en esta etapa: `GET /api/auth/contextos`. Los endpoints de
+selección persistente de empresa y establecimiento quedan pendientes de la
+integración web/mobile; no se debe inferir un cambio de contexto sólo desde un
+identificador enviado por el frontend.
 
 ## Compatibilidad con la demo
 

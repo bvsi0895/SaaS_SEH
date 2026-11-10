@@ -110,4 +110,8 @@ Builds y typecheck:
 4. La migración inicial debe corregirse en una fase separada para que
    `prisma migrate dev` reproduzca correctamente el shadow database sin
    depender de `migrate deploy`.
+5. Prisma mantiene una columna nullable `usuarioId` técnica en
+   `AccesoEmpresa` por la relación inversa legacy; la autorización no la usa,
+   pero debe normalizarse en una migración aditiva posterior para que el único
+   vínculo de usuario sea la membresía organizacional.
 
