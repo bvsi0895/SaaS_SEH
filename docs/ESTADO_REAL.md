@@ -2,6 +2,8 @@
 
 Fecha de corte: 2026-11-09
 Rama de estabilización: `feature/estabilizacion-mvp`
+Ubicación definitiva de desarrollo: `D:\Proyectos\SEH`
+Respaldo preservado: `F:\4-Trabajos\Portafolio\Proyecto SEH\SEH`
 
 ## Inventario
 
