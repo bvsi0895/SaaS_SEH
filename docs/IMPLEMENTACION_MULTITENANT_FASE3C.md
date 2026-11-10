@@ -99,19 +99,19 @@ Builds y typecheck:
 - Web: OK; Vite emitió sólo la advertencia existente de chunk mayor a 500 kB.
 - Mobile TypeScript: OK.
 
-## Riesgos pendientes
+## Estado histórico y cierre de pendientes en Fase 3D
 
-1. El selector de contexto múltiple todavía expone la lista de contextos, pero
-   la selección persistente por sesión/header debe integrarse en web y mobile.
-2. Las operaciones de edición de items de checklist deben completar la misma
-   verificación de ámbito antes de considerarse endurecidas.
-3. Debe añadirse una prueba HTTP e2e con dos tokens reales y endpoints de
-   fotografía/PDF, además de los tests de servicio y la verificación SQL.
-4. La migración inicial debe corregirse en una fase separada para que
-   `prisma migrate dev` reproduzca correctamente el shadow database sin
-   depender de `migrate deploy`.
-5. Prisma mantiene una columna nullable `usuarioId` técnica en
-   `AccesoEmpresa` por la relación inversa legacy; la autorización no la usa,
-   pero debe normalizarse en una migración aditiva posterior para que el único
-   vínculo de usuario sea la membresía organizacional.
+1. Fase 3D integró el selector persistente en web/mobile y la validación del
+   header en backend.
+2. Las operaciones de edición, eliminación y reorder de ítems validan el
+   ámbito del checklist padre.
+3. El E2E HTTP con dos tokens reales cubre fotografía, PDF y accesos cruzados.
+4. El orden de migraciones se corrigió renombrando la inicial a
+   `20261110000000_init`; `migrate deploy`, `migrate status` y shadow database
+   fueron verificados en una base nueva.
+5. `AccesoEmpresa.usuarioId` fue eliminado mediante migración aditiva con
+   precondición de datos no nulos; la relación vigente es la membresía.
+
+Los riesgos residuales y la suite final están documentados en
+`docs/VALIDACION_MULTITENANT_FASE3D.md`.
 

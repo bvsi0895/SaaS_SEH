@@ -1,6 +1,6 @@
 # Arquitectura multiempresa de SEH
 
-Estado: diseño aprobado conceptualmente para implementación posterior.
+Estado: diseño aprobado e implementado parcialmente; la validación de Fase 3D se documenta en `docs/VALIDACION_MULTITENANT_FASE3D.md`.
 Rama: `feature/multitenant-seguridad`.
 Base de diseño: `e9de9b6`.
 Migraciones aplicadas: ninguna.
@@ -176,10 +176,10 @@ pero no son autoridad. El contexto nuevo debe incluir
 `organizacionId`, `organizacionEmpresaId` y, si corresponde,
 `establecimientoId`; el servidor vuelve a validarlos en cada operación sensible.
 
-Endpoint disponible en esta etapa: `GET /api/auth/contextos`. Los endpoints de
-selección persistente de empresa y establecimiento quedan pendientes de la
-integración web/mobile; no se debe inferir un cambio de contexto sólo desde un
-identificador enviado por el frontend.
+`GET /api/auth/contextos` devuelve los contextos autorizados. Web y mobile
+persisten únicamente la preferencia `organizacionEmpresaId` y la envían como
+selector. El backend la vuelve a validar en cada operación mediante el guard;
+la preferencia del cliente nunca es autoridad.
 
 ## Compatibilidad con la demo
 
