@@ -7,6 +7,7 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix('api');
 
   // Configuración global de validación
   app.useGlobalPipes(
@@ -48,7 +49,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('docs', app, document);
 
   // Puerto desde variable de entorno
   const port = process.env.PORT || 3000;

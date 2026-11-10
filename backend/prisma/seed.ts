@@ -13,9 +13,6 @@ async function main() {
     create: {
       nombre: 'Empresa Demo S.A.',
       cuit: '30-71234567-8',
-      direccion: 'Av. Corrientes 1234, CABA',
-      telefono: '+54 11 4567-8901',
-      email: 'contacto@empresademo.com.ar',
       activa: true,
     },
   });
@@ -92,7 +89,7 @@ async function main() {
       id: 'checklist-seguridad-general',
       nombre: 'Inspección de Seguridad General',
       descripcion: 'Checklist para verificar condiciones generales de seguridad en el área de trabajo',
-      tipo: TipoChecklist.SEGURIDAD,
+      tipo: TipoChecklist.GENERAL,
       empresaId: empresa.id,
       activo: true,
       items: {
@@ -120,7 +117,7 @@ async function main() {
       id: 'checklist-higiene-industrial',
       nombre: 'Inspección de Higiene Industrial',
       descripcion: 'Verificación de condiciones de higiene en áreas productivas',
-      tipo: TipoChecklist.HIGIENE,
+      tipo: TipoChecklist.ORDEN_LIMPIEZA,
       empresaId: empresa.id,
       activo: true,
       items: {
@@ -227,6 +224,7 @@ async function main() {
       empresaId: empresa.id,
       hallazgoId: hallazgo1.id,
       responsableId: supervisor.id,
+      creadorId: supervisor.id,
     },
   });
 
@@ -238,6 +236,7 @@ async function main() {
       empresaId: empresa.id,
       hallazgoId: hallazgo2.id,
       responsableId: supervisor.id,
+      creadorId: supervisor.id,
     },
   });
   console.log('✅ Acciones correctivas creadas');

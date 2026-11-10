@@ -1,6 +1,6 @@
 // Enums
 export type Rol = 'ADMIN_EMPRESA' | 'SUPERVISOR' | 'TECNICO';
-export type TipoChecklist = 'SEGURIDAD' | 'HIGIENE' | 'AMBIENTAL' | 'EPP' | 'INCENDIO' | 'OTRO';
+export type TipoChecklist = 'GENERAL' | 'EPP' | 'ORDEN_LIMPIEZA' | 'RIESGO_QUIMICO' | 'MAQUINARIA' | 'ERGONOMIA' | 'INCENDIO' | 'OTRO';
 export type EstadoInspeccion = 'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA';
 export type CumplimientoItem = 'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA' | 'OBSERVACION';
 export type NivelRiesgo = 'BAJO' | 'MEDIO' | 'ALTO' | 'CRITICO';

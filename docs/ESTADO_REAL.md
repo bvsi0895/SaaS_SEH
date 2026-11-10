@@ -5,6 +5,14 @@ Rama de estabilización: `feature/estabilizacion-mvp`
 Ubicación definitiva de desarrollo: `D:\Proyectos\SEH`
 Respaldo preservado: `F:\4-Trabajos\Portafolio\Proyecto SEH\SEH`
 
+## Fase 2 — estado de integración
+
+- Prefijo global corregido a `/api`; Swagger queda disponible en `/api/docs`.
+- Clientes web/mobile alineados con métodos y rutas reales de inspecciones, hallazgos, acciones y checklists.
+- Migración inicial versionada en `backend/prisma/migrations/20261110_init/migration.sql`.
+- Seed corregido y validado estáticamente contra el schema Prisma.
+- Docker Desktop no está disponible y `localhost:5432` no tiene PostgreSQL escuchando; por eso no se ejecutaron migración, seed ni recorrido real con datos.
+
 ## Inventario
 
 - `backend`: NestJS 10, Prisma 5, PostgreSQL, JWT y Swagger/OpenAPI.

@@ -38,6 +38,7 @@ enum EstadoInspeccion {
 }
 
 enum CumplimientoItem {
+  PENDIENTE
   CUMPLE
   NO_CUMPLE
   NO_APLICA
@@ -66,6 +67,9 @@ model Empresa {
   id        String   @id @default(uuid())
   nombre    String
   cuit      String?  @unique
+  direccion String?
+  telefono  String?
+  email     String?
   logoUrl   String?
   activa    Boolean  @default(true)
   createdAt DateTime @default(now())

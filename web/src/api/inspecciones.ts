@@ -44,8 +44,8 @@ export const inspeccionesApi = {
     data: RegistrarItemDto
   ): Promise<InspeccionItem> => {
     const response = await apiClient.patch<InspeccionItem>(
-      `/inspecciones/${inspeccionId}/items/${itemId}`,
-      data
+      `/inspecciones/${inspeccionId}/item`,
+      { inspeccionItemId: itemId, ...data }
     );
     return response.data;
   },
@@ -61,12 +61,12 @@ export const inspeccionesApi = {
   },
 
   getMisInspecciones: async (): Promise<Inspeccion[]> => {
-    const response = await apiClient.get<Inspeccion[]>('/inspecciones/mis-inspecciones');
+    const response = await apiClient.get<Inspeccion[]>('/inspecciones/me');
     return response.data;
   },
 
   getEnProgreso: async (): Promise<Inspeccion[]> => {
-    const response = await apiClient.get<Inspeccion[]>('/inspecciones/en-progreso');
+    const response = await apiClient.get<Inspeccion[]>('/inspecciones/me', { params: { estado: 'EN_PROGRESO' } });
     return response.data;
   },
 

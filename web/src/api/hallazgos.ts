@@ -40,7 +40,7 @@ export const hallazgosApi = {
   },
 
   update: async (id: string, data: UpdateHallazgoDto): Promise<Hallazgo> => {
-    const response = await apiClient.patch<Hallazgo>(`/hallazgos/${id}`, data);
+    const response = await apiClient.put<Hallazgo>(`/hallazgos/${id}`, data);
     return response.data;
   },
 
@@ -49,12 +49,12 @@ export const hallazgosApi = {
   },
 
   getByInspeccion: async (inspeccionId: string): Promise<Hallazgo[]> => {
-    const response = await apiClient.get<Hallazgo[]>(`/hallazgos/inspeccion/${inspeccionId}`);
+    const response = await apiClient.get<Hallazgo[]>('/hallazgos', { params: { inspeccionId } });
     return response.data;
   },
 
   getCriticos: async (): Promise<Hallazgo[]> => {
-    const response = await apiClient.get<Hallazgo[]>('/hallazgos/criticos');
+    const response = await apiClient.get<Hallazgo[]>('/hallazgos', { params: { nivelRiesgo: 'CRITICO' } });
     return response.data;
   },
 };

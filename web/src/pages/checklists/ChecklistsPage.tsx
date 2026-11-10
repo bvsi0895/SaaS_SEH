@@ -31,10 +31,12 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { Checklist, TipoChecklist } from '../../types';
 
 const tipoColors: Record<TipoChecklist, string> = {
-  SEGURIDAD: '#1976d2',
-  HIGIENE: '#2e7d32',
-  AMBIENTAL: '#00796b',
+  GENERAL: '#1976d2',
   EPP: '#7b1fa2',
+  ORDEN_LIMPIEZA: '#2e7d32',
+  RIESGO_QUIMICO: '#ef6c00',
+  MAQUINARIA: '#455a64',
+  ERGONOMIA: '#00838f',
   INCENDIO: '#d32f2f',
   OTRO: '#757575',
 };
@@ -52,7 +54,7 @@ export default function ChecklistsPage() {
   const [formData, setFormData] = useState<CreateChecklistDto>({
     nombre: '',
     descripcion: '',
-    tipo: 'SEGURIDAD',
+    tipo: 'GENERAL',
   });
 
   const { data: checklists, isLoading } = useQuery({
@@ -133,7 +135,7 @@ export default function ChecklistsPage() {
         action={{
           label: 'Nuevo Checklist',
           onClick: () => {
-            setFormData({ nombre: '', descripcion: '', tipo: 'SEGURIDAD' });
+            setFormData({ nombre: '', descripcion: '', tipo: 'GENERAL' });
             setCreateDialogOpen(true);
           },
           icon: 'add',

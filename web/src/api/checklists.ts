@@ -33,7 +33,7 @@ export const checklistsApi = {
   },
 
   update: async (id: string, data: Partial<CreateChecklistDto>): Promise<Checklist> => {
-    const response = await apiClient.patch<Checklist>(`/checklists/${id}`, data);
+    const response = await apiClient.put<Checklist>(`/checklists/${id}`, data);
     return response.data;
   },
 
@@ -42,7 +42,7 @@ export const checklistsApi = {
   },
 
   duplicate: async (id: string, nombre: string): Promise<Checklist> => {
-    const response = await apiClient.post<Checklist>(`/checklists/${id}/duplicar`, { nombre });
+    const response = await apiClient.post<Checklist>(`/checklists/${id}/duplicate`, { nombre });
     return response.data;
   },
 
@@ -53,22 +53,22 @@ export const checklistsApi = {
   },
 
   updateItem: async (
-    checklistId: string,
+    _checklistId: string,
     itemId: string,
     data: Partial<CreateChecklistItemDto>
   ): Promise<ChecklistItem> => {
     const response = await apiClient.patch<ChecklistItem>(
-      `/checklists/${checklistId}/items/${itemId}`,
+      `/checklists/items/${itemId}`,
       data
     );
     return response.data;
   },
 
-  deleteItem: async (checklistId: string, itemId: string): Promise<void> => {
-    await apiClient.delete(`/checklists/${checklistId}/items/${itemId}`);
+  deleteItem: async (_checklistId: string, itemId: string): Promise<void> => {
+    await apiClient.delete(`/checklists/items/${itemId}`);
   },
 
   reorderItems: async (checklistId: string, data: ReorderItemsDto): Promise<void> => {
-    await apiClient.patch(`/checklists/${checklistId}/items/reordenar`, data);
+    await apiClient.patch(`/checklists/${checklistId}/reorder`, data.items);
   },
 };
