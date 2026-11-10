@@ -20,6 +20,24 @@ enum Rol {
   TECNICO
 }
 
+enum TipoOrganizacion {
+  PROFESIONAL_INDEPENDIENTE
+  CONSULTORA
+  PYME
+}
+
+enum RolOrganizacion {
+  OWNER
+  ADMIN_ORGANIZACION
+  AUDITOR_ORGANIZACION
+}
+
+enum EstadoRelacionEmpresa {
+  ACTIVA
+  SUSPENDIDA
+  REVOCADA
+}
+
 enum TipoChecklist {
   GENERAL
   EPP
@@ -76,35 +94,39 @@ model Empresa {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  usuarios           Usuario[]
-  checklists         Checklist[]
-  inspecciones       Inspeccion[]
+  usuarios            Usuario[]
+  checklists          Checklist[]
+  inspecciones        Inspeccion[]
   accionesCorrectivas AccionCorrectiva[]
+  organizaciones      OrganizacionEmpresa[]
+  establecimientos    Establecimiento[]
 
   @@map("empresas")
 }
 
 model Usuario {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  password        String   // Hash bcrypt
-  nombre          String
-  apellido        String
-  rol             Rol      @default(TECNICO)
-  activo          Boolean  @default(true)
-  ultimoAcceso    DateTime?
-  refreshToken    String?  // Para JWT refresh
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String // Hash bcrypt
+  nombre       String
+  apellido     String
+  rol          Rol       @default(TECNICO)
+  activo       Boolean   @default(true)
+  ultimoAcceso DateTime?
+  refreshToken String? // Para JWT refresh
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relación con empresa
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   // Relaciones
-  inspecciones        Inspeccion[]
-  accionesAsignadas   AccionCorrectiva[] @relation("AccionAsignada")
-  accionesCreadoras   AccionCorrectiva[] @relation("AccionCreador")
+  inspecciones           Inspeccion[]
+  accionesAsignadas      AccionCorrectiva[]    @relation("AccionAsignada")
+  accionesCreadoras      AccionCorrectiva[]    @relation("AccionCreador")
+  membresiasOrganizacion OrganizacionMiembro[]
+  accesosEmpresa         AccesoEmpresa[]
 
   @@index([email])
   @@index([empresaId])
@@ -112,17 +134,19 @@ model Usuario {
 }
 
 model Checklist {
-  id          String         @id @default(uuid())
+  id          String        @id @default(uuid())
   nombre      String
   descripcion String?
-  tipo        TipoChecklist  @default(GENERAL)
-  activo      Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  tipo        TipoChecklist @default(GENERAL)
+  activo      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   // Relación con empresa
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId             String
+  empresa               Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  organizacionEmpresaId String?
+  organizacionEmpresa   OrganizacionEmpresa? @relation(fields: [organizacionEmpresaId], references: [id])
 
   // Relaciones
   items        ChecklistItem[]
@@ -136,7 +160,7 @@ model Checklist {
 model ChecklistItem {
   id          String  @id @default(uuid())
   descripcion String
-  orden       Int     // Para ordenar los items
+  orden       Int // Para ordenar los items
   obligatorio Boolean @default(true)
 
   // Relación con checklist
@@ -152,26 +176,30 @@ model ChecklistItem {
 
 model Inspeccion {
   id              String           @id @default(uuid())
-  sector          String           // Área de la planta
+  sector          String // Área de la planta
   descripcion     String?
   fechaHoraInicio DateTime         @default(now())
   fechaHoraFin    DateTime?
   estado          EstadoInspeccion @default(EN_PROGRESO)
 
   // Ubicación (opcional)
-  ubicacionTexto  String?
-  latitud         Float?
-  longitud        Float?
+  ubicacionTexto String?
+  latitud        Float?
+  longitud       Float?
 
   // Observaciones generales
-  observaciones   String?
+  observaciones String?
 
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relación con empresa
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId             String
+  empresa               Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  organizacionEmpresaId String?
+  organizacionEmpresa   OrganizacionEmpresa? @relation(fields: [organizacionEmpresaId], references: [id])
+  establecimientoId     String?
+  establecimiento       Establecimiento?     @relation(fields: [establecimientoId], references: [id])
 
   // Relación con checklist
   checklistId String
@@ -186,6 +214,8 @@ model Inspeccion {
   hallazgos Hallazgo[]
 
   @@index([empresaId])
+  @@index([organizacionEmpresaId])
+  @@index([establecimientoId])
   @@index([usuarioId])
   @@index([checklistId])
   @@index([estado])
@@ -214,17 +244,17 @@ model InspeccionItem {
 }
 
 model Hallazgo {
-  id              String      @id @default(uuid())
-  titulo          String
-  descripcion     String
-  nivelRiesgo     NivelRiesgo @default(MEDIO)
-  ubicacionTexto  String
+  id             String      @id @default(uuid())
+  titulo         String
+  descripcion    String
+  nivelRiesgo    NivelRiesgo @default(MEDIO)
+  ubicacionTexto String
 
   // Fotos (almacenamos URLs separadas por comas o JSON)
-  fotosUrls       String?     // JSON array de URLs
+  fotosUrls String? // JSON array de URLs
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relación con inspección
   inspeccionId String
@@ -239,22 +269,24 @@ model Hallazgo {
 }
 
 model AccionCorrectiva {
-  id               String       @id @default(uuid())
-  descripcion      String
-  fechaCompromiso  DateTime
-  fechaCierre      DateTime?
-  estado           EstadoAccion @default(PENDIENTE)
+  id              String       @id @default(uuid())
+  descripcion     String
+  fechaCompromiso DateTime
+  fechaCierre     DateTime?
+  estado          EstadoAccion @default(PENDIENTE)
 
   // Evidencia de cierre
-  evidenciaUrl     String?
-  notasCierre      String?
+  evidenciaUrl String?
+  notasCierre  String?
 
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relación con empresa
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresaId             String
+  empresa               Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  organizacionEmpresaId String?
+  organizacionEmpresa   OrganizacionEmpresa? @relation(fields: [organizacionEmpresaId], references: [id])
 
   // Relación con hallazgo
   hallazgoId String
@@ -270,8 +302,109 @@ model AccionCorrectiva {
   creador   Usuario @relation("AccionCreador", fields: [creadorId], references: [id])
 
   @@index([empresaId])
+  @@index([organizacionEmpresaId])
   @@index([hallazgoId])
   @@index([estado])
   @@index([fechaCompromiso])
   @@map("acciones_correctivas")
+}
+
+model Organizacion {
+  id            String                @id @default(uuid())
+  nombre        String
+  tipo          TipoOrganizacion
+  activa        Boolean               @default(true)
+  miembros      OrganizacionMiembro[]
+  empresas      OrganizacionEmpresa[]
+  creadaEn      DateTime              @default(now())
+  actualizadaEn DateTime              @updatedAt
+
+  @@index([activa])
+  @@map("organizaciones")
+}
+
+model OrganizacionMiembro {
+  id             String          @id @default(uuid())
+  organizacionId String
+  usuarioId      String
+  rol            RolOrganizacion
+  activa         Boolean         @default(true)
+  organizacion   Organizacion    @relation(fields: [organizacionId], references: [id])
+  usuario        Usuario         @relation(fields: [usuarioId], references: [id])
+  accesosEmpresa AccesoEmpresa[]
+
+  @@unique([organizacionId, usuarioId])
+  @@unique([id, organizacionId])
+  @@index([usuarioId, activa])
+  @@map("organizacion_miembros")
+}
+
+model OrganizacionEmpresa {
+  id                  String                @id @default(uuid())
+  organizacionId      String
+  empresaId           String
+  estado              EstadoRelacionEmpresa @default(ACTIVA)
+  creadaEn            DateTime              @default(now())
+  actualizadaEn       DateTime              @updatedAt
+  organizacion        Organizacion          @relation(fields: [organizacionId], references: [id])
+  empresa             Empresa               @relation(fields: [empresaId], references: [id])
+  accesos             AccesoEmpresa[]
+  checklists          Checklist[]
+  inspecciones        Inspeccion[]
+  accionesCorrectivas AccionCorrectiva[]
+
+  @@unique([organizacionId, empresaId])
+  @@unique([id, organizacionId, empresaId])
+  @@index([empresaId, estado])
+  @@index([organizacionId, estado])
+  @@map("organizacion_empresas")
+}
+
+model Establecimiento {
+  id           String                  @id @default(uuid())
+  empresaId    String
+  nombre       String
+  codigo       String?
+  direccion    String?
+  activo       Boolean                 @default(true)
+  empresa      Empresa                 @relation(fields: [empresaId], references: [id])
+  accesos      AccesoEstablecimiento[]
+  inspecciones Inspeccion[]
+
+  @@unique([empresaId, codigo])
+  @@unique([id, empresaId])
+  @@index([empresaId, activo])
+  @@map("establecimientos")
+}
+
+model AccesoEmpresa {
+  id                    String                  @id @default(uuid())
+  organizacionEmpresaId String
+  organizacionMiembroId String
+  organizacionId        String
+  empresaId             String
+  rol                   Rol
+  activo                Boolean                 @default(true)
+  organizacionEmpresa   OrganizacionEmpresa     @relation(fields: [organizacionEmpresaId, organizacionId, empresaId], references: [id, organizacionId, empresaId])
+  organizacionMiembro   OrganizacionMiembro     @relation(fields: [organizacionMiembroId, organizacionId], references: [id, organizacionId])
+  establecimientos      AccesoEstablecimiento[]
+  Usuario               Usuario?                @relation(fields: [usuarioId], references: [id])
+  usuarioId             String?
+
+  @@unique([organizacionEmpresaId, organizacionMiembroId])
+  @@index([organizacionMiembroId, activo])
+  @@index([empresaId, organizacionId, activo])
+  @@map("accesos_empresa")
+}
+
+model AccesoEstablecimiento {
+  accesoEmpresaId   String
+  establecimientoId String
+  empresaId         String
+  accesoEmpresa     AccesoEmpresa   @relation(fields: [accesoEmpresaId], references: [id])
+  establecimiento   Establecimiento @relation(fields: [establecimientoId, empresaId], references: [id, empresaId])
+
+  @@id([accesoEmpresaId, establecimientoId])
+  @@index([establecimientoId])
+  @@map("accesos_establecimiento")
 }

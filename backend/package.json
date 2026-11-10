@@ -18,6 +18,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:backfill-multitenant": "ts-node prisma/backfill-multitenant.ts",
+    "test:multitenant:isolation": "ts-node prisma/verify-multitenant-isolation.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
