@@ -17,7 +17,7 @@ export const authApi = {
   },
 
   getProfile: async (): Promise<Usuario> => {
-    const response = await apiClient.get<Usuario>('/auth/profile');
+    const response = await apiClient.get<Usuario>('/auth/me');
     return response.data;
   },
 
@@ -27,6 +27,6 @@ export const authApi = {
   },
 
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
+    await apiClient.patch('/usuarios/me/password', { currentPassword, newPassword });
   },
 };

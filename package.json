@@ -3,20 +3,15 @@
   "version": "1.0.0",
   "description": "Sistema de Seguridad e Higiene - Monorepo completo",
   "private": true,
-  "workspaces": [
-    "backend",
-    "web",
-    "mobile"
-  ],
   "scripts": {
-    "dev:backend": "pnpm --filter backend dev",
-    "dev:web": "pnpm --filter web dev",
-    "dev:mobile": "pnpm --filter mobile start",
-    "build:backend": "pnpm --filter backend build",
-    "build:web": "pnpm --filter web build",
+    "dev:backend": "pnpm --filter seh-backend dev",
+    "dev:web": "pnpm --filter seh-web dev",
+    "dev:mobile": "pnpm --filter seh-mobile start",
+    "build:backend": "pnpm --filter seh-backend build",
+    "build:web": "pnpm --filter seh-web build",
     "build:all": "pnpm -r build",
-    "test": "pnpm -r test",
-    "test:cov": "pnpm -r test:cov",
+    "test": "pnpm --filter seh-backend test",
+    "test:cov": "pnpm --filter seh-backend test:cov",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "pnpm -r clean && rm -rf node_modules"

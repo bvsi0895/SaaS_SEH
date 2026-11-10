@@ -44,14 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(credentials);
     localStorage.setItem('accessToken', response.accessToken);
     localStorage.setItem('refreshToken', response.refreshToken);
-    setUser(response.user);
+    setUser(response.usuario);
   };
 
   const register = async (data: RegisterData) => {
     const response = await authApi.register(data);
     localStorage.setItem('accessToken', response.accessToken);
     localStorage.setItem('refreshToken', response.refreshToken);
-    setUser(response.user);
+    setUser(response.usuario);
   };
 
   const logout = async () => {

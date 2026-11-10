@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(credentials);
     await SecureStore.setItemAsync('accessToken', response.accessToken);
     await SecureStore.setItemAsync('refreshToken', response.refreshToken);
-    setUser(response.user);
+    setUser(response.usuario);
   };
 
   const logout = async () => {

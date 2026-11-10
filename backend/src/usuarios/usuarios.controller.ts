@@ -47,6 +47,13 @@ export class UsuariosController {
     return this.usuariosService.findAll(empresaId, { rol, activo });
   }
 
+  @Get('tecnicos')
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @ApiOperation({ summary: 'Listar técnicos de la empresa' })
+  async findTechnicians(@CurrentUser('empresaId') empresaId: string) {
+    return this.usuariosService.findAll(empresaId, { rol: Rol.TECNICO });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
   @ApiResponse({ status: 200, description: 'Usuario encontrado' })

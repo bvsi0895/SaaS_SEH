@@ -33,7 +33,7 @@ export const usuariosApi = {
   },
 
   update: async (id: string, data: UpdateUsuarioDto): Promise<Usuario> => {
-    const response = await apiClient.patch<Usuario>(`/usuarios/${id}`, data);
+    const response = await apiClient.put<Usuario>(`/usuarios/${id}`, data);
     return response.data;
   },
 
@@ -42,7 +42,7 @@ export const usuariosApi = {
   },
 
   changePassword: async (id: string, newPassword: string): Promise<void> => {
-    await apiClient.post(`/usuarios/${id}/cambiar-password`, { newPassword });
+    await apiClient.patch(`/usuarios/${id}/password`, { newPassword });
   },
 
   getTecnicos: async (): Promise<Usuario[]> => {
