@@ -44,8 +44,11 @@ export class EmpresasController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener mi empresa' })
   @ApiResponse({ status: 200, description: 'Datos de la empresa' })
-  async getMyEmpresa(@CurrentUser('empresaId') empresaId: string) {
-    return this.empresasService.findOne(empresaId);
+  async getMyEmpresa(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+  ) {
+    return this.empresasService.findOne(empresaId, organizacionEmpresaId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,12 +74,13 @@ export class EmpresasController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
     // Solo puede ver su propia empresa
     if (id !== empresaId) {
-      return this.empresasService.findOne(empresaId);
+      return this.empresasService.findOne(empresaId, organizacionEmpresaId);
     }
-    return this.empresasService.findOne(id);
+    return this.empresasService.findOne(id, organizacionEmpresaId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

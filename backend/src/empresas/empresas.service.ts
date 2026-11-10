@@ -38,7 +38,7 @@ export class EmpresasService {
   /**
    * Obtener empresa por ID
    */
-  async findOne(id: string) {
+  async findOne(id: string, organizacionEmpresaId?: string) {
     const empresa = await this.prisma.empresa.findUnique({
       where: { id },
       include: {
@@ -55,6 +55,22 @@ export class EmpresasService {
 
     if (!empresa) {
       throw new NotFoundException('Empresa no encontrada');
+    }
+
+    if (organizacionEmpresaId) {
+      const [usuarios, checklists, inspecciones, accionesCorrectivas] = await Promise.all([
+        this.prisma.usuario.count({
+          where: { empresaId: id, membresiasOrganizacion: { some: { organizacion: { empresas: { some: { id: organizacionEmpresaId } } }, activa: true } } },
+        }),
+        this.prisma.checklist.count({ where: { empresaId: id, organizacionEmpresaId } }),
+        this.prisma.inspeccion.count({ where: { empresaId: id, organizacionEmpresaId } }),
+        this.prisma.accionCorrectiva.count({ where: { empresaId: id, organizacionEmpresaId } }),
+      ]);
+
+      return {
+        ...empresa,
+        _count: { usuarios, checklists, inspecciones, accionesCorrectivas },
+      };
     }
 
     return empresa;

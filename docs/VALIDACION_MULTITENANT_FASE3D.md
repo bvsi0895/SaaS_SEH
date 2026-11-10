@@ -8,7 +8,7 @@ Base de trabajo: `da8418e`
 
 La validación HTTP real contra el backend y PostgreSQL local demostró aislamiento entre dos organizaciones vinculadas a la misma empresa: login, contextos, checklists, inspecciones, hallazgos, fotografía, PDF y accesos cruzados rechazados.
 
-La fase no se declara cerrada todavía: queda pendiente una revisión específica de los endpoints administrativos que todavía exponen la entidad compartida `Empresa` por diseño legacy.
+La entidad base `Empresa` continúa compartida por diseño; sus conteos operativos en `GET /empresas/me` y `GET /empresas/:id` quedan filtrados por el contexto activo.
 
 ## Cambios realizados
 
@@ -17,6 +17,7 @@ La fase no se declara cerrada todavía: queda pendiente una revisión específic
 - El cambio de contexto limpia la caché de consultas y la sesión limpia la preferencia persistida.
 - Las operaciones de checklist protegen también actualización, eliminación y reorder de ítems.
 - Usuarios y estadísticas de empresa se filtran por el contexto de organización activo cuando corresponde.
+- Los endpoints de empresa no exponen conteos operativos de otra organización vinculada al mismo cliente.
 - `AccesoEmpresa.usuarioId` fue eliminado. La relación canónica es `AccesoEmpresa.organizacionMiembroId`.
 
 ## Prisma y migraciones
@@ -71,6 +72,6 @@ El `finally` elimina los registros temporales. La comprobación posterior devolv
 
 ## Riesgos y pendientes
 
-1. La entidad `Empresa` es compartida deliberadamente entre organizaciones. Los endpoints administrativos que devuelven sus datos base deben seguir revisándose para no incluir conteos operativos globales.
+1. La entidad `Empresa` es compartida deliberadamente; los datos base no son expedientes operativos y los conteos de los endpoints de contexto sí están aislados.
 2. La migración quedó verificada en una base nueva y aplicada en desarrollo; no se aplicó ninguna base productiva.
 3. No se modificó el modelo comercial, ni se incorporaron offline, IA, merge o deploy.
