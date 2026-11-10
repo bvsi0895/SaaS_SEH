@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   Box,
   Grid,
@@ -12,6 +13,11 @@ import {
   ListItemText,
   ListItemAvatar,
   Avatar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
 } from '@mui/material';
 import {
   Assignment as InspeccionIcon,
@@ -34,6 +40,7 @@ import {
   Bar,
 } from 'recharts';
 import { dashboardApi } from '../../api/dashboard';
+import { reportesApi } from '../../api/reportes';
 import PageHeader from '../../components/common/PageHeader';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -89,26 +96,55 @@ function KPICard({ title, value, subtitle, icon, color, trend }: KPICardProps) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [establecimientoId, setEstablecimientoId] = useState('');
+  const [generandoInforme, setGenerandoInforme] = useState(false);
+  const filters = establecimientoId ? { establecimientoId } : undefined;
+  const { data: establecimientos = [] } = useQuery({
+    queryKey: ['reportes', 'establecimientos'],
+    queryFn: reportesApi.getEstablecimientos,
+  });
 
   const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard', 'kpis'],
-    queryFn: dashboardApi.getKPIs,
+    queryKey: ['dashboard', 'kpis', establecimientoId],
+    queryFn: () => dashboardApi.getKPIs(filters),
   });
 
   const { data: tendencias, isLoading: tendenciasLoading } = useQuery({
-    queryKey: ['dashboard', 'tendencias'],
-    queryFn: () => dashboardApi.getTendencias(6),
+    queryKey: ['dashboard', 'tendencias', establecimientoId],
+    queryFn: () => dashboardApi.getTendencias(6, filters),
   });
 
   const { data: topSectores } = useQuery({
-    queryKey: ['dashboard', 'topSectores'],
-    queryFn: () => dashboardApi.getTopSectores(5),
+    queryKey: ['dashboard', 'topSectores', establecimientoId],
+    queryFn: () => dashboardApi.getTopSectores(5, filters),
   });
 
   const { data: actividad } = useQuery({
-    queryKey: ['dashboard', 'actividad'],
-    queryFn: () => dashboardApi.getActividadReciente(10),
+    queryKey: ['dashboard', 'actividad', establecimientoId],
+    queryFn: () => dashboardApi.getActividadReciente(10, filters),
   });
+
+  const descargarInforme = async () => {
+    setGenerandoInforme(true);
+    try {
+      const now = new Date();
+      const desde = new Date(now.getFullYear(), now.getMonth(), 1);
+      const hasta = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const blob = await reportesApi.descargarInformeMensual({
+        fechaDesde: desde.toISOString(),
+        fechaHasta: hasta.toISOString(),
+        ...(establecimientoId ? { establecimientoId } : {}),
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `informe-mensual-${desde.toISOString().slice(0, 7)}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setGenerandoInforme(false);
+    }
+  };
 
   const calcularTrend = () => {
     if (!kpis) return 0;
@@ -126,6 +162,26 @@ export default function DashboardPage() {
         title={`Bienvenido, ${user?.nombre}`}
         subtitle="Resumen de actividad del sistema"
       />
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 240 }}>
+            <InputLabel id="dashboard-establecimiento-label">Establecimiento</InputLabel>
+            <Select
+              labelId="dashboard-establecimiento-label"
+              value={establecimientoId}
+              label="Establecimiento"
+              onChange={(event) => setEstablecimientoId(event.target.value)}
+            >
+              <MenuItem value="">Todos los autorizados</MenuItem>
+              {establecimientos.map((item) => <MenuItem key={item.id} value={item.id}>{item.nombre}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={descargarInforme} disabled={generandoInforme}>
+            {generandoInforme ? 'Generando…' : 'Descargar informe mensual'}
+          </Button>
+        </Box>
+      </Paper>
 
       {/* KPIs */}
       <Grid container spacing={3} sx={{ mb: 4 }}>

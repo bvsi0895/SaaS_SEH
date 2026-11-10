@@ -1,15 +1,17 @@
 import apiClient from './client';
 import type { DashboardKPIs, DashboardTrend, TopSector, ActividadReciente } from '../types';
 
+export interface DashboardFilters { establecimientoId?: string; }
+
 export const dashboardApi = {
-  getKPIs: async (): Promise<DashboardKPIs> => {
+  getKPIs: async (filters?: DashboardFilters): Promise<DashboardKPIs> => {
     const [kpisResponse, resumenResponse] = await Promise.all([
-      apiClient.get<{ inspeccionesMes: number; variacionMensual: number }>('/dashboard/kpis'),
+      apiClient.get<{ inspeccionesMes: number; variacionMensual: number }>('/dashboard/kpis', { params: filters }),
       apiClient.get<{
         inspecciones: { porcentajeCumplimiento: number };
         hallazgos: { total: number; porNivel: Record<string, number> };
         accionesCorrectivas: { porEstado: Record<string, number>; vencidas: number };
-      }>('/dashboard/resumen'),
+      }>('/dashboard/resumen', { params: filters }),
     ]);
     const resumen = resumenResponse.data;
     const accionesPendientes =
@@ -28,11 +30,11 @@ export const dashboardApi = {
     };
   },
 
-  getTendencias: async (meses?: number): Promise<DashboardTrend[]> => {
+  getTendencias: async (meses?: number, filters?: DashboardFilters): Promise<DashboardTrend[]> => {
     const response = await apiClient.get<{
       inspecciones: Record<string, number>;
       hallazgos: Record<string, number>;
-    }>('/dashboard/tendencias', { params: { meses } });
+    }>('/dashboard/tendencias', { params: { meses, ...filters } });
     const fechas = new Set([
       ...Object.keys(response.data.inspecciones),
       ...Object.keys(response.data.hallazgos),
@@ -44,14 +46,14 @@ export const dashboardApi = {
     }));
   },
 
-  getTopSectores: async (limit?: number): Promise<TopSector[]> => {
+  getTopSectores: async (limit?: number, filters?: DashboardFilters): Promise<TopSector[]> => {
     const response = await apiClient.get<TopSector[]>('/dashboard/top-sectores', {
-      params: { limit },
+      params: { limit, ...filters },
     });
     return response.data;
   },
 
-  getActividadReciente: async (limit?: number): Promise<ActividadReciente[]> => {
+  getActividadReciente: async (limit?: number, filters?: DashboardFilters): Promise<ActividadReciente[]> => {
     const response = await apiClient.get<{
       inspecciones: Array<{
         id: string;
@@ -73,7 +75,7 @@ export const dashboardApi = {
         hallazgo: { titulo: string };
       }>;
     }>('/dashboard/actividad-reciente', {
-      params: { limit },
+      params: { limit, ...filters },
     });
     const { inspecciones, hallazgos, acciones } = response.data;
     return [
