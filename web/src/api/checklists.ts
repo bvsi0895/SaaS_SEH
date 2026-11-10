@@ -9,6 +9,7 @@ export interface CreateChecklistDto {
 
 export interface CreateChecklistItemDto {
   descripcion: string;
+  orden: number;
   obligatorio?: boolean;
 }
 

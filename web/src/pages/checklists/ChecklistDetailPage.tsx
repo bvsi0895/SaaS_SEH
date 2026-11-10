@@ -48,6 +48,7 @@ export default function ChecklistDetailPage() {
   const [selectedItem, setSelectedItem] = useState<ChecklistItem | null>(null);
   const [newItem, setNewItem] = useState<CreateChecklistItemDto>({
     descripcion: '',
+    orden: 1,
     obligatorio: true,
   });
 
@@ -63,7 +64,7 @@ export default function ChecklistDetailPage() {
       showSuccess('Item agregado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['checklist', id] });
       setAddItemDialogOpen(false);
-      setNewItem({ descripcion: '', obligatorio: true });
+      setNewItem({ descripcion: '', orden: 1, obligatorio: true });
     },
     onError: () => {
       showError('Error al agregar el item');
@@ -104,7 +105,11 @@ export default function ChecklistDetailPage() {
 
   const handleAddItem = () => {
     if (newItem.descripcion.trim()) {
-      addItemMutation.mutate(newItem);
+      const nextOrder = (checklist?.items || []).reduce(
+        (max, item) => Math.max(max, item.orden),
+        0,
+      ) + 1;
+      addItemMutation.mutate({ ...newItem, orden: nextOrder });
     }
   };
 

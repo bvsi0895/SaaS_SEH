@@ -25,8 +25,13 @@ export const hallazgosApi = {
     nivelRiesgo?: string;
     inspeccionId?: string;
   }): Promise<{ data: Hallazgo[]; total: number }> => {
-    const response = await apiClient.get('/hallazgos', { params });
-    return response.data;
+    const response = await apiClient.get<Hallazgo[] | { data: Hallazgo[]; total: number }>(
+      '/hallazgos',
+      { params },
+    );
+    return Array.isArray(response.data)
+      ? { data: response.data, total: response.data.length }
+      : response.data;
   },
 
   getById: async (id: string): Promise<Hallazgo> => {
@@ -36,6 +41,13 @@ export const hallazgosApi = {
 
   create: async (data: CreateHallazgoDto): Promise<Hallazgo> => {
     const response = await apiClient.post<Hallazgo>('/hallazgos', data);
+    return response.data;
+  },
+
+  uploadPhoto: async (id: string, file: File): Promise<Hallazgo> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<Hallazgo>(`/hallazgos/${id}/fotos`, formData);
     return response.data;
   },
 

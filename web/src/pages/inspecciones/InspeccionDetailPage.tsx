@@ -52,6 +52,7 @@ export default function InspeccionDetailPage() {
   const [finalizarDialogOpen, setFinalizarDialogOpen] = useState(false);
   const [observacionesFinal, setObservacionesFinal] = useState('');
   const [hallazgoDialogOpen, setHallazgoDialogOpen] = useState(false);
+  const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
   const [nuevoHallazgo, setNuevoHallazgo] = useState<Partial<CreateHallazgoDto>>({
     nivelRiesgo: 'MEDIO',
   });
@@ -96,16 +97,37 @@ export default function InspeccionDetailPage() {
 
   const crearHallazgoMutation = useMutation({
     mutationFn: (data: CreateHallazgoDto) => hallazgosApi.create(data),
-    onSuccess: () => {
-      showSuccess('Hallazgo creado exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
-      setHallazgoDialogOpen(false);
-      setNuevoHallazgo({ nivelRiesgo: 'MEDIO' });
+    onSuccess: (hallazgo) => {
+      if (hallazgoPhoto) {
+        subirFotoMutation.mutate({ id: hallazgo.id, file: hallazgoPhoto });
+        return;
+      }
+      finalizarCreacionHallazgo();
     },
     onError: () => {
       showError('Error al crear el hallazgo');
     },
   });
+
+  const subirFotoMutation = useMutation({
+    mutationFn: ({ id: hallazgoId, file }: { id: string; file: File }) =>
+      hallazgosApi.uploadPhoto(hallazgoId, file),
+    onSuccess: () => {
+      showSuccess('Hallazgo y fotografía creados exitosamente');
+      finalizarCreacionHallazgo();
+    },
+    onError: () => {
+      showError('Hallazgo creado, pero no se pudo adjuntar la fotografía');
+      finalizarCreacionHallazgo();
+    },
+  });
+
+  const finalizarCreacionHallazgo = () => {
+    queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+    setHallazgoDialogOpen(false);
+    setHallazgoPhoto(null);
+    setNuevoHallazgo({ nivelRiesgo: 'MEDIO' });
+  };
 
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
     if (cumplimiento === 'OBSERVACION' || cumplimiento === 'NO_CUMPLE') {
@@ -518,6 +540,20 @@ export default function InspeccionDetailPage() {
                   setNuevoHallazgo({ ...nuevoHallazgo, ubicacionTexto: e.target.value })
                 }
               />
+            </Grid>
+            <Grid item xs={12}>
+              <Button component="label" variant="outlined">
+                {hallazgoPhoto ? `Fotografía: ${hallazgoPhoto.name}` : 'Adjuntar fotografía'}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setHallazgoPhoto(event.target.files?.[0] || null)}
+                />
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                JPG, PNG o WEBP hasta 5 MiB
+              </Typography>
             </Grid>
           </Grid>
         </DialogContent>

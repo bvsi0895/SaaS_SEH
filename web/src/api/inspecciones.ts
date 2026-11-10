@@ -24,8 +24,13 @@ export const inspeccionesApi = {
     estado?: string;
     checklistId?: string;
   }): Promise<{ data: Inspeccion[]; total: number }> => {
-    const response = await apiClient.get('/inspecciones', { params });
-    return response.data;
+    const response = await apiClient.get<Inspeccion[] | { data: Inspeccion[]; total: number }>(
+      '/inspecciones',
+      { params },
+    );
+    return Array.isArray(response.data)
+      ? { data: response.data, total: response.data.length }
+      : response.data;
   },
 
   getById: async (id: string): Promise<Inspeccion> => {

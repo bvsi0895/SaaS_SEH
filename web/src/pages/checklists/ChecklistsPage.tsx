@@ -265,10 +265,12 @@ export default function ChecklistsPage() {
                   setFormData({ ...formData, tipo: e.target.value as TipoChecklist })
                 }
               >
-                <MenuItem value="SEGURIDAD">Seguridad</MenuItem>
-                <MenuItem value="HIGIENE">Higiene</MenuItem>
-                <MenuItem value="AMBIENTAL">Ambiental</MenuItem>
-                <MenuItem value="EPP">EPP</MenuItem>
+                <MenuItem value="GENERAL">General</MenuItem>
+                <MenuItem value="EPP">Elementos de protección personal</MenuItem>
+                <MenuItem value="ORDEN_LIMPIEZA">Orden y limpieza</MenuItem>
+                <MenuItem value="RIESGO_QUIMICO">Riesgo químico</MenuItem>
+                <MenuItem value="MAQUINARIA">Maquinaria</MenuItem>
+                <MenuItem value="ERGONOMIA">Ergonomía</MenuItem>
                 <MenuItem value="INCENDIO">Incendio</MenuItem>
                 <MenuItem value="OTRO">Otro</MenuItem>
               </TextField>
