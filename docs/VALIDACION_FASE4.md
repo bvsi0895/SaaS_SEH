@@ -25,6 +25,12 @@ asignaciones, y limpió sus registros.
 Resultado: **aprobado**. El aislamiento de dos consultoras, fotografías, PDF,
 checklists e inspecciones continúa funcionando.
 
+`pnpm --filter seh-backend test:revocacion:e2e`
+
+Resultado: **aprobado**. Un técnico temporal consultó establecimientos con un
+JWT activo; tras revocar su `AccesoEmpresa`, la misma sesión recibió `403`.
+Los fixtures fueron eliminados.
+
 ## Pruebas desde navegador
 
 Probado en navegador integrado con usuario ficticio administrador:
@@ -35,13 +41,15 @@ Probado en navegador integrado con usuario ficticio administrador:
 - alta visual de una empresa cliente;
 - selección de la empresa cliente;
 - alta visual de un establecimiento con sectores;
+- listado de técnicos y asignaciones;
+- botón de revocación con diálogo de confirmación, cancelado sin modificar datos;
 - mensajes de éxito y actualización de listas.
 
 Los datos creados durante la prueba visual fueron eliminados al finalizar.
 La vista se observó en escritorio con viewport aproximado de 1009×792. La
-adaptación responsive está implementada con Grid/Stack, pero la prueba de
-viewport móvil real queda pendiente de una sesión de navegador con emulación
-móvil disponible.
+adaptación responsive está implementada con Grid/Stack. La prueba móvil real
+de 390×844 no pudo ejecutarse porque el navegador integrado disponible no
+expone emulación o resize de viewport; no se declara aprobada esa parte.
 
 ## Validaciones técnicas
 
@@ -51,11 +59,13 @@ móvil disponible.
 | `pnpm --filter seh-web build` | Aprobado; warning de chunk Vite >500 kB |
 | `pnpm --filter seh-mobile exec tsc --noEmit` | Aprobado |
 | `pnpm --filter seh-backend exec jest --runInBand` | 3 suites / 7 tests aprobados |
+| `pnpm --filter seh-backend test:revocacion:e2e` | Aprobado; JWT activo rechazado después de revocar |
 | `pnpm --filter seh-backend exec prisma migrate status` | Base al día |
 
 ## Estado real
 
-La administración funcional de empresas-clientes y establecimientos está
-operativa por HTTP y parcialmente validada desde navegador. No se declara
-cerrada la aceptación integral hasta ejecutar la misma prueba con viewport
-móvil real y completar la cobertura visual de revocación de asignaciones.
+La administración funcional de empresas-clientes, establecimientos,
+asignaciones y revocación está operativa por HTTP y validada visualmente en
+escritorio. La aceptación integral queda pendiente únicamente de una prueba
+real en viewport móvil 390×844; la invitación por email queda para una fase
+posterior.

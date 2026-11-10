@@ -85,6 +85,7 @@ organizaciones, empresas-clientes, establecimientos, miembros y asignaciones.
 La migración aditiva `20261110100000_fase4_admin_consultoras` está aplicada en
 la base local de desarrollo. El build backend/web, typecheck mobile, E2E de
 administración y E2E de aislamiento multiempresa fueron verificados. La
-validación visual confirmó login, alta de empresa y alta de establecimiento en
-escritorio; la emulación móvil real y la cobertura visual específica de
-revocación de asignaciones quedan pendientes.
+validación visual confirmó login, alta de empresa, alta de establecimiento y
+confirmación de revocación en escritorio. El E2E de revocación demostró `403`
+con una sesión JWT que conservaba su token. La emulación móvil exacta 390×844
+queda pendiente porque el navegador disponible no expuso control de viewport.
