@@ -89,3 +89,26 @@ validación visual confirmó login, alta de empresa, alta de establecimiento y
 confirmación de revocación en escritorio. El E2E de revocación demostró `403`
 con una sesión JWT que conservaba su token. La emulación móvil exacta 390×844
 queda pendiente porque el navegador disponible no expuso control de viewport.
+
+## Fase 5 — Informes profesionales y métricas
+
+La rama `feature/informes-profesionales` parte de `e6511c4` y agrega el
+endpoint protegido `GET /api/reportes/mensual.pdf`, con filtros de período y
+establecimiento. El informe se genera contra PostgreSQL local, respeta
+`organizacionEmpresaId`, valida `AccesoEstablecimiento` cuando existe una
+restricción explícita y no acepta IDs de empresa u organización desde el
+cliente. El dashboard permite filtrar los indicadores por establecimiento y
+descargar el PDF del contexto actual.
+
+Validaciones de esta fase:
+
+- backend build, web build y mobile typecheck: OK;
+- Jest: 3 suites y 7 tests OK;
+- E2E de informes: OK para período con datos, período sin inspecciones,
+  establecimiento autorizado, establecimiento inválido y contexto inválido;
+- regresiones de administración, aislamiento multiempresa y revocación: OK.
+
+Limitaciones honestas: el PDF identifica comercialmente a la consultora pero
+todavía no incrusta el binario de `logoUrl`; las fotografías se contabilizan y
+siguen protegidas por sus endpoints autenticados. No se realizó en esta fase
+una nueva prueba visual de viewport móvil exacto 390×844.
