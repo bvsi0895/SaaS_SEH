@@ -77,3 +77,14 @@ La demo local completa puede ejecutarse y generar un PDF real. Queda pendiente
 automatizar el recorrido HTTP completo como suite e2e separada; los tests
 actuales cubren autenticación y autorización de servicio, mientras que el
 recorrido completo fue verificado manualmente contra PostgreSQL local.
+
+## Fase 4 — Gestión de consultoras
+
+La rama `feature/gestion-consultoras` incorpora administración contextual de
+organizaciones, empresas-clientes, establecimientos, miembros y asignaciones.
+La migración aditiva `20261110100000_fase4_admin_consultoras` está aplicada en
+la base local de desarrollo. El build backend/web, typecheck mobile, E2E de
+administración y E2E de aislamiento multiempresa fueron verificados. La
+validación visual confirmó login, alta de empresa y alta de establecimiento en
+escritorio; la emulación móvil real y la cobertura visual específica de
+revocación de asignaciones quedan pendientes.
