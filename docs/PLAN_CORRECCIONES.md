@@ -21,6 +21,7 @@
 - Ejecutar build de backend y web, y typecheck de mobile.
 - Corregir errores de compilación sin cambiar reglas de negocio.
 - Si pnpm vuelve a bloquearse en el enlazado, mover temporalmente el checkout o el store a una unidad local autorizada; no cambiar de gestor.
+- Mantener el build backend como `prisma generate && nest build` para que el cliente Prisma no dependa de postinstall.
 - Agregar pruebas unitarias o de integración donde el entorno permita una base de datos de prueba.
 
 ## D4 — Contratos API

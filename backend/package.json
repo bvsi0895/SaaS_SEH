@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "API REST del sistema SEH",
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "dev": "nest start --watch",
