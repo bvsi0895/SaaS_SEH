@@ -131,3 +131,28 @@ Los Dockerfiles de backend y web también se construyeron correctamente; Vite
 mantiene únicamente el warning de chunk grande. No se realizó deploy público.
 El detalle está en
 `docs/VALIDACION_FASE6A.md`.
+
+## Fase 6B — Validación final y preparación del despliegue
+
+Se instaló Playwright como dependencia de desarrollo y Chromium local. La
+prueba Playwright pasó en los dos viewports exactos: `390×844` y `1440×900`.
+Recorrió login, dashboard, cambio de contexto, administración, empresas,
+establecimientos, técnicos, inspecciones, detalle, checklists, hallazgos y
+acciones. No registró errores de consola ni fallos reales de red.
+
+Se corrigieron el rate limiting global no aplicado, la compatibilidad de IDs
+legacy en inspecciones/hallazgos/reportes, la validación binaria de imágenes y
+el desplazamiento móvil de tabs administrativos. Compose ahora mantiene
+PostgreSQL y backend en la red interna, publica web sólo en loopback y añade
+healthcheck, límites de memoria y rotación de logs.
+
+Se realizó backup de PostgreSQL y evidencias, con restauración aislada y
+conteos coincidentes: 5 empresas, 9 usuarios, 7 inspecciones, 8 hallazgos y 6
+acciones; 7 archivos de evidencia respaldados.
+
+Pendientes antes de una publicación comercial amplia: migrar tokens desde
+localStorage a cookies HttpOnly/SameSite, definir rate limiting distribuido y
+reemplazar almacenamiento local por almacenamiento privado de objetos si se
+requiere alta disponibilidad. El detalle está en
+`docs/VALIDACION_FASE6B.md`, `docs/AUDITORIA_SEGURIDAD_DEMO.md`,
+`docs/PLAN_BACKUP_RESTAURACION.md` y `docs/CHECKLIST_DESPLIEGUE.md`.
