@@ -38,6 +38,11 @@ Entorno: PostgreSQL local de desarrollo, datos ficticios
 La E2E restaura el `logoUrl` original y elimina el archivo temporal y el
 establecimiento ficticio al finalizar.
 
+La inspección visual del PDF regenerado confirmó 2 páginas A4, sin páginas en
+blanco, con encabezado, dos miniaturas de evidencias, responsable técnico, pie
+institucional y numeración consistente. Las evidencias ficticias existentes se
+visualizaron como miniaturas negras, sin afectar la estructura del documento.
+
 ## Validación visual
 
 Se verificó desde el navegador local el login, dashboard, selector de

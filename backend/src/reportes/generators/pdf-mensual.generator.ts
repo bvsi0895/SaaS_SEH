@@ -153,10 +153,10 @@ export class PDFMensualGenerator {
     const range = doc.bufferedPageRange();
     for (let index = range.start; index < range.start + range.count; index += 1) {
       doc.switchToPage(index);
-      doc.strokeColor('#d0d7de').lineWidth(0.5).moveTo(48, 785).lineTo(547, 785).stroke();
+      doc.strokeColor('#d0d7de').lineWidth(0.5).moveTo(48, 765).lineTo(547, 765).stroke();
       doc.font('Helvetica').fontSize(8).fillColor('#666')
-        .text('SEH — Informe profesional', 48, 793, { width: 250 })
-        .text(`Página ${index + 1} de ${range.count}`, 347, 793, { width: 200, align: 'right' });
+        .text('SEH - Informe profesional', 48, 773, { width: 250, lineBreak: false })
+        .text(`Página ${index + 1} de ${range.count}`, 347, 773, { width: 200, align: 'right', lineBreak: false });
     }
   }
 
