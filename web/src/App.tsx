@@ -17,6 +17,7 @@ import AccionDetailPage from './pages/acciones/AccionDetailPage';
 import UsuariosPage from './pages/usuarios/UsuariosPage';
 import PerfilPage from './pages/perfil/PerfilPage';
 import LoadingScreen from './components/common/LoadingScreen';
+import AdministracionPage from './pages/administracion/AdministracionPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="acciones" element={<AccionesPage />} />
         <Route path="acciones/:id" element={<AccionDetailPage />} />
         <Route path="usuarios" element={<UsuariosPage />} />
+        <Route path="administracion" element={<AdministracionPage />} />
         <Route path="perfil" element={<PerfilPage />} />
       </Route>
 

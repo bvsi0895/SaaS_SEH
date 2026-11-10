@@ -31,6 +31,50 @@ export interface ContextoAutorizado {
   empresaNombre?: string;
 }
 
+export type RolOrganizacion = 'OWNER' | 'ADMIN_ORGANIZACION' | 'AUDITOR_ORGANIZACION';
+export type EstadoRelacionEmpresa = 'ACTIVA' | 'SUSPENDIDA' | 'REVOCADA';
+
+export interface Organizacion {
+  id: string;
+  nombre: string;
+  tipo: string;
+  logoUrl?: string;
+  emailContacto?: string;
+  telefono?: string;
+  direccion?: string;
+  activa: boolean;
+  _count?: { miembros: number; empresas: number };
+}
+
+export interface EmpresaCliente extends Empresa {
+  _count?: { usuarios: number; inspecciones: number; establecimientos: number };
+}
+
+export interface OrganizacionEmpresaView {
+  id: string;
+  estado: EstadoRelacionEmpresa;
+  empresa: EmpresaCliente;
+}
+
+export interface Establecimiento {
+  id: string;
+  empresaId: string;
+  nombre: string;
+  codigo?: string;
+  direccion?: string;
+  sectores?: string;
+  activo: boolean;
+}
+
+export interface OrganizacionMiembroView {
+  id: string;
+  usuarioId: string;
+  rol: RolOrganizacion;
+  activa: boolean;
+  usuario: Pick<Usuario, 'id' | 'email' | 'nombre' | 'apellido' | 'rol' | 'activo'>;
+  accesosEmpresa: Array<{ id: string; rol: Rol; activo: boolean; empresaId: string; organizacionEmpresa: { id: string; estado: EstadoRelacionEmpresa; empresa: { nombre: string } } }>;
+}
+
 export interface Empresa {
   id: string;
   nombre: string;

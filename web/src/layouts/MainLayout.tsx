@@ -28,6 +28,7 @@ import {
   Warning as HallazgosIcon,
   Build as AccionesIcon,
   People as UsuariosIcon,
+  Business as AdministracionIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -46,6 +47,7 @@ const menuItems = [
 
 const adminMenuItems = [
   { text: 'Usuarios', icon: <UsuariosIcon />, path: '/usuarios' },
+  { text: 'Administración', icon: <AdministracionIcon />, path: '/administracion' },
 ];
 
 export default function MainLayout() {
@@ -82,7 +84,7 @@ export default function MainLayout() {
     navigate('/login');
   };
 
-  const isAdmin = user?.rol === 'ADMIN_EMPRESA';
+  const isAdmin = user?.rol === 'ADMIN_EMPRESA' || user?.rol === 'SUPERVISOR';
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

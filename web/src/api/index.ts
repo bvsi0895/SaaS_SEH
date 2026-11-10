@@ -5,4 +5,5 @@ export { hallazgosApi } from './hallazgos';
 export { accionesApi } from './acciones';
 export { dashboardApi } from './dashboard';
 export { usuariosApi } from './usuarios';
+export { administracionApi } from './administracion';
 export { default as apiClient } from './client';
