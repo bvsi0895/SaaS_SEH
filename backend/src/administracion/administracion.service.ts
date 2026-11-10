@@ -45,6 +45,20 @@ export class AdministracionService {
     return relation;
   }
 
+  private async assertAccess(organizacionId: string, usuarioId: string, organizacionEmpresaId: string) {
+    const access = await this.prisma.accesoEmpresa.findFirst({
+      where: {
+        organizacionEmpresaId,
+        organizacionId,
+        activo: true,
+        organizacionMiembro: { usuarioId, activa: true },
+        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+      },
+      select: { id: true },
+    });
+    if (!access) throw new ForbiddenException('No tiene acceso a esta empresa');
+  }
+
   getOrganization(organizacionId: string) {
     return this.prisma.organizacion.findUniqueOrThrow({
       where: { id: organizacionId },
@@ -177,7 +191,7 @@ export class AdministracionService {
 
   async listEstablishments(organizacionId: string, usuarioId: string, relationId: string) {
     const relation = await this.getRelation(organizacionId, relationId);
-    await this.assertAdmin(organizacionId, usuarioId);
+    await this.assertAccess(organizacionId, usuarioId, relationId);
     return this.prisma.establecimiento.findMany({ where: { empresaId: relation.empresaId }, orderBy: { nombre: 'asc' } });
   }
 
