@@ -1,42 +1,29 @@
-# Etapa 1: Build
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /workspace
 
-# Copiar archivos de dependencias
-COPY package*.json ./
-COPY prisma ./prisma/
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY backend/package.json backend/package.json
 
-# Instalar dependencias
-RUN npm ci
+RUN pnpm install --frozen-lockfile --filter seh-backend...
 
-# Copiar codigo fuente
-COPY . .
+COPY backend backend
 
-# Generar cliente Prisma
-RUN npx prisma generate
+RUN pnpm --filter seh-backend prisma:generate
 
-# Compilar TypeScript
-RUN npm run build
+RUN pnpm --filter seh-backend build
 
-# Etapa 2: Produccion
 FROM node:20-alpine AS production
 
 WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-# Instalar solo dependencias de produccion
-COPY package*.json ./
-COPY prisma ./prisma/
+COPY --from=builder /workspace/backend/package.json ./package.json
+COPY --from=builder /workspace/backend/prisma ./prisma
+COPY --from=builder /workspace/backend/node_modules ./node_modules
+COPY --from=builder /workspace/backend/dist ./dist
 
-RUN npm ci --only=production
-
-# Generar cliente Prisma
-RUN npx prisma generate
-
-# Copiar build desde etapa anterior
-COPY --from=builder /app/dist ./dist
-
-# Crear usuario no-root
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001
 USER nestjs
@@ -44,9 +31,8 @@ USER nestjs
 # Exponer puerto
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Comando de inicio
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main.js"]

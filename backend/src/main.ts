@@ -20,7 +20,7 @@ async function bootstrap() {
   );
 
   // CORS configurado desde variables de entorno
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173'];
+  const corsOrigins = process.env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()).filter(Boolean) || ['http://localhost:5173'];
   app.enableCors({
     origin: corsOrigins,
     credentials: true,

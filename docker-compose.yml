@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Base de datos PostgreSQL
   postgres:
@@ -8,14 +6,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-seh_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seh_password_123}
-      POSTGRES_DB: ${POSTGRES_DB:-seh_db}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-seh_demo}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seh_user} -d ${POSTGRES_DB:-seh_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-seh_user} -d ${POSTGRES_DB:-seh_demo}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,15 +23,20 @@ services:
   # Backend NestJS
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: seh-backend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-seh_user}:${POSTGRES_PASSWORD:-seh_password_123}@postgres:5432/${POSTGRES_DB:-seh_db}?schema=public
-      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-seh_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-seh_demo}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-30d}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      STORAGE_TYPE: local
+      UPLOAD_DIR: ./uploads
       PORT: 3000
     ports:
       - "3000:3000"
@@ -41,21 +44,23 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     networks:
       - seh-network
+    volumes:
+      - seh_uploads:/app/uploads
 
   # Frontend Web React
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL is required}
     container_name: seh-web
     restart: unless-stopped
     ports:
@@ -81,6 +86,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  seh_uploads:
     driver: local
 
 networks:
