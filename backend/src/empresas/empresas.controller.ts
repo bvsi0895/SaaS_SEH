@@ -54,8 +54,11 @@ export class EmpresasController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener estadísticas de mi empresa' })
   @ApiResponse({ status: 200, description: 'Estadísticas de la empresa' })
-  async getMyEmpresaStats(@CurrentUser('empresaId') empresaId: string) {
-    return this.empresasService.getStats(empresaId);
+  async getMyEmpresaStats(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+  ) {
+    return this.empresasService.getStats(empresaId, organizacionEmpresaId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

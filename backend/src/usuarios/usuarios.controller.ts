@@ -41,17 +41,21 @@ export class UsuariosController {
   @ApiResponse({ status: 200, description: 'Lista de usuarios' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
     @Query('rol') rol?: Rol,
     @Query('activo') activo?: boolean,
   ) {
-    return this.usuariosService.findAll(empresaId, { rol, activo });
+    return this.usuariosService.findAll(empresaId, { rol, activo }, organizacionId);
   }
 
   @Get('tecnicos')
   @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
   @ApiOperation({ summary: 'Listar técnicos de la empresa' })
-  async findTechnicians(@CurrentUser('empresaId') empresaId: string) {
-    return this.usuariosService.findAll(empresaId, { rol: Rol.TECNICO });
+  async findTechnicians(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+  ) {
+    return this.usuariosService.findAll(empresaId, { rol: Rol.TECNICO }, organizacionId);
   }
 
   @Get(':id')
@@ -61,8 +65,9 @@ export class UsuariosController {
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.usuariosService.findOne(id, empresaId);
+    return this.usuariosService.findOne(id, empresaId, organizacionId);
   }
 
   @Post()
@@ -74,10 +79,12 @@ export class UsuariosController {
   async create(
     @Body() createUsuarioDto: CreateUsuarioDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
     // Forzar que el usuario sea de la misma empresa
     createUsuarioDto.empresaId = empresaId;
-    return this.usuariosService.create(createUsuarioDto);
+    return this.usuariosService.create(createUsuarioDto, organizacionId, organizacionEmpresaId);
   }
 
   @Put(':id')
@@ -89,8 +96,9 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUsuarioDto: UpdateUsuarioDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.usuariosService.update(id, updateUsuarioDto, empresaId);
+    return this.usuariosService.update(id, updateUsuarioDto, empresaId, organizacionId);
   }
 
   @Patch('me/password')
@@ -110,9 +118,10 @@ export class UsuariosController {
   async adminChangePassword(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
     @Body() dto: AdminChangePasswordDto,
   ) {
-    return this.usuariosService.adminChangePassword(id, empresaId, dto);
+    return this.usuariosService.adminChangePassword(id, empresaId, dto, organizacionId);
   }
 
   @Patch(':id/deactivate')
@@ -122,8 +131,9 @@ export class UsuariosController {
   async deactivate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.usuariosService.deactivate(id, empresaId);
+    return this.usuariosService.deactivate(id, empresaId, organizacionId);
   }
 
   @Patch(':id/activate')
@@ -133,8 +143,9 @@ export class UsuariosController {
   async activate(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.usuariosService.activate(id, empresaId);
+    return this.usuariosService.activate(id, empresaId, organizacionId);
   }
 
   @Delete(':id')
@@ -145,7 +156,8 @@ export class UsuariosController {
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.usuariosService.remove(id, empresaId);
+    return this.usuariosService.remove(id, empresaId, organizacionId);
   }
 }

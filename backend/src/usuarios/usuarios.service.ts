@@ -9,6 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto, AdminChangePasswordDto } from './dto';
 import { Rol } from '@prisma/client';
+import { RolOrganizacion } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UsuariosService {
@@ -17,10 +19,11 @@ export class UsuariosService {
   /**
    * Obtener todos los usuarios de una empresa
    */
-  async findAll(empresaId: string, filters?: { rol?: Rol; activo?: boolean }) {
+  async findAll(empresaId: string, filters?: { rol?: Rol; activo?: boolean }, organizacionId?: string) {
     return this.prisma.usuario.findMany({
       where: {
         empresaId,
+        ...(organizacionId && { membresiasOrganizacion: { some: { organizacionId, activa: true } } }),
         ...(filters?.rol && { rol: filters.rol }),
         ...(filters?.activo !== undefined && { activo: filters.activo }),
       },
@@ -42,9 +45,13 @@ export class UsuariosService {
   /**
    * Obtener un usuario por ID
    */
-  async findOne(id: string, empresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionId?: string) {
     const usuario = await this.prisma.usuario.findUnique({
-      where: { id },
+      where: {
+        id,
+        ...(empresaId && { empresaId }),
+        ...(organizacionId && { membresiasOrganizacion: { some: { organizacionId, activa: true } } }),
+      },
       select: {
         id: true,
         email: true,
@@ -69,11 +76,6 @@ export class UsuariosService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    // Verificar que pertenece a la misma empresa
-    if (empresaId && usuario.empresaId !== empresaId) {
-      throw new ForbiddenException('No tiene permiso para ver este usuario');
-    }
-
     return usuario;
   }
 
@@ -89,7 +91,7 @@ export class UsuariosService {
   /**
    * Crear nuevo usuario
    */
-  async create(createUsuarioDto: CreateUsuarioDto) {
+  async create(createUsuarioDto: CreateUsuarioDto, organizacionId?: string, organizacionEmpresaId?: string) {
     // Verificar que el email no existe
     const existingUser = await this.findByEmail(createUsuarioDto.email);
     if (existingUser) {
@@ -108,26 +110,51 @@ export class UsuariosService {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(createUsuarioDto.password, 10);
 
-    // Crear usuario
-    const usuario = await this.prisma.usuario.create({
-      data: {
-        email: createUsuarioDto.email.toLowerCase(),
-        password: hashedPassword,
-        nombre: createUsuarioDto.nombre,
-        apellido: createUsuarioDto.apellido,
-        rol: createUsuarioDto.rol || Rol.TECNICO,
-        empresaId: createUsuarioDto.empresaId,
-      },
-      select: {
-        id: true,
-        email: true,
-        nombre: true,
-        apellido: true,
-        rol: true,
-        activo: true,
-        createdAt: true,
-        empresaId: true,
-      },
+    const usuario = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.usuario.create({
+        data: {
+          email: createUsuarioDto.email.toLowerCase(),
+          password: hashedPassword,
+          nombre: createUsuarioDto.nombre,
+          apellido: createUsuarioDto.apellido,
+          rol: createUsuarioDto.rol || Rol.TECNICO,
+          empresaId: createUsuarioDto.empresaId,
+        },
+        select: {
+          id: true,
+          email: true,
+          nombre: true,
+          apellido: true,
+          rol: true,
+          activo: true,
+          createdAt: true,
+          empresaId: true,
+        },
+      });
+
+      if (organizacionId && organizacionEmpresaId) {
+        const membership = await tx.organizacionMiembro.create({
+          data: {
+            id: randomUUID(),
+            organizacionId,
+            usuarioId: created.id,
+            rol: RolOrganizacion.AUDITOR_ORGANIZACION,
+            activa: true,
+          },
+        });
+        await tx.accesoEmpresa.create({
+          data: {
+            id: randomUUID(),
+            organizacionEmpresaId,
+            organizacionMiembroId: membership.id,
+            organizacionId,
+            empresaId: createUsuarioDto.empresaId,
+            rol: createUsuarioDto.rol || Rol.TECNICO,
+            activo: true,
+          },
+        });
+      }
+      return created;
     });
 
     return usuario;
@@ -136,9 +163,9 @@ export class UsuariosService {
   /**
    * Actualizar usuario
    */
-  async update(id: string, updateUsuarioDto: UpdateUsuarioDto, empresaId?: string) {
+  async update(id: string, updateUsuarioDto: UpdateUsuarioDto, empresaId?: string, organizacionId?: string) {
     // Verificar que existe
-    const usuario = await this.findOne(id, empresaId);
+    const usuario = await this.findOne(id, empresaId, organizacionId);
 
     // Actualizar
     return this.prisma.usuario.update({
@@ -187,8 +214,8 @@ export class UsuariosService {
     return { message: 'Contraseña actualizada exitosamente' };
   }
 
-  async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto) {
-    await this.findOne(id, empresaId);
+  async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto, organizacionId?: string) {
+    await this.findOne(id, empresaId, organizacionId);
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.usuario.update({
       where: { id },
@@ -200,8 +227,8 @@ export class UsuariosService {
   /**
    * Desactivar usuario (soft delete)
    */
-  async deactivate(id: string, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async deactivate(id: string, empresaId?: string, organizacionId?: string) {
+    await this.findOne(id, empresaId, organizacionId);
 
     return this.prisma.usuario.update({
       where: { id },
@@ -219,8 +246,8 @@ export class UsuariosService {
   /**
    * Reactivar usuario
    */
-  async activate(id: string, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async activate(id: string, empresaId?: string, organizacionId?: string) {
+    await this.findOne(id, empresaId, organizacionId);
 
     return this.prisma.usuario.update({
       where: { id },
@@ -238,8 +265,8 @@ export class UsuariosService {
   /**
    * Eliminar usuario permanentemente
    */
-  async remove(id: string, empresaId?: string) {
-    await this.findOne(id, empresaId);
+  async remove(id: string, empresaId?: string, organizacionId?: string) {
+    await this.findOne(id, empresaId, organizacionId);
 
     await this.prisma.usuario.delete({
       where: { id },

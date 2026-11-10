@@ -8,6 +8,8 @@ export interface TenantContext {
   empresaId: string;
   organizacionMiembroId: string;
   accesoEmpresaId: string;
+  organizacionNombre?: string;
+  empresaNombre?: string;
 }
 
 @Injectable()
@@ -25,7 +27,10 @@ export class TenancyService {
           ...(requestedOrganizacionEmpresaId && { id: requestedOrganizacionEmpresaId }),
         },
       },
-      select: { id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true },
+      select: {
+        id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
+        organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
+      },
     });
 
     if (!access) throw new ForbiddenException('No existe un acceso activo al contexto solicitado');
@@ -35,6 +40,8 @@ export class TenancyService {
       empresaId: access.empresaId,
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
+      organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
+      empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     };
   }
 
@@ -45,7 +52,10 @@ export class TenancyService {
         organizacionMiembro: { usuarioId, activa: true, organizacion: { activa: true } },
         organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
       },
-      select: { id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true },
+      select: {
+        id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
+        organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
+      },
       orderBy: { organizacionEmpresaId: 'asc' },
     });
     return accesses.map((access) => ({
@@ -54,6 +64,8 @@ export class TenancyService {
       empresaId: access.empresaId,
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
+      organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
+      empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     }));
   }
 

@@ -109,8 +109,10 @@ export class ChecklistsController {
   async updateItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() updateItemDto: UpdateChecklistItemDto,
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.updateItem(itemId, updateItemDto);
+    return this.checklistsService.updateItem(itemId, updateItemDto, empresaId, organizacionEmpresaId);
   }
 
   @Delete('items/:itemId')
@@ -118,8 +120,12 @@ export class ChecklistsController {
   @ApiOperation({ summary: 'Eliminar item de checklist' })
   @ApiResponse({ status: 200, description: 'Item eliminado' })
   @ApiResponse({ status: 400, description: 'Item ya usado en inspecciones' })
-  async removeItem(@Param('itemId', ParseUUIDPipe) itemId: string) {
-    return this.checklistsService.removeItem(itemId);
+  async removeItem(
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+  ) {
+    return this.checklistsService.removeItem(itemId, empresaId, organizacionEmpresaId);
   }
 
   @Post(':id/duplicate')
@@ -165,7 +171,9 @@ export class ChecklistsController {
   async reorderItems(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() itemOrders: { id: string; orden: number }[],
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.checklistsService.reorderItems(id, itemOrders);
+    return this.checklistsService.reorderItems(id, itemOrders, empresaId, organizacionEmpresaId);
   }
 }

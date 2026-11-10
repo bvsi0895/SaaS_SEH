@@ -20,6 +20,7 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:backfill-multitenant": "ts-node prisma/backfill-multitenant.ts",
     "test:multitenant:isolation": "ts-node prisma/verify-multitenant-isolation.ts",
+    "test:multitenant:e2e": "ts-node prisma/verify-multitenant-e2e.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

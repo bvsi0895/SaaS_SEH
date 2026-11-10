@@ -134,12 +134,17 @@ export class ChecklistsService {
   /**
    * Actualizar item de checklist
    */
-  async updateItem(itemId: string, updateItemDto: UpdateChecklistItemDto) {
+  async updateItem(itemId: string, updateItemDto: UpdateChecklistItemDto, empresaId?: string, organizacionEmpresaId?: string) {
     const item = await this.prisma.checklistItem.findUnique({
       where: { id: itemId },
+      include: { checklist: { select: { empresaId: true, organizacionEmpresaId: true } } },
     });
 
     if (!item) {
+      throw new NotFoundException('Item no encontrado');
+    }
+    if ((empresaId && item.checklist.empresaId !== empresaId) ||
+      (organizacionEmpresaId && item.checklist.organizacionEmpresaId !== organizacionEmpresaId)) {
       throw new NotFoundException('Item no encontrado');
     }
 
@@ -152,15 +157,20 @@ export class ChecklistsService {
   /**
    * Eliminar item de checklist
    */
-  async removeItem(itemId: string) {
+  async removeItem(itemId: string, empresaId?: string, organizacionEmpresaId?: string) {
     const item = await this.prisma.checklistItem.findUnique({
       where: { id: itemId },
       include: {
         inspeccionItems: true,
+        checklist: { select: { empresaId: true, organizacionEmpresaId: true } },
       },
     });
 
     if (!item) {
+      throw new NotFoundException('Item no encontrado');
+    }
+    if ((empresaId && item.checklist.empresaId !== empresaId) ||
+      (organizacionEmpresaId && item.checklist.organizacionEmpresaId !== organizacionEmpresaId)) {
       throw new NotFoundException('Item no encontrado');
     }
 
@@ -234,7 +244,17 @@ export class ChecklistsService {
   /**
    * Reordenar items de checklist
    */
-  async reorderItems(checklistId: string, itemOrders: { id: string; orden: number }[]) {
+  async reorderItems(checklistId: string, itemOrders: { id: string; orden: number }[], empresaId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(checklistId, empresaId, organizacionEmpresaId);
+    const validItems = await this.prisma.checklistItem.count({
+      where: {
+        checklistId,
+        id: { in: itemOrders.map((item) => item.id) },
+      },
+    });
+    if (validItems !== itemOrders.length) {
+      throw new NotFoundException('Item no encontrado');
+    }
     const updates = itemOrders.map((item) =>
       this.prisma.checklistItem.update({
         where: { id: item.id },
@@ -244,6 +264,6 @@ export class ChecklistsService {
 
     await this.prisma.$transaction(updates);
 
-    return this.findOne(checklistId);
+    return this.findOne(checklistId, empresaId, organizacionEmpresaId);
   }
 }

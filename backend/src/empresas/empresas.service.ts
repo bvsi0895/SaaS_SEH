@@ -139,17 +139,18 @@ export class EmpresasService {
   /**
    * Obtener estadísticas de la empresa
    */
-  async getStats(empresaId: string) {
+  async getStats(empresaId: string, organizacionEmpresaId?: string) {
+    const scope = organizacionEmpresaId ? { organizacionEmpresaId } : {};
     const [empresa, inspecciones, hallazgos, acciones] = await Promise.all([
       this.prisma.empresa.findUnique({
         where: { id: empresaId },
         select: { nombre: true },
       }),
-      this.prisma.inspeccion.count({ where: { empresaId } }),
+      this.prisma.inspeccion.count({ where: { empresaId, ...scope } }),
       this.prisma.hallazgo.count({
-        where: { inspeccion: { empresaId } },
+        where: { inspeccion: { empresaId, ...scope } },
       }),
-      this.prisma.accionCorrectiva.count({ where: { empresaId } }),
+      this.prisma.accionCorrectiva.count({ where: { empresaId, ...scope } }),
     ]);
 
     return {
