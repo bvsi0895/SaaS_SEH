@@ -156,3 +156,12 @@ reemplazar almacenamiento local por almacenamiento privado de objetos si se
 requiere alta disponibilidad. El detalle está en
 `docs/VALIDACION_FASE6B.md`, `docs/AUDITORIA_SEGURIDAD_DEMO.md`,
 `docs/PLAN_BACKUP_RESTAURACION.md` y `docs/CHECKLIST_DESPLIEGUE.md`.
+
+## Fase 6C — Preparación de infraestructura
+
+Se documentó la arquitectura recomendada para una demo privada, los recursos
+estimados para 3–5 usuarios, requisitos de PostgreSQL/evidencias/backups/logs,
+convivencia segura con un proxy existente, diagnóstico de una VM, riesgos de
+infraestructura compartida y rollback/restauración. No se accedió a Oracle
+Cloud ni se modificaron servidores. El documento de decisión es
+`docs/INFRAESTRUCTURA_DEMO.md`.
