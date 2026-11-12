@@ -3,6 +3,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+**/.npmrc
 backend/uploads
 backend/logs
 mobile/.expo

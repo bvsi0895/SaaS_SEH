@@ -4,4 +4,3 @@ packages:
   - mobile
 allowBuilds:
   bcrypt: true
-storeDir: D:\.pnpm-store

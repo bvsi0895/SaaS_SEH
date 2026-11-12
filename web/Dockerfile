@@ -7,10 +7,10 @@ ARG VITE_API_URL=http://localhost:3000/api
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/package.json
 
-RUN pnpm install --frozen-lockfile --filter seh-web...
+RUN pnpm install --frozen-lockfile --config.store-dir=/pnpm/store --config.package-import-method=copy --filter seh-web...
 
 COPY web web
 
