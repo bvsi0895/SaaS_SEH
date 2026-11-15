@@ -237,6 +237,8 @@ model InspeccionItem {
   checklistItemId String
   checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id])
 
+  hallazgo Hallazgo?
+
   @@index([inspeccionId])
   @@index([checklistItemId])
   @@map("inspeccion_items")
@@ -258,6 +260,10 @@ model Hallazgo {
   // Relación con inspección
   inspeccionId String
   inspeccion   Inspeccion @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+
+  // Vínculo opcional con el incumplimiento que originó el hallazgo.
+  inspeccionItemId String? @unique
+  inspeccionItem   InspeccionItem? @relation(fields: [inspeccionItemId], references: [id], onDelete: SetNull)
 
   // Relaciones
   accionesCorrectivas AccionCorrectiva[]

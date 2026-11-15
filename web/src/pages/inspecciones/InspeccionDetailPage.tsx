@@ -20,6 +20,8 @@ import {
   DialogActions,
   ToggleButtonGroup,
   ToggleButton,
+  Tooltip,
+  LinearProgress,
   Paper,
   Skeleton,
   MenuItem,
@@ -35,7 +37,8 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { inspeccionesApi } from '../../api/inspecciones';
-import { hallazgosApi, CreateHallazgoDto } from '../../api/hallazgos';
+import { hallazgosApi, CreateHallazgoDto, UpdateHallazgoDto } from '../../api/hallazgos';
+import { accionesApi, CreateAccionDto } from '../../api/acciones';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
@@ -48,11 +51,15 @@ export default function InspeccionDetailPage() {
   const { showSuccess, showError } = useSnackbar();
 
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [selectedItemStatus, setSelectedItemStatus] = useState<CumplimientoItem | null>(null);
   const [observacion, setObservacion] = useState('');
   const [finalizarDialogOpen, setFinalizarDialogOpen] = useState(false);
   const [observacionesFinal, setObservacionesFinal] = useState('');
   const [hallazgoDialogOpen, setHallazgoDialogOpen] = useState(false);
+  const [editingHallazgoId, setEditingHallazgoId] = useState<string | null>(null);
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
+  const [accionDescripcion, setAccionDescripcion] = useState('');
+  const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
   const [nuevoHallazgo, setNuevoHallazgo] = useState<Partial<CreateHallazgoDto>>({
     nivelRiesgo: 'MEDIO',
   });
@@ -76,6 +83,7 @@ export default function InspeccionDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
       setSelectedItem(null);
+      setSelectedItemStatus(null);
       setObservacion('');
     },
     onError: () => {
@@ -99,22 +107,44 @@ export default function InspeccionDetailPage() {
     mutationFn: (data: CreateHallazgoDto) => hallazgosApi.create(data),
     onSuccess: (hallazgo) => {
       if (hallazgoPhoto) {
-        subirFotoMutation.mutate({ id: hallazgo.id, file: hallazgoPhoto });
+        subirFotoMutation.mutate({
+          id: hallazgo.id,
+          file: hallazgoPhoto,
+          successMessage: 'Hallazgo y fotografía creados exitosamente',
+        });
         return;
       }
-      finalizarCreacionHallazgo();
+      guardarAccionCorrectiva(hallazgo.id, 'Hallazgo creado exitosamente');
     },
     onError: () => {
       showError('Error al crear el hallazgo');
     },
   });
 
+  const actualizarHallazgoMutation = useMutation({
+    mutationFn: ({ id: hallazgoId, data }: { id: string; data: UpdateHallazgoDto }) =>
+      hallazgosApi.update(hallazgoId, data),
+    onSuccess: (hallazgo) => {
+      if (hallazgoPhoto) {
+        subirFotoMutation.mutate({
+          id: hallazgo.id,
+          file: hallazgoPhoto,
+          successMessage: 'Hallazgo y fotografía actualizados exitosamente',
+        });
+        return;
+      }
+      guardarAccionCorrectiva(hallazgo.id, 'Hallazgo actualizado exitosamente');
+    },
+    onError: () => {
+      showError('Error al actualizar el hallazgo');
+    },
+  });
+
   const subirFotoMutation = useMutation({
-    mutationFn: ({ id: hallazgoId, file }: { id: string; file: File }) =>
+    mutationFn: ({ id: hallazgoId, file }: { id: string; file: File; successMessage: string }) =>
       hallazgosApi.uploadPhoto(hallazgoId, file),
-    onSuccess: () => {
-      showSuccess('Hallazgo y fotografía creados exitosamente');
-      finalizarCreacionHallazgo();
+    onSuccess: (_, variables) => {
+      guardarAccionCorrectiva(variables.id, variables.successMessage);
     },
     onError: () => {
       showError('Hallazgo creado, pero no se pudo adjuntar la fotografía');
@@ -122,16 +152,79 @@ export default function InspeccionDetailPage() {
     },
   });
 
+  const crearAccionMutation = useMutation({
+    mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
+    onSuccess: () => {
+      showSuccess('Hallazgo y acción correctiva guardados exitosamente');
+      finalizarCreacionHallazgo();
+    },
+    onError: () => {
+      showError('Hallazgo guardado, pero no se pudo crear la acción correctiva');
+      finalizarCreacionHallazgo();
+    },
+  });
+
+  const guardarAccionCorrectiva = (hallazgoId: string, successMessage: string) => {
+    if (accionDescripcion.trim() && accionFechaCompromiso) {
+      crearAccionMutation.mutate({
+        descripcion: accionDescripcion.trim(),
+        fechaCompromiso: accionFechaCompromiso,
+        hallazgoId,
+      });
+      return;
+    }
+    showSuccess(successMessage);
+    finalizarCreacionHallazgo();
+  };
+
   const finalizarCreacionHallazgo = () => {
     queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
+    setAccionDescripcion('');
+    setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
+    setEditingHallazgoId(null);
     setNuevoHallazgo({ nivelRiesgo: 'MEDIO' });
   };
 
+  const openHallazgoForItem = (itemId: string) => {
+    const item = inspeccion?.items?.find((candidate) => candidate.id === itemId);
+    if (!item) return;
+    const existing = inspeccion?.hallazgos?.find((hallazgo) => hallazgo.inspeccionItemId === itemId);
+    setEditingHallazgoId(existing?.id || null);
+    setNuevoHallazgo(existing
+      ? {
+          titulo: existing.titulo,
+          descripcion: existing.descripcion,
+          nivelRiesgo: existing.nivelRiesgo,
+          ubicacionTexto: existing.ubicacionTexto,
+          inspeccionId: id!,
+          inspeccionItemId: itemId,
+        }
+      : {
+          titulo: `Incumplimiento: ${item.checklistItem?.descripcion || 'Ítem de inspección'}`,
+          nivelRiesgo: 'MEDIO',
+          ubicacionTexto: inspeccion?.sector || '',
+          inspeccionId: id!,
+          inspeccionItemId: itemId,
+        });
+    setHallazgoDialogOpen(true);
+  };
+
+  const handleNoCumple = (itemId: string) => {
+    registrarItemMutation.mutate(
+      { itemId, cumplimiento: 'NO_CUMPLE' },
+      { onSuccess: () => openHallazgoForItem(itemId) },
+    );
+  };
+
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
-    if (cumplimiento === 'OBSERVACION' || cumplimiento === 'NO_CUMPLE') {
+    if (cumplimiento === 'NO_CUMPLE') {
+      handleNoCumple(itemId);
+    } else if (cumplimiento === 'OBSERVACION') {
       setSelectedItem(itemId);
+      setSelectedItemStatus(cumplimiento);
+      setObservacion(inspeccion?.items?.find((item) => item.id === itemId)?.observacion || '');
     } else {
       registrarItemMutation.mutate({ itemId, cumplimiento });
     }
@@ -143,7 +236,7 @@ export default function InspeccionDetailPage() {
       if (item) {
         registrarItemMutation.mutate({
           itemId: selectedItem,
-          cumplimiento: item.cumplimiento === 'PENDIENTE' ? 'OBSERVACION' : item.cumplimiento,
+          cumplimiento: selectedItemStatus || 'OBSERVACION',
           observacion,
         });
       }
@@ -152,10 +245,12 @@ export default function InspeccionDetailPage() {
 
   const handleCrearHallazgo = () => {
     if (nuevoHallazgo.titulo && nuevoHallazgo.descripcion && nuevoHallazgo.ubicacionTexto) {
-      crearHallazgoMutation.mutate({
-        ...nuevoHallazgo as CreateHallazgoDto,
-        inspeccionId: id!,
-      });
+      const data = nuevoHallazgo as CreateHallazgoDto;
+      if (editingHallazgoId) {
+        actualizarHallazgoMutation.mutate({ id: editingHallazgoId, data });
+      } else {
+        crearHallazgoMutation.mutate({ ...data, inspeccionId: id! });
+      }
     }
   };
 
@@ -191,6 +286,12 @@ export default function InspeccionDetailPage() {
   const itemsCompletados = inspeccion?.items?.filter((i) => i.cumplimiento !== 'PENDIENTE').length || 0;
   const totalItems = inspeccion?.items?.length || 0;
   const progreso = totalItems > 0 ? Math.round((itemsCompletados / totalItems) * 100) : 0;
+  const itemsNoAplica = inspeccion?.items?.filter((i) => i.cumplimiento === 'NO_APLICA').length || 0;
+  const itemsCumplen = inspeccion?.items?.filter((i) => i.cumplimiento === 'CUMPLE').length || 0;
+  const itemsEvaluables = totalItems - itemsNoAplica;
+  const porcentajeCumplimiento = itemsEvaluables > 0
+    ? Math.round((itemsCumplen / itemsEvaluables) * 100)
+    : 0;
 
   if (isLoading) {
     return (
@@ -284,10 +385,26 @@ export default function InspeccionDetailPage() {
 
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Progreso
+                    Progreso de respuestas
                   </Typography>
+                  <LinearProgress variant="determinate" value={progreso} sx={{ mt: 0.5, mb: 0.5 }} />
                   <Typography variant="body2">
-                    {itemsCompletados} / {totalItems} items ({progreso}%)
+                    {itemsCompletados} / {totalItems} respondidos ({progreso}%)
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Nivel de cumplimiento
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={porcentajeCumplimiento}
+                    color="success"
+                    sx={{ mt: 0.5, mb: 0.5 }}
+                  />
+                  <Typography variant="body2">
+                    {itemsCumplen} / {itemsEvaluables} cumplen ({porcentajeCumplimiento}%)
                   </Typography>
                 </Box>
               </Box>
@@ -311,7 +428,11 @@ export default function InspeccionDetailPage() {
                     startIcon={<AddIcon />}
                     fullWidth
                     sx={{ mt: 2 }}
-                    onClick={() => setHallazgoDialogOpen(true)}
+                    onClick={() => {
+                      setEditingHallazgoId(null);
+                      setNuevoHallazgo({ nivelRiesgo: 'MEDIO', inspeccionId: id! });
+                      setHallazgoDialogOpen(true);
+                    }}
                   >
                     Registrar Hallazgo
                   </Button>
@@ -399,18 +520,26 @@ export default function InspeccionDetailPage() {
                             if (value) handleCumplimiento(item.id, value);
                           }}
                         >
-                          <ToggleButton value="CUMPLE" color="success">
-                            <CumpleIcon />
-                          </ToggleButton>
-                          <ToggleButton value="NO_CUMPLE" color="error">
-                            <NoCumpleIcon />
-                          </ToggleButton>
-                          <ToggleButton value="OBSERVACION" color="warning">
-                            <ObservacionIcon />
-                          </ToggleButton>
-                          <ToggleButton value="NO_APLICA">
-                            <NoAplicaIcon />
-                          </ToggleButton>
+                          <Tooltip title="Cumple">
+                            <ToggleButton value="CUMPLE" color="success" aria-label="Cumple">
+                              <CumpleIcon />
+                            </ToggleButton>
+                          </Tooltip>
+                          <Tooltip title="No cumple">
+                            <ToggleButton value="NO_CUMPLE" color="error" aria-label="No cumple">
+                              <NoCumpleIcon />
+                            </ToggleButton>
+                          </Tooltip>
+                          <Tooltip title="Con observaciones">
+                            <ToggleButton value="OBSERVACION" color="warning" aria-label="Con observaciones">
+                              <ObservacionIcon />
+                            </ToggleButton>
+                          </Tooltip>
+                          <Tooltip title="No aplica">
+                            <ToggleButton value="NO_APLICA" aria-label="No aplica">
+                              <NoAplicaIcon />
+                            </ToggleButton>
+                          </Tooltip>
                         </ToggleButtonGroup>
                       ) : (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -428,7 +557,16 @@ export default function InspeccionDetailPage() {
       </Grid>
 
       {/* Dialog para observacion */}
-      <Dialog open={!!selectedItem} onClose={() => setSelectedItem(null)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={!!selectedItem}
+        onClose={() => {
+          setSelectedItem(null);
+          setSelectedItemStatus(null);
+          setObservacion('');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Agregar Observacion</DialogTitle>
         <DialogContent>
           <TextField
@@ -442,7 +580,15 @@ export default function InspeccionDetailPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelectedItem(null)}>Cancelar</Button>
+          <Button
+            onClick={() => {
+              setSelectedItem(null);
+              setSelectedItemStatus(null);
+              setObservacion('');
+            }}
+          >
+            Cancelar
+          </Button>
           <Button variant="contained" onClick={handleSaveObservacion}>
             Guardar
           </Button>
@@ -489,7 +635,7 @@ export default function InspeccionDetailPage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Registrar Hallazgo</DialogTitle>
+        <DialogTitle>{editingHallazgoId ? 'Editar Hallazgo' : 'Registrar Hallazgo'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
@@ -555,6 +701,28 @@ export default function InspeccionDetailPage() {
                 JPG, PNG o WEBP hasta 5 MiB
               </Typography>
             </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Acción correctiva (opcional)"
+                value={accionDescripcion}
+                onChange={(e) => setAccionDescripcion(e.target.value)}
+                helperText="Si la completa, se creará una acción pendiente vinculada al hallazgo."
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Fecha compromiso"
+                value={accionFechaCompromiso}
+                onChange={(e) => setAccionFechaCompromiso(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                disabled={!accionDescripcion.trim()}
+              />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -562,9 +730,11 @@ export default function InspeccionDetailPage() {
           <Button
             variant="contained"
             onClick={handleCrearHallazgo}
-            disabled={crearHallazgoMutation.isPending}
+            disabled={crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending}
           >
-            {crearHallazgoMutation.isPending ? 'Creando...' : 'Crear Hallazgo'}
+            {crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending
+              ? 'Guardando...'
+              : editingHallazgoId ? 'Guardar Hallazgo' : 'Crear Hallazgo'}
           </Button>
         </DialogActions>
       </Dialog>

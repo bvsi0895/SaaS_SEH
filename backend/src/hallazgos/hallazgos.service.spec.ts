@@ -156,3 +156,85 @@ describe('HallazgosService WebP optimization', () => {
     await expect(service.getPhoto('hallazgo-1', filename, 'empresa-origen', 'contexto-a')).resolves.toEqual(legacy);
   });
 });
+
+describe('HallazgosService linked inspection findings', () => {
+  it('validates the item belongs to the inspection before creating a finding', async () => {
+    const prisma = {
+      inspeccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'inspeccion-1',
+          empresaId: 'empresa-1',
+          organizacionEmpresaId: 'contexto-1',
+          estado: 'EN_PROGRESO',
+        }),
+      },
+      inspeccionItem: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'item-1', inspeccionId: 'otra-inspeccion' }),
+      },
+      hallazgo: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.create({
+      inspeccionId: 'inspeccion-1',
+      inspeccionItemId: 'item-1',
+      titulo: 'Incumplimiento de seguridad',
+      descripcion: 'Descripción suficientemente detallada',
+      nivelRiesgo: 'MEDIO',
+      ubicacionTexto: 'Sector A',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.hallazgo.create).not.toHaveBeenCalled();
+  });
+
+  it('updates the existing linked finding instead of creating a duplicate', async () => {
+    const existing = {
+      id: 'hallazgo-1',
+      fotosUrls: null,
+      inspeccion: {
+        id: 'inspeccion-1',
+        empresaId: 'empresa-1',
+        organizacionEmpresaId: 'contexto-1',
+        estado: 'EN_PROGRESO',
+      },
+      accionesCorrectivas: [],
+    };
+    const prisma = {
+      inspeccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'inspeccion-1',
+          empresaId: 'empresa-1',
+          organizacionEmpresaId: 'contexto-1',
+          estado: 'EN_PROGRESO',
+        }),
+      },
+      inspeccionItem: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'item-1', inspeccionId: 'inspeccion-1' }),
+      },
+      hallazgo: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({ id: 'hallazgo-1' })
+          .mockResolvedValueOnce(existing),
+        update: jest.fn().mockResolvedValue(existing),
+        create: jest.fn(),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await service.create({
+      inspeccionId: 'inspeccion-1',
+      inspeccionItemId: 'item-1',
+      titulo: 'Incumplimiento actualizado',
+      descripcion: 'Descripción actualizada suficientemente detallada',
+      nivelRiesgo: 'ALTO',
+      ubicacionTexto: 'Sector B',
+    }, 'empresa-1', 'contexto-1');
+
+    expect(prisma.hallazgo.create).not.toHaveBeenCalled();
+    expect(prisma.hallazgo.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'hallazgo-1' },
+    }));
+  });
+});

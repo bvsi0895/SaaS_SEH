@@ -7,8 +7,9 @@ export interface CreateHallazgoDto {
   nivelRiesgo: NivelRiesgo;
   ubicacionTexto: string;
   ubicacionGps?: string;
-  fotosUrls?: string;
+  fotosUrls?: string[];
   inspeccionId: string;
+  inspeccionItemId?: string;
 }
 
 export interface UpdateHallazgoDto {

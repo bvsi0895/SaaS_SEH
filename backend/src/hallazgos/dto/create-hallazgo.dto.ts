@@ -10,6 +10,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NivelRiesgo } from '@prisma/client';
 
 export class CreateHallazgoDto {
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'ID del ítem de inspección que originó el hallazgo',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  inspeccionItemId?: string;
+
   @ApiProperty({
     example: '550e8400-e29b-41d4-a716-446655440000',
     description: 'ID de la inspección',

@@ -114,6 +114,7 @@ export interface InspeccionItem {
   inspeccionId: string;
   checklistItemId: string;
   checklistItem?: ChecklistItem;
+  hallazgo?: Hallazgo;
 }
 
 export interface Inspeccion {
@@ -148,6 +149,7 @@ export interface Hallazgo {
   ubicacionGps?: string;
   fotosUrls?: string;
   inspeccionId: string;
+  inspeccionItemId?: string;
   inspeccion?: Inspeccion;
   accionesCorrectivas?: AccionCorrectiva[];
   createdAt: string;

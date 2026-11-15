@@ -238,9 +238,33 @@ export class HallazgosService {
       );
     }
 
+    if (createHallazgoDto.inspeccionItemId) {
+      const item = await this.prisma.inspeccionItem.findUnique({
+        where: { id: createHallazgoDto.inspeccionItemId },
+        select: { id: true, inspeccionId: true },
+      });
+      if (!item || item.inspeccionId !== createHallazgoDto.inspeccionId) {
+        throw new BadRequestException('El ítem no pertenece a la inspección');
+      }
+
+      const existing = await this.prisma.hallazgo.findUnique({
+        where: { inspeccionItemId: createHallazgoDto.inspeccionItemId },
+      });
+      if (existing) {
+        return this.update(existing.id, {
+          titulo: createHallazgoDto.titulo,
+          descripcion: createHallazgoDto.descripcion,
+          nivelRiesgo: createHallazgoDto.nivelRiesgo,
+          ubicacionTexto: createHallazgoDto.ubicacionTexto,
+          fotosUrls: createHallazgoDto.fotosUrls,
+        }, empresaId, organizacionEmpresaId);
+      }
+    }
+
     return this.prisma.hallazgo.create({
       data: {
         inspeccionId: createHallazgoDto.inspeccionId,
+        ...(createHallazgoDto.inspeccionItemId && { inspeccionItemId: createHallazgoDto.inspeccionItemId }),
         titulo: createHallazgoDto.titulo,
         descripcion: createHallazgoDto.descripcion,
         nivelRiesgo: createHallazgoDto.nivelRiesgo,
