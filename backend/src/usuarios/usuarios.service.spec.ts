@@ -21,7 +21,7 @@ describe('UsuariosService.changePassword', () => {
     service = new UsuariosService(prisma as never);
   });
 
-  it('verifies the current password, hashes the new one and returns no credentials', async () => {
+  it('verifies, hashes, invalidates the refresh token and returns no credentials', async () => {
     prisma.usuario.findUnique.mockResolvedValue({ id: 'user-1', password: 'stored-hash' });
     prisma.usuario.update.mockResolvedValue({ id: 'user-1' });
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -36,7 +36,7 @@ describe('UsuariosService.changePassword', () => {
     expect(bcrypt.hash).toHaveBeenCalledWith('NewPassword123!', 10);
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { password: 'new-hash' },
+      data: { password: 'new-hash', refreshToken: null },
     });
     expect(response).toEqual({ message: 'Contraseña actualizada exitosamente' });
     expect(JSON.stringify(response)).not.toContain('Password');
