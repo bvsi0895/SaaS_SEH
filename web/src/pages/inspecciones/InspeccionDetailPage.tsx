@@ -38,7 +38,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { inspeccionesApi } from '../../api/inspecciones';
 import { hallazgosApi, CreateHallazgoDto, UpdateHallazgoDto } from '../../api/hallazgos';
-import { accionesApi, CreateAccionDto } from '../../api/acciones';
+import { accionesApi, CreateAccionDto, UpdateAccionDto } from '../../api/acciones';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
@@ -57,6 +57,8 @@ export default function InspeccionDetailPage() {
   const [observacionesFinal, setObservacionesFinal] = useState('');
   const [hallazgoDialogOpen, setHallazgoDialogOpen] = useState(false);
   const [editingHallazgoId, setEditingHallazgoId] = useState<string | null>(null);
+  const [editingAccionId, setEditingAccionId] = useState<string | null>(null);
+  const [hallazgoOriginItemId, setHallazgoOriginItemId] = useState<string | null>(null);
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
   const [accionDescripcion, setAccionDescripcion] = useState('');
   const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
@@ -164,13 +166,30 @@ export default function InspeccionDetailPage() {
     },
   });
 
+  const actualizarAccionMutation = useMutation({
+    mutationFn: ({ id: accionId, data }: { id: string; data: UpdateAccionDto }) =>
+      accionesApi.update(accionId, data),
+    onSuccess: () => {
+      showSuccess('Hallazgo y acción correctiva actualizados exitosamente');
+      finalizarCreacionHallazgo();
+    },
+    onError: () => {
+      showError('Hallazgo actualizado, pero no se pudo actualizar la acción correctiva');
+      finalizarCreacionHallazgo();
+    },
+  });
+
   const guardarAccionCorrectiva = (hallazgoId: string, successMessage: string) => {
     if (accionDescripcion.trim() && accionFechaCompromiso) {
-      crearAccionMutation.mutate({
+      const data = {
         descripcion: accionDescripcion.trim(),
         fechaCompromiso: accionFechaCompromiso,
-        hallazgoId,
-      });
+      };
+      if (editingAccionId) {
+        actualizarAccionMutation.mutate({ id: editingAccionId, data });
+      } else {
+        crearAccionMutation.mutate({ ...data, hallazgoId });
+      }
       return;
     }
     showSuccess(successMessage);
@@ -184,6 +203,8 @@ export default function InspeccionDetailPage() {
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
     setEditingHallazgoId(null);
+    setEditingAccionId(null);
+    setHallazgoOriginItemId(null);
     setNuevoHallazgo({ nivelRiesgo: 'MEDIO' });
   };
 
@@ -192,6 +213,11 @@ export default function InspeccionDetailPage() {
     if (!item) return;
     const existing = inspeccion?.hallazgos?.find((hallazgo) => hallazgo.inspeccionItemId === itemId);
     setEditingHallazgoId(existing?.id || null);
+    setHallazgoOriginItemId(itemId);
+    const existingAction = existing?.accionesCorrectivas?.[0];
+    setEditingAccionId(existingAction?.id || null);
+    setAccionDescripcion(existingAction?.descripcion || '');
+    setAccionFechaCompromiso(existingAction?.fechaCompromiso?.slice(0, 10) || new Date().toISOString().slice(0, 10));
     setNuevoHallazgo(existing
       ? {
           titulo: existing.titulo,
@@ -216,6 +242,20 @@ export default function InspeccionDetailPage() {
       { itemId, cumplimiento: 'NO_CUMPLE' },
       { onSuccess: () => openHallazgoForItem(itemId) },
     );
+  };
+
+  const cancelarHallazgo = () => {
+    const hadLinkedNonCompliance = !!hallazgoOriginItemId;
+    setHallazgoDialogOpen(false);
+    setHallazgoPhoto(null);
+    setAccionDescripcion('');
+    setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
+    setEditingHallazgoId(null);
+    setEditingAccionId(null);
+    setHallazgoOriginItemId(null);
+    if (hadLinkedNonCompliance) {
+      showSuccess('El incumplimiento quedó guardado sin hallazgo. Puede registrarlo nuevamente desde el ítem.');
+    }
   };
 
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
@@ -430,6 +470,10 @@ export default function InspeccionDetailPage() {
                     sx={{ mt: 2 }}
                     onClick={() => {
                       setEditingHallazgoId(null);
+                      setEditingAccionId(null);
+                      setHallazgoOriginItemId(null);
+                      setAccionDescripcion('');
+                      setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
                       setNuevoHallazgo({ nivelRiesgo: 'MEDIO', inspeccionId: id! });
                       setHallazgoDialogOpen(true);
                     }}
@@ -631,7 +675,7 @@ export default function InspeccionDetailPage() {
       {/* Dialog para nuevo hallazgo */}
       <Dialog
         open={hallazgoDialogOpen}
-        onClose={() => setHallazgoDialogOpen(false)}
+        onClose={cancelarHallazgo}
         maxWidth="sm"
         fullWidth
       >
@@ -726,13 +770,13 @@ export default function InspeccionDetailPage() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setHallazgoDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={cancelarHallazgo}>Cancelar</Button>
           <Button
             variant="contained"
             onClick={handleCrearHallazgo}
-            disabled={crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending}
+            disabled={crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending}
           >
-            {crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending
+            {crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending
               ? 'Guardando...'
               : editingHallazgoId ? 'Guardar Hallazgo' : 'Crear Hallazgo'}
           </Button>

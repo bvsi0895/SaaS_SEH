@@ -58,6 +58,26 @@ describe('InspeccionesService respuestas', () => {
     expect(prisma.inspeccionItem.update).not.toHaveBeenCalled();
   });
 
+  it('does not persist an answer from another organization context', async () => {
+    prisma.inspeccion.findUnique.mockResolvedValue({
+      id: 'inspection-1',
+      empresaId: 'company-1',
+      organizacionEmpresaId: 'context-1',
+      estado: EstadoInspeccion.EN_PROGRESO,
+      items: [{ id: 'inspection-item-1' }],
+    });
+
+    await expect(
+      service.registrarItem(
+        'inspection-1',
+        { inspeccionItemId: 'inspection-item-1', cumplimiento: CumplimientoItem.NO_CUMPLE },
+        'company-1',
+        'context-2',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.inspeccionItem.update).not.toHaveBeenCalled();
+  });
+
   it('starts new inspections with unanswered items instead of counting them as compliant', async () => {
     prisma.checklist.findUnique.mockResolvedValue({
       id: 'checklist-1',

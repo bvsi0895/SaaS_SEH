@@ -224,7 +224,7 @@ model Inspeccion {
 
 model InspeccionItem {
   id           String           @id @default(uuid())
-  cumplimiento CumplimientoItem @default(CUMPLE)
+  cumplimiento CumplimientoItem @default(PENDIENTE)
   observacion  String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
