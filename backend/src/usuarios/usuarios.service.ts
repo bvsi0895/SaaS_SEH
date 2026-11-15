@@ -208,7 +208,7 @@ export class UsuariosService {
     // Actualizar
     await this.prisma.usuario.update({
       where: { id: userId },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, refreshToken: null },
     });
 
     return { message: 'Contraseña actualizada exitosamente' };
