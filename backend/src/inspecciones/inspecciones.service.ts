@@ -156,7 +156,7 @@ export class InspeccionesService {
         items: {
           create: checklist.items.map((item) => ({
             checklistItemId: item.id,
-            cumplimiento: CumplimientoItem.CUMPLE, // Por defecto
+            cumplimiento: CumplimientoItem.PENDIENTE,
           })),
         },
       },
@@ -326,8 +326,9 @@ export class InspeccionesService {
     ).length;
 
     const totalItems = inspeccion.items.length;
+    const itemsEvaluables = totalItems - itemsNoAplica;
     const porcentajeCumplimiento =
-      totalItems > 0 ? Math.round((itemsCumplen / (totalItems - itemsNoAplica)) * 100) : 0;
+      itemsEvaluables > 0 ? Math.round((itemsCumplen / itemsEvaluables) * 100) : 0;
 
     return {
       id: inspeccion.id,
