@@ -37,6 +37,8 @@ export default function AccionesPage() {
       }),
   });
 
+  const isClientPaginated = data ? !data.isPaginated : false;
+
   const isVencida = (accion: AccionCorrectiva) => {
     return (
       isPast(new Date(accion.fechaCompromiso)) &&
@@ -153,7 +155,7 @@ export default function AccionesPage() {
           columns={columns}
           rowCount={data?.total || 0}
           loading={isLoading}
-          paginationMode="server"
+          paginationMode={isClientPaginated ? 'client' : 'server'}
           paginationModel={{ page, pageSize }}
           onPaginationModelChange={(model) => {
             setPage(model.page);
