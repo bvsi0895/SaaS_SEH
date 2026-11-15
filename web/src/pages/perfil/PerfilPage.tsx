@@ -133,6 +133,7 @@ export default function PerfilPage() {
                     <TextField
                       fullWidth
                       type="password"
+                      autoComplete="current-password"
                       label="Contrasena actual"
                       error={!!errors.currentPassword}
                       helperText={errors.currentPassword?.message}
@@ -145,6 +146,7 @@ export default function PerfilPage() {
                     <TextField
                       fullWidth
                       type="password"
+                      autoComplete="new-password"
                       label="Nueva contrasena"
                       error={!!errors.newPassword}
                       helperText={errors.newPassword?.message}
@@ -155,8 +157,8 @@ export default function PerfilPage() {
                           message: 'Minimo 8 caracteres',
                         },
                         pattern: {
-                          value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-                          message: 'Debe contener mayuscula, minuscula y numero',
+                          value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).*$/,
+                          message: 'Debe contener mayuscula, minuscula, numero y caracter especial',
                         },
                       })}
                     />
@@ -165,6 +167,7 @@ export default function PerfilPage() {
                     <TextField
                       fullWidth
                       type="password"
+                      autoComplete="new-password"
                       label="Confirmar nueva contrasena"
                       error={!!errors.confirmPassword}
                       helperText={errors.confirmPassword?.message}
