@@ -3,16 +3,27 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { extname, join, basename } from 'path';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { join, basename } from 'path';
 import { randomUUID } from 'crypto';
+// Sharp is CommonJS at runtime in the current Nest/Jest toolchain.
+const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHallazgoDto, UpdateHallazgoDto } from './dto';
 import { NivelRiesgo, EstadoInspeccion } from '@prisma/client';
 
 @Injectable()
 export class HallazgosService {
-  constructor(private prisma: PrismaService) {}
+  private static activeImageOptimizations = 0;
+
+  constructor(private prisma: PrismaService) {
+    const configuredConcurrency = Number(process.env.SHARP_CONCURRENCY || 1);
+    const concurrency = Number.isFinite(configuredConcurrency) && configuredConcurrency >= 1
+      ? Math.floor(configuredConcurrency)
+      : 1;
+    sharp.concurrency(concurrency);
+    sharp.cache({ memory: 32, files: 0, items: 100 });
+  }
 
   private isSupportedImage(buffer: Buffer): boolean {
     return (
@@ -26,22 +37,77 @@ export class HallazgosService {
     return join(process.cwd(), process.env.UPLOAD_DIR || './uploads', 'hallazgos');
   }
 
+  private getMaxImagePixels(): number {
+    const configured = Number(process.env.MAX_IMAGE_PIXELS || 40_000_000);
+    return Number.isFinite(configured) && configured > 0 ? configured : 40_000_000;
+  }
+
+  private getWebpQuality(): number {
+    const configured = Number(process.env.WEBP_QUALITY || 82);
+    return Number.isFinite(configured) && configured >= 1 && configured <= 100 ? configured : 82;
+  }
+
+  private getMaxConcurrentOptimizations(): number {
+    const configured = Number(process.env.MAX_IMAGE_PROCESSING_CONCURRENCY || 1);
+    return Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 1;
+  }
+
+  private async optimizeImage(buffer: Buffer): Promise<Buffer> {
+    const maxConcurrent = this.getMaxConcurrentOptimizations();
+    while (HallazgosService.activeImageOptimizations >= maxConcurrent) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    HallazgosService.activeImageOptimizations += 1;
+    const maxImagePixels = this.getMaxImagePixels();
+    try {
+      const image = sharp(buffer, {
+        limitInputPixels: maxImagePixels,
+        failOn: 'warning',
+      });
+      const metadata = await image.metadata();
+      if (!metadata.width || !metadata.height || metadata.width * metadata.height > maxImagePixels) {
+        throw new Error('image dimensions exceed the configured limit');
+      }
+
+      return image
+        .rotate()
+        .resize({
+          width: 1920,
+          height: 1920,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .webp({ quality: this.getWebpQuality() })
+        .toBuffer();
+    } catch {
+      throw new BadRequestException('La imagen está corrupta o supera los límites permitidos');
+    } finally {
+      HallazgosService.activeImageOptimizations -= 1;
+    }
+  }
+
   async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
     if (!this.isSupportedImage(file.buffer)) {
       throw new BadRequestException('El contenido no corresponde a una imagen JPG, PNG o WEBP válida');
     }
-    const extension = extname(file.originalname).toLowerCase();
-    const filename = `${id}-${randomUUID()}${extension}`;
+    const optimized = await this.optimizeImage(file.buffer);
+    const filename = `${id}-${randomUUID()}.webp`;
     const uploadDir = this.getUploadDir();
     await mkdir(uploadDir, { recursive: true });
-    await writeFile(join(uploadDir, filename), file.buffer, { flag: 'wx' });
+    const filePath = join(uploadDir, filename);
+    await writeFile(filePath, optimized, { flag: 'wx' });
     const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
     photos.push(`/api/hallazgos/${id}/fotos/${filename}`);
-    return this.prisma.hallazgo.update({
-      where: { id },
-      data: { fotosUrls: JSON.stringify(photos) },
-    });
+    try {
+      return await this.prisma.hallazgo.update({
+        where: { id },
+        data: { fotosUrls: JSON.stringify(photos) },
+      });
+    } catch (error) {
+      await unlink(filePath).catch(() => undefined);
+      throw error;
+    }
   }
 
   async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string) {

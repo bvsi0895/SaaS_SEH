@@ -1,4 +1,5 @@
 import { PDFMensualGenerator, ReporteMensualData } from './pdf-mensual.generator';
+const sharp = require('sharp') as any;
 
 const onePixelPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -32,6 +33,15 @@ describe('PDFMensualGenerator', () => {
       { buffer: Buffer.from('invalid'), nombre: 'evidencia-invalida.png' },
       { buffer: onePixelPng, nombre: 'evidencia-2.png' },
     ];
+    const pdf = await new PDFMensualGenerator().generate(data);
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it('genera correctamente un informe con una fotografía WebP', async () => {
+    const webp = await sharp(onePixelPng).webp({ quality: 82 }).toBuffer();
+    const data = baseData();
+    data.fotos = [{ buffer: webp, nombre: 'evidencia-1.webp' }];
     const pdf = await new PDFMensualGenerator().generate(data);
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1000);
