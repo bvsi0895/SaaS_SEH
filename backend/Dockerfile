@@ -22,12 +22,21 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-COPY --from=builder /workspace/deploy ./
-COPY --from=builder /workspace/backend/prisma ./prisma
-COPY --from=builder /workspace/backend/dist ./dist
-
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001
+
+COPY --from=builder --chown=nestjs:nodejs /workspace/deploy ./
+COPY --from=builder --chown=nestjs:nodejs /workspace/backend/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /workspace/backend/dist ./dist
+
+# El contexto puede aportar archivos con permisos restrictivos (por ejemplo 0600).
+# Normalizamos lectura/ejecución para el usuario no privilegiado sin hacerlos públicos
+# de forma innecesaria y reservamos escritura para el volumen de uploads.
+RUN chmod -R u+rwX,go+rX /app \
+  && mkdir -p /app/uploads \
+  && chown -R nestjs:nodejs /app \
+  && chmod 700 /app/uploads
+
 USER nestjs
 
 # Exponer puerto
