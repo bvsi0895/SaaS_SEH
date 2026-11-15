@@ -45,10 +45,25 @@ export const hallazgosApi = {
     return response.data;
   },
 
-  uploadPhoto: async (id: string, file: File): Promise<Hallazgo> => {
+  uploadPhoto: async (
+    id: string,
+    file: File,
+    onUploadProgress?: (progress: number) => void,
+  ): Promise<Hallazgo> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post<Hallazgo>(`/hallazgos/${id}/fotos`, formData);
+    const response = await apiClient.post<Hallazgo>(`/hallazgos/${id}/fotos`, formData, {
+      onUploadProgress: (event) => {
+        if (event.total) onUploadProgress?.(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+    return response.data;
+  },
+
+  getPhoto: async (id: string, filename: string): Promise<Blob> => {
+    const response = await apiClient.get(`/hallazgos/${id}/fotos/${encodeURIComponent(filename)}`, {
+      responseType: 'blob',
+    });
     return response.data;
   },
 

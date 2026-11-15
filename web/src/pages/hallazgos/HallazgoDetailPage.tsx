@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,8 +20,12 @@ import {
   TextField,
   MenuItem,
   Skeleton,
+  Alert,
+  CircularProgress,
+  IconButton,
+  LinearProgress,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Close as CloseIcon, PhotoLibrary as PhotoLibraryIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { hallazgosApi } from '../../api/hallazgos';
@@ -31,6 +35,24 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { DatePicker } from '@mui/x-date-pickers';
+
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const getPhotoPaths = (fotosUrls?: string) => {
+  if (!fotosUrls) return [];
+  try {
+    const parsed = JSON.parse(fotosUrls);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const getPhotoFilename = (path: string) => {
+  const filename = path.split('/').pop() || path;
+  return decodeURIComponent(filename);
+};
 
 export default function HallazgoDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +64,15 @@ export default function HallazgoDetailPage() {
   const [nuevaAccion, setNuevaAccion] = useState<Partial<CreateAccionDto>>({
     fechaCompromiso: new Date().toISOString(),
   });
+  const [photoPreviews, setPhotoPreviews] = useState<Array<{ filename: string; url: string }>>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ filename: string; url: string } | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   const { data: hallazgo, isLoading } = useQuery({
     queryKey: ['hallazgo', id],
@@ -53,6 +84,85 @@ export default function HallazgoDetailPage() {
     queryKey: ['usuarios', 'tecnicos'],
     queryFn: usuariosApi.getTecnicos,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const createdPreviews: Array<{ filename: string; url: string }> = [];
+    const urls = getPhotoPaths(hallazgo?.fotosUrls);
+    setPhotoPreviews([]);
+    setSelectedPhoto(null);
+    setPhotoError(null);
+    if (!id || urls.length === 0) {
+      setPhotoLoading(false);
+      return () => undefined;
+    }
+
+    setPhotoLoading(true);
+    Promise.all(urls.map(async (path) => {
+      const filename = getPhotoFilename(path);
+      const blob = await hallazgosApi.getPhoto(id, filename);
+      const preview = { filename, url: URL.createObjectURL(blob) };
+      createdPreviews.push(preview);
+      return preview;
+    }))
+      .then((previews) => {
+        if (cancelled) {
+          previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+          return;
+        }
+        setPhotoPreviews(previews);
+      })
+      .catch(() => {
+        createdPreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+        if (!cancelled) setPhotoError('No se pudieron cargar las evidencias fotográficas');
+      })
+      .finally(() => {
+        if (!cancelled) setPhotoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      createdPreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [id, hallazgo?.fotosUrls]);
+
+  const handlePhotoSelection = (files: FileList | null) => {
+    setUploadError(null);
+    setUploadSuccess(null);
+    const validFiles = Array.from(files || []).filter((file) => {
+      if (!PHOTO_TYPES.has(file.type) || file.size > MAX_PHOTO_SIZE) {
+        setUploadError('Solo se aceptan JPG, PNG o WebP de hasta 5 MiB por archivo');
+        return false;
+      }
+      return true;
+    });
+    setSelectedFiles(validFiles);
+    setUploadProgress({});
+  };
+
+  const handleUploadPhotos = async () => {
+    if (!id || selectedFiles.length === 0) return;
+    setUploadingPhotos(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      for (const file of selectedFiles) {
+        setUploadProgress((current) => ({ ...current, [file.name]: 0 }));
+        await hallazgosApi.uploadPhoto(id, file, (progress) => {
+          setUploadProgress((current) => ({ ...current, [file.name]: progress }));
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
+      setSelectedFiles([]);
+      setUploadProgress({});
+      setUploadSuccess(`${selectedFiles.length} fotografía(s) cargada(s) correctamente`);
+    } catch {
+      setUploadError('No se pudieron cargar todas las fotografías. Las ya confirmadas se conservaron.');
+      await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
 
   const crearAccionMutation = useMutation({
     mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
@@ -155,6 +265,73 @@ export default function HallazgoDetailPage() {
                     {format(new Date(hallazgo.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}
                   </Typography>
                 </Box>
+
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Evidencias fotográficas ({photoPreviews.length})
+                    </Typography>
+                    {photoLoading && <CircularProgress size={18} aria-label="Cargando fotografías" />}
+                  </Box>
+                  {photoError && <Alert severity="error" sx={{ mb: 1 }}>{photoError}</Alert>}
+                  {!photoLoading && !photoError && photoPreviews.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">No hay fotografías asociadas</Typography>
+                  )}
+                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 1 }}>
+                    {photoPreviews.map((preview) => (
+                      <Box
+                        key={preview.filename}
+                        component="button"
+                        type="button"
+                        onClick={() => setSelectedPhoto(preview)}
+                        aria-label={`Ampliar evidencia ${preview.filename}`}
+                        sx={{ border: 0, p: 0, background: 'none', cursor: 'pointer', flex: '0 0 auto' }}
+                      >
+                        <Box
+                          component="img"
+                          src={preview.url}
+                          alt={`Evidencia ${preview.filename}`}
+                          sx={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 1, display: 'block' }}
+                        />
+                      </Box>
+                    ))}
+                  </Box>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    size="small"
+                    startIcon={<PhotoLibraryIcon />}
+                    disabled={uploadingPhotos}
+                  >
+                    Seleccionar fotografías
+                    <input
+                      hidden
+                      multiple
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) => handlePhotoSelection(event.target.files)}
+                    />
+                  </Button>
+                  {selectedFiles.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      {selectedFiles.map((file) => (
+                        <Box key={`${file.name}-${file.lastModified}`} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {file.name}
+                          </Typography>
+                          {uploadProgress[file.name] !== undefined && (
+                            <LinearProgress variant="determinate" value={uploadProgress[file.name]} sx={{ width: 100 }} />
+                          )}
+                        </Box>
+                      ))}
+                      <Button variant="contained" size="small" onClick={handleUploadPhotos} disabled={uploadingPhotos}>
+                        {uploadingPhotos ? 'Cargando...' : 'Subir fotografías'}
+                      </Button>
+                    </Box>
+                  )}
+                  {uploadError && <Alert severity="error" sx={{ mt: 1 }}>{uploadError}</Alert>}
+                  {uploadSuccess && <Alert severity="success" sx={{ mt: 1 }}>{uploadSuccess}</Alert>}
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -215,6 +392,20 @@ export default function HallazgoDetailPage() {
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog open={!!selectedPhoto} onClose={() => setSelectedPhoto(null)} maxWidth="md">
+        <DialogTitle sx={{ pr: 6 }}>
+          Evidencia fotográfica
+          <IconButton aria-label="Cerrar visor" onClick={() => setSelectedPhoto(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center' }}>
+          {selectedPhoto && (
+            <Box component="img" src={selectedPhoto.url} alt={`Evidencia ${selectedPhoto.filename}`} sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para nueva accion */}
       <Dialog

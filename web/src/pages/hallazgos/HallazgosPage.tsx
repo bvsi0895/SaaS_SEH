@@ -10,6 +10,7 @@ import {
   Grid,
   IconButton,
   Tooltip,
+  Button,
 } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { Visibility as ViewIcon } from '@mui/icons-material';
@@ -19,6 +20,16 @@ import { hallazgosApi } from '../../api/hallazgos';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { Hallazgo } from '../../types';
+
+const getPhotoCount = (fotosUrls?: string) => {
+  if (!fotosUrls) return 0;
+  try {
+    const parsed = JSON.parse(fotosUrls);
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+};
 
 export default function HallazgosPage() {
   const navigate = useNavigate();
@@ -70,6 +81,22 @@ export default function HallazgosPage() {
       width: 130,
       valueFormatter: (params) =>
         format(new Date(params.value), 'dd/MM/yyyy', { locale: es }),
+    },
+    {
+      field: 'evidencias',
+      headerName: 'Evidencias',
+      width: 110,
+      sortable: false,
+      valueGetter: (params) => getPhotoCount(params.row.fotosUrls),
+      renderCell: (params: GridRenderCellParams<Hallazgo>) => (
+        <Button
+          size="small"
+          onClick={() => navigate(`/hallazgos/${params.row.id}`)}
+          aria-label={`Ver ${getPhotoCount(params.row.fotosUrls)} evidencias`}
+        >
+          {getPhotoCount(params.row.fotosUrls)} foto{getPhotoCount(params.row.fotosUrls) === 1 ? '' : 's'}
+        </Button>
+      ),
     },
     {
       field: 'acciones',
