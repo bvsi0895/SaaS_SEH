@@ -58,7 +58,7 @@ export const checklistsApi = {
     itemId: string,
     data: Partial<CreateChecklistItemDto>
   ): Promise<ChecklistItem> => {
-    const response = await apiClient.patch<ChecklistItem>(
+    const response = await apiClient.put<ChecklistItem>(
       `/checklists/items/${itemId}`,
       data
     );
