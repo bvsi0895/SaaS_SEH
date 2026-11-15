@@ -564,26 +564,34 @@ export default function InspeccionDetailPage() {
                             if (value) handleCumplimiento(item.id, value);
                           }}
                         >
-                          <Tooltip title="Cumple">
-                            <ToggleButton value="CUMPLE" color="success" aria-label="Cumple">
+                          <ToggleButton value="CUMPLE" color="success" aria-label="Cumple">
+                            <Tooltip title="Cumple">
+                              <span>
                               <CumpleIcon />
-                            </ToggleButton>
-                          </Tooltip>
-                          <Tooltip title="No cumple">
-                            <ToggleButton value="NO_CUMPLE" color="error" aria-label="No cumple">
+                              </span>
+                            </Tooltip>
+                          </ToggleButton>
+                          <ToggleButton value="NO_CUMPLE" color="error" aria-label="No cumple">
+                            <Tooltip title="No cumple">
+                              <span>
                               <NoCumpleIcon />
-                            </ToggleButton>
-                          </Tooltip>
-                          <Tooltip title="Con observaciones">
-                            <ToggleButton value="OBSERVACION" color="warning" aria-label="Con observaciones">
+                              </span>
+                            </Tooltip>
+                          </ToggleButton>
+                          <ToggleButton value="OBSERVACION" color="warning" aria-label="Con observaciones">
+                            <Tooltip title="Con observaciones">
+                              <span>
                               <ObservacionIcon />
-                            </ToggleButton>
-                          </Tooltip>
-                          <Tooltip title="No aplica">
-                            <ToggleButton value="NO_APLICA" aria-label="No aplica">
+                              </span>
+                            </Tooltip>
+                          </ToggleButton>
+                          <ToggleButton value="NO_APLICA" aria-label="No aplica">
+                            <Tooltip title="No aplica">
+                              <span>
                               <NoAplicaIcon />
-                            </ToggleButton>
-                          </Tooltip>
+                              </span>
+                            </Tooltip>
+                          </ToggleButton>
                         </ToggleButtonGroup>
                       ) : (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

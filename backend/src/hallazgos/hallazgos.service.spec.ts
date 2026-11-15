@@ -155,6 +155,20 @@ describe('HallazgosService WebP optimization', () => {
 
     await expect(service.getPhoto('hallazgo-1', filename, 'empresa-origen', 'contexto-a')).resolves.toEqual(legacy);
   });
+
+  it('appends a second photo without removing the first one', async () => {
+    const first = await sharp({ create: { width: 20, height: 20, channels: 3, background: 'red' } }).jpeg().toBuffer();
+    const second = await sharp({ create: { width: 24, height: 24, channels: 3, background: 'blue' } }).png().toBuffer();
+
+    await service.addPhoto('hallazgo-1', 'empresa-origen', { buffer: first, originalname: 'first.jpg' }, 'contexto-a');
+    const firstPhoto = JSON.parse(hallazgo.fotosUrls as string)[0];
+    await service.addPhoto('hallazgo-1', 'empresa-origen', { buffer: second, originalname: 'second.png' }, 'contexto-a');
+
+    const photos = JSON.parse(hallazgo.fotosUrls as string) as string[];
+    expect(photos).toHaveLength(2);
+    expect(photos[0]).toBe(firstPhoto);
+    expect(photos[1]).toMatch(/\.webp$/);
+  });
 });
 
 describe('HallazgosService linked inspection findings', () => {
