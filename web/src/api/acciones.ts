@@ -1,5 +1,6 @@
 import apiClient from './client';
 import type { AccionCorrectiva, EstadoAccion } from '../types';
+import { normalizeAccionesResponse } from './normalize-acciones-response';
 
 export interface CreateAccionDto {
   descripcion: string;
@@ -23,8 +24,11 @@ export const accionesApi = {
     estado?: EstadoAccion;
     responsableId?: string;
   }): Promise<{ data: AccionCorrectiva[]; total: number }> => {
-    const response = await apiClient.get('/acciones-correctivas', { params });
-    return response.data;
+    const response = await apiClient.get<AccionCorrectiva[] | { data: AccionCorrectiva[]; total: number }>(
+      '/acciones-correctivas',
+      { params },
+    );
+    return normalizeAccionesResponse(response.data);
   },
 
   getById: async (id: string): Promise<AccionCorrectiva> => {
