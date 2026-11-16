@@ -82,9 +82,7 @@ export class UsuariosController {
     @CurrentUser('organizacionId') organizacionId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    // Forzar que el usuario sea de la misma empresa
-    createUsuarioDto.empresaId = empresaId;
-    return this.usuariosService.create(createUsuarioDto, organizacionId, organizacionEmpresaId);
+    return this.usuariosService.create(createUsuarioDto, empresaId, organizacionId, organizacionEmpresaId);
   }
 
   @Put(':id')

@@ -12,7 +12,10 @@ import {
   Avatar,
   Alert,
   Chip,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi } from '../../api/auth';
 import PageHeader from '../../components/common/PageHeader';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +39,9 @@ export default function PerfilPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const {
     register,
@@ -54,11 +60,11 @@ export default function PerfilPage() {
 
     try {
       await authApi.changePassword(data.currentPassword, data.newPassword);
-      showSuccess('Contrasena actualizada exitosamente');
+      showSuccess('Contraseña actualizada exitosamente');
       setSuccess(true);
       reset();
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Error al cambiar la contrasena';
+      const message = err.response?.data?.message || 'Error al cambiar la contraseña';
       setError(message);
       showError(message);
     } finally {
@@ -106,12 +112,12 @@ export default function PerfilPage() {
           </Card>
         </Grid>
 
-        {/* Cambiar contrasena */}
+        {/* Cambiar contraseña */}
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Cambiar Contrasena
+                Cambiar contraseña
               </Typography>
               <Divider sx={{ mb: 3 }} />
 
@@ -123,7 +129,7 @@ export default function PerfilPage() {
 
               {success && (
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  Contrasena actualizada exitosamente
+                  Contraseña actualizada exitosamente
                 </Alert>
               )}
 
@@ -132,33 +138,55 @@ export default function PerfilPage() {
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showCurrentPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      label="Contrasena actual"
+                      label="Contraseña actual"
                       error={!!errors.currentPassword}
                       helperText={errors.currentPassword?.message}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={showCurrentPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                              onClick={() => setShowCurrentPassword((visible) => !visible)}
+                              edge="end"
+                            >
+                              {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                       {...register('currentPassword', {
-                        required: 'Ingresa tu contrasena actual',
+                        required: 'Ingresa tu contraseña actual',
                       })}
                     />
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showNewPassword ? 'text' : 'password'}
                       autoComplete="new-password"
-                      label="Nueva contrasena"
+                      label="Nueva contraseña"
                       error={!!errors.newPassword}
-                      helperText={errors.newPassword?.message}
+                      helperText={errors.newPassword?.message || 'Mínimo 8 caracteres'}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={showNewPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                              onClick={() => setShowNewPassword((visible) => !visible)}
+                              edge="end"
+                            >
+                              {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                       {...register('newPassword', {
-                        required: 'Ingresa la nueva contrasena',
+                        required: 'Ingresa la nueva contraseña',
                         minLength: {
                           value: 8,
-                          message: 'Minimo 8 caracteres',
-                        },
-                        pattern: {
-                          value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).*$/,
-                          message: 'Debe contener mayuscula, minuscula, numero y caracter especial',
+                          message: 'La contraseña debe tener al menos 8 caracteres',
                         },
                       })}
                     />
@@ -166,15 +194,28 @@ export default function PerfilPage() {
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showConfirmPassword ? 'text' : 'password'}
                       autoComplete="new-password"
-                      label="Confirmar nueva contrasena"
+                      label="Confirmar nueva contraseña"
                       error={!!errors.confirmPassword}
                       helperText={errors.confirmPassword?.message}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                              onClick={() => setShowConfirmPassword((visible) => !visible)}
+                              edge="end"
+                            >
+                              {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                       {...register('confirmPassword', {
-                        required: 'Confirma la nueva contrasena',
+                        required: 'Confirma la nueva contraseña',
                         validate: (value) =>
-                          value === newPassword || 'Las contrasenas no coinciden',
+                          value === newPassword || 'Las contraseñas no coinciden',
                       })}
                     />
                   </Grid>
@@ -185,7 +226,7 @@ export default function PerfilPage() {
                       disabled={isLoading}
                       sx={{ mt: 1 }}
                     >
-                      {isLoading ? 'Cambiando...' : 'Cambiar Contrasena'}
+                      {isLoading ? 'Cambiando...' : 'Cambiar contraseña'}
                     </Button>
                   </Grid>
                 </Grid>

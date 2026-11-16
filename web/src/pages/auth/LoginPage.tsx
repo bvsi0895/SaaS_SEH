@@ -79,7 +79,7 @@ export default function LoginPage() {
 
       <TextField
         fullWidth
-        label="Contrasena"
+        label="Contraseña"
         type={showPassword ? 'text' : 'password'}
         margin="normal"
         autoComplete="current-password"
@@ -103,11 +103,7 @@ export default function LoginPage() {
           ),
         }}
         {...register('password', {
-          required: 'La contrasena es requerida',
-          minLength: {
-            value: 6,
-            message: 'La contrasena debe tener al menos 6 caracteres',
-          },
+          required: 'La contraseña es requerida',
         })}
       />
 

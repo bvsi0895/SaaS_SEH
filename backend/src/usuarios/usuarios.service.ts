@@ -8,7 +8,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto, AdminChangePasswordDto } from './dto';
-import { Rol } from '@prisma/client';
+import { EstadoRelacionEmpresa, Rol } from '@prisma/client';
 import { RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -91,7 +91,12 @@ export class UsuariosService {
   /**
    * Crear nuevo usuario
    */
-  async create(createUsuarioDto: CreateUsuarioDto, organizacionId?: string, organizacionEmpresaId?: string) {
+  async create(
+    createUsuarioDto: CreateUsuarioDto,
+    empresaId: string,
+    organizacionId?: string,
+    organizacionEmpresaId?: string,
+  ) {
     // Verificar que el email no existe
     const existingUser = await this.findByEmail(createUsuarioDto.email);
     if (existingUser) {
@@ -100,11 +105,26 @@ export class UsuariosService {
 
     // Verificar que la empresa existe
     const empresa = await this.prisma.empresa.findUnique({
-      where: { id: createUsuarioDto.empresaId },
+      where: { id: empresaId },
     });
 
     if (!empresa) {
       throw new BadRequestException('Empresa no encontrada');
+    }
+
+    if (organizacionId && organizacionEmpresaId) {
+      const relacion = await this.prisma.organizacionEmpresa.findUnique({
+        where: { id: organizacionEmpresaId },
+        select: { id: true, organizacionId: true, empresaId: true, estado: true },
+      });
+      if (
+        !relacion ||
+        relacion.organizacionId !== organizacionId ||
+        relacion.empresaId !== empresaId ||
+        relacion.estado !== EstadoRelacionEmpresa.ACTIVA
+      ) {
+        throw new ForbiddenException('La empresa no pertenece a la organización activa');
+      }
     }
 
     // Hash de la contraseña
@@ -118,7 +138,7 @@ export class UsuariosService {
           nombre: createUsuarioDto.nombre,
           apellido: createUsuarioDto.apellido,
           rol: createUsuarioDto.rol || Rol.TECNICO,
-          empresaId: createUsuarioDto.empresaId,
+          empresaId,
         },
         select: {
           id: true,
@@ -148,7 +168,7 @@ export class UsuariosService {
             organizacionEmpresaId,
             organizacionMiembroId: membership.id,
             organizacionId,
-            empresaId: createUsuarioDto.empresaId,
+            empresaId,
             rol: createUsuarioDto.rol || Rol.TECNICO,
             activo: true,
           },

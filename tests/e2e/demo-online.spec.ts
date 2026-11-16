@@ -22,7 +22,7 @@ test('recorre la demo en el viewport configurado', async ({ page }, testInfo) =>
 
   await page.goto('/login');
   await page.getByLabel('Correo electronico').fill(email!);
-  await page.getByLabel('Contrasena').fill(password!);
+  await page.getByLabel('Contraseña').fill(password!);
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: /Bienvenido/ })).toBeVisible();
