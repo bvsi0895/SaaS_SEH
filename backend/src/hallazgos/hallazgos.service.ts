@@ -86,8 +86,8 @@ export class HallazgosService {
     }
   }
 
-  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string, usuarioId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
     if (!this.isSupportedImage(file.buffer)) {
       throw new BadRequestException('El contenido no corresponde a una imagen JPG, PNG o WEBP válida');
     }
@@ -110,8 +110,8 @@ export class HallazgosService {
     }
   }
 
-  async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
     const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
     if (!photos.some((photo) => basename(photo) === filename)) {
       throw new NotFoundException('Foto no encontrada');
@@ -137,6 +137,7 @@ export class HallazgosService {
       fechaHasta?: Date;
     },
     organizacionEmpresaId?: string,
+    usuarioId?: string,
   ) {
     return this.prisma.hallazgo.findMany({
       where: {
@@ -150,6 +151,12 @@ export class HallazgosService {
         }),
         ...(filters?.fechaDesde && { createdAt: { gte: filters.fechaDesde } }),
         ...(filters?.fechaHasta && { createdAt: { lte: filters.fechaHasta } }),
+        ...(usuarioId && {
+          OR: [
+            { inspeccion: { usuarioId } },
+            { accionesCorrectivas: { some: { responsableId: usuarioId } } },
+          ],
+        }),
       },
       include: {
         inspeccion: {
@@ -172,7 +179,7 @@ export class HallazgosService {
   /**
    * Obtener hallazgo por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.prisma.hallazgo.findUnique({
       where: { id },
       include: {
@@ -207,6 +214,13 @@ export class HallazgosService {
     if (organizacionEmpresaId && hallazgo.inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
+    if (
+      usuarioId &&
+      hallazgo.inspeccion.usuario.id !== usuarioId &&
+      !hallazgo.accionesCorrectivas.some((accion) => accion.responsable?.id === usuarioId)
+    ) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
 
     return hallazgo;
   }
@@ -214,7 +228,7 @@ export class HallazgosService {
   /**
    * Crear nuevo hallazgo
    */
-  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string) {
+  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     // Verificar que la inspección existe
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: createHallazgoDto.inspeccionId },
@@ -228,6 +242,9 @@ export class HallazgosService {
       throw new NotFoundException('Inspección no encontrada');
     }
     if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Inspección no encontrada');
+    }
+    if (usuarioId && inspeccion.usuarioId !== usuarioId) {
       throw new NotFoundException('Inspección no encontrada');
     }
 
@@ -257,7 +274,7 @@ export class HallazgosService {
           nivelRiesgo: createHallazgoDto.nivelRiesgo,
           ubicacionTexto: createHallazgoDto.ubicacionTexto,
           fotosUrls: createHallazgoDto.fotosUrls,
-        }, empresaId, organizacionEmpresaId);
+        }, empresaId, organizacionEmpresaId, usuarioId);
       }
     }
 
@@ -284,8 +301,8 @@ export class HallazgosService {
   /**
    * Actualizar hallazgo
    */
-  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     // Solo editar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
@@ -308,8 +325,8 @@ export class HallazgosService {
   /**
    * Eliminar hallazgo
    */
-  async remove(id: string, empresaId?: string, organizacionEmpresaId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async remove(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     // Solo eliminar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {

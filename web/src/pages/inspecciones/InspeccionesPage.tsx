@@ -22,15 +22,17 @@ import { inspeccionesApi } from '../../api/inspecciones';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { Inspeccion } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function InspeccionesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState<string>('');
+  const { user, activeContextId } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['inspecciones', page, pageSize, estadoFilter],
+    queryKey: ['inspecciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter],
     queryFn: () =>
       inspeccionesApi.getAll({
         page: page + 1,
@@ -150,10 +152,12 @@ export default function InspeccionesPage() {
                 select
                 label="Estado"
                 value={estadoFilter}
-                onChange={(e) => setEstadoFilter(e.target.value)}
+                onChange={(e) => {
+                  setEstadoFilter(e.target.value);
+                  setPage(0);
+                }}
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="PENDIENTE">Pendiente</MenuItem>
                 <MenuItem value="EN_PROGRESO">En Progreso</MenuItem>
                 <MenuItem value="COMPLETADA">Completada</MenuItem>
                 <MenuItem value="CANCELADA">Cancelada</MenuItem>
@@ -169,7 +173,7 @@ export default function InspeccionesPage() {
           columns={columns}
           rowCount={data?.total || 0}
           loading={isLoading}
-          paginationMode="server"
+          paginationMode={data && !data.isPaginated ? 'client' : 'server'}
           paginationModel={{ page, pageSize }}
           onPaginationModelChange={(model) => {
             setPage(model.page);

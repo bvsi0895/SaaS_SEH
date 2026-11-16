@@ -34,6 +34,7 @@ import { usuariosApi } from '../../api/usuarios';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { DatePicker } from '@mui/x-date-pickers';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -59,6 +60,8 @@ export default function HallazgoDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
+  const { user, activeContextId } = useAuth();
+  const isTechnician = user?.rol === 'TECNICO';
 
   const [accionDialogOpen, setAccionDialogOpen] = useState(false);
   const [nuevaAccion, setNuevaAccion] = useState<Partial<CreateAccionDto>>({
@@ -75,13 +78,13 @@ export default function HallazgoDetailPage() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   const { data: hallazgo, isLoading } = useQuery({
-    queryKey: ['hallazgo', id],
+    queryKey: ['hallazgo', id, activeContextId, user?.id, user?.rol],
     queryFn: () => hallazgosApi.getById(id!),
     enabled: !!id,
   });
 
   const { data: tecnicos } = useQuery({
-    queryKey: ['usuarios', 'tecnicos'],
+    queryKey: ['usuarios', 'tecnicos', activeContextId, user?.id, user?.rol],
     queryFn: usuariosApi.getTecnicos,
   });
 
@@ -297,7 +300,7 @@ export default function HallazgoDetailPage() {
                       </Box>
                     ))}
                   </Box>
-                  <Button
+              <Button
                     component="label"
                     variant="outlined"
                     size="small"
@@ -312,7 +315,7 @@ export default function HallazgoDetailPage() {
                       accept="image/jpeg,image/png,image/webp"
                       onChange={(event) => handlePhotoSelection(event.target.files)}
                     />
-                  </Button>
+              </Button>
                   {selectedFiles.length > 0 && (
                     <Box sx={{ mt: 1 }}>
                       {selectedFiles.map((file) => (
@@ -351,14 +354,14 @@ export default function HallazgoDetailPage() {
                 }}
               >
                 <Typography variant="h6">Acciones Correctivas</Typography>
-                <Button
+                {!isTechnician && <Button
                   variant="contained"
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={() => setAccionDialogOpen(true)}
                 >
                   Nueva Accion
-                </Button>
+                </Button>}
               </Box>
               <Divider sx={{ mb: 2 }} />
 

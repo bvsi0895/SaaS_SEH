@@ -49,6 +49,8 @@ export class HallazgosController {
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @Query('nivelRiesgo') nivelRiesgo?: NivelRiesgo,
     @Query('inspeccionId') inspeccionId?: string,
     @Query('conAccionesCorrectivas') conAccionesCorrectivas?: boolean,
@@ -61,7 +63,7 @@ export class HallazgosController {
       conAccionesCorrectivas,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    }, organizacionEmpresaId);
+    }, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Get('estadisticas')
@@ -92,8 +94,10 @@ export class HallazgosController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.hallazgosService.findOne(id, empresaId, organizacionEmpresaId);
+    return this.hallazgosService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post()
@@ -104,8 +108,10 @@ export class HallazgosController {
     @Body() createHallazgoDto: CreateHallazgoDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.hallazgosService.create(createHallazgoDto, empresaId, organizacionEmpresaId);
+    return this.hallazgosService.create(createHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post(':id/fotos')
@@ -125,12 +131,14 @@ export class HallazgosController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @UploadedFile() file?: { buffer: Buffer; originalname: string },
   ) {
     if (!file) {
       throw new BadRequestException('Se requiere una imagen JPG, PNG o WEBP');
     }
-    return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId);
+    return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Get(':id/fotos/:filename')
@@ -140,9 +148,11 @@ export class HallazgosController {
     @Param('filename') filename: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @Res() res: Response,
   ) {
-    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId, organizacionEmpresaId);
+    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
     res.type(filename).send(photo);
   }
 
@@ -155,8 +165,10 @@ export class HallazgosController {
     @Body() updateHallazgoDto: UpdateHallazgoDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.hallazgosService.update(id, updateHallazgoDto, empresaId, organizacionEmpresaId);
+    return this.hallazgosService.update(id, updateHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Delete(':id')
@@ -167,7 +179,9 @@ export class HallazgosController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.hallazgosService.remove(id, empresaId, organizacionEmpresaId);
+    return this.hallazgosService.remove(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 }

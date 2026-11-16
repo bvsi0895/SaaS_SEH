@@ -38,7 +38,7 @@ export class InspeccionesController {
   constructor(private readonly inspeccionesService: InspeccionesService) {}
 
   @Get()
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Listar todas las inspecciones de la empresa' })
   @ApiQuery({ name: 'estado', enum: EstadoInspeccion, required: false })
   @ApiQuery({ name: 'usuarioId', required: false })
@@ -50,6 +50,8 @@ export class InspeccionesController {
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @Query('estado') estado?: EstadoInspeccion,
     @Query('usuarioId') usuarioId?: string,
     @Query('checklistId') checklistId?: string,
@@ -59,7 +61,7 @@ export class InspeccionesController {
   ) {
     return this.inspeccionesService.findAll(empresaId, {
       estado,
-      usuarioId,
+      usuarioId: currentUserRole === Rol.TECNICO ? currentUserId : usuarioId,
       checklistId,
       sector,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
@@ -88,8 +90,10 @@ export class InspeccionesController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.findOne(id, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Get(':id/resumen')
@@ -99,8 +103,10 @@ export class InspeccionesController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.getResumen(id, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.getResumen(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post()
@@ -124,8 +130,10 @@ export class InspeccionesController {
     @Body() updateInspeccionDto: UpdateInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Patch(':id/item')
@@ -136,8 +144,10 @@ export class InspeccionesController {
     @Body() registrarItemDto: RegistrarItemDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Patch(':id/items')
@@ -148,8 +158,10 @@ export class InspeccionesController {
     @Body() registrarDto: RegistrarMultiplesItemsDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post(':id/finalizar')
@@ -161,8 +173,10 @@ export class InspeccionesController {
     @Body() finalizarDto: FinalizarInspeccionDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post(':id/cancelar')
@@ -172,7 +186,9 @@ export class InspeccionesController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.cancelar(id, empresaId, organizacionEmpresaId);
+    return this.inspeccionesService.cancelar(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 }

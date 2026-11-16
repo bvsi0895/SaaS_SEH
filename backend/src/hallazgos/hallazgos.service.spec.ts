@@ -18,6 +18,27 @@ const createHallazgo = () => ({
 });
 
 describe('HallazgosService authorization', () => {
+  it('allows a technician to see own-inspection findings but not another technician\'s finding', async () => {
+    const prisma = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...createHallazgo(),
+          inspeccion: {
+            ...createHallazgo().inspeccion,
+            usuario: { id: 'technician-a' },
+          },
+          accionesCorrectivas: [],
+        }),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-b'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-a'))
+      .resolves.toBeDefined();
+  });
+
   it('does not expose a finding from another company', async () => {
     const prisma = {
       hallazgo: {

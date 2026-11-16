@@ -30,5 +30,6 @@ test('marks a complete array so the grid can paginate pages 1 and 2 locally', ()
 
 test('switches the grid to client pagination only for complete arrays and keeps the status filter', () => {
   assert.match(actionsPage, /paginationMode=\{isClientPaginated \? 'client' : 'server'\}/);
-  assert.match(actionsPage, /estado: estadoFilter/);
+  assert.match(actionsPage, /estado: isOverdueFilter \? undefined : estadoFilter/);
+  assert.match(actionsPage, /vencidas: isOverdueFilter/);
 });

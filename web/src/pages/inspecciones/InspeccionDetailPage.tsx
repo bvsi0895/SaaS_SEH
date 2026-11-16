@@ -43,12 +43,15 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { CumplimientoItem, NivelRiesgo } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function InspeccionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
+  const { user, activeContextId } = useAuth();
+  const isTechnician = user?.rol === 'TECNICO';
 
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [selectedItemStatus, setSelectedItemStatus] = useState<CumplimientoItem | null>(null);
@@ -67,7 +70,7 @@ export default function InspeccionDetailPage() {
   });
 
   const { data: inspeccion, isLoading } = useQuery({
-    queryKey: ['inspeccion', id],
+    queryKey: ['inspeccion', id, activeContextId, user?.id, user?.rol],
     queryFn: () => inspeccionesApi.getById(id!),
     enabled: !!id,
   });
@@ -182,6 +185,11 @@ export default function InspeccionDetailPage() {
   });
 
   const guardarAccionCorrectiva = (hallazgoId: string, successMessage: string) => {
+    if (isTechnician) {
+      showSuccess(successMessage);
+      finalizarCreacionHallazgo();
+      return;
+    }
     if (accionDescripcion.trim() && accionFechaCompromiso) {
       const data = {
         descripcion: accionDescripcion.trim(),
@@ -755,7 +763,7 @@ export default function InspeccionDetailPage() {
                 JPG, PNG o WEBP hasta 5 MiB
               </Typography>
             </Grid>
-            <Grid item xs={12}>
+            {!isTechnician && <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -765,8 +773,8 @@ export default function InspeccionDetailPage() {
                 onChange={(e) => setAccionDescripcion(e.target.value)}
                 helperText="Si la completa, se creará una acción pendiente vinculada al hallazgo."
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
+            </Grid>}
+            {!isTechnician && <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 type="date"
@@ -776,7 +784,7 @@ export default function InspeccionDetailPage() {
                 InputLabelProps={{ shrink: true }}
                 disabled={!accionDescripcion.trim()}
               />
-            </Grid>
+            </Grid>}
           </Grid>
         </DialogContent>
         <DialogActions>

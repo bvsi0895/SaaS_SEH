@@ -1,0 +1,56 @@
+name: Technician permissions PostgreSQL integration
+
+on:
+  pull_request:
+    branches:
+      - feature/demo-online
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  technician-permissions-postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seh_permissions_test
+          POSTGRES_PASSWORD: seh_permissions_test_password
+          POSTGRES_DB: seh_permissions_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U seh_permissions_test -d seh_permissions_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter seh-backend exec prisma generate
+        env:
+          DATABASE_URL: postgresql://seh_permissions_test:seh_permissions_test_password@localhost:5432/seh_permissions_test?schema=public
+      - name: Apply Prisma migrations
+        run: pnpm --filter seh-backend exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://seh_permissions_test:seh_permissions_test_password@localhost:5432/seh_permissions_test?schema=public
+      - name: Run authorization integration test
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/technician-permissions-postgres.integration.ts
+        env:
+          DATABASE_URL: postgresql://seh_permissions_test:seh_permissions_test_password@localhost:5432/seh_permissions_test?schema=public
+          NODE_ENV: test

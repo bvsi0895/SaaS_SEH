@@ -20,21 +20,34 @@ import { accionesApi } from '../../api/acciones';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { AccionCorrectiva } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccionesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState<string>('');
+  const { user, activeContextId } = useAuth();
+  const isTechnician = user?.rol === 'TECNICO';
+  const isOverdueFilter = estadoFilter === 'VENCIDAS';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['acciones', page, pageSize, estadoFilter],
-    queryFn: () =>
-      accionesApi.getAll({
+    queryKey: ['acciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter],
+    queryFn: async () => {
+      if (isTechnician) {
+        const rows = await accionesApi.getMisAcciones({
+          estado: isOverdueFilter ? undefined : estadoFilter as any || undefined,
+          vencidas: isOverdueFilter,
+        });
+        return { data: rows, total: rows.length, isPaginated: false };
+      }
+      return accionesApi.getAll({
         page: page + 1,
         limit: pageSize,
-        estado: estadoFilter as any || undefined,
-      }),
+        estado: isOverdueFilter ? undefined : estadoFilter as any || undefined,
+        vencidas: isOverdueFilter,
+      });
+    },
   });
 
   const isClientPaginated = data ? !data.isPaginated : false;
@@ -136,13 +149,16 @@ export default function AccionesPage() {
                 select
                 label="Estado"
                 value={estadoFilter}
-                onChange={(e) => setEstadoFilter(e.target.value)}
+                onChange={(e) => {
+                  setEstadoFilter(e.target.value);
+                  setPage(0);
+                }}
               >
                 <MenuItem value="">Todos</MenuItem>
                 <MenuItem value="PENDIENTE">Pendiente</MenuItem>
                 <MenuItem value="EN_PROGRESO">En Progreso</MenuItem>
                 <MenuItem value="RESUELTA">Resuelta</MenuItem>
-                <MenuItem value="VENCIDA">Vencida</MenuItem>
+                <MenuItem value="VENCIDAS">Vencidas</MenuItem>
               </TextField>
             </Grid>
           </Grid>
