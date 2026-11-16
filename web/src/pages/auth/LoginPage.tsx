@@ -84,7 +84,7 @@ export default function LoginPage() {
         margin="normal"
         autoComplete="current-password"
         error={!!errors.password}
-        helperText={errors.password?.message || 'Mínimo 8 caracteres'}
+        helperText={errors.password?.message}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -104,10 +104,6 @@ export default function LoginPage() {
         }}
         {...register('password', {
           required: 'La contraseña es requerida',
-          minLength: {
-            value: 8,
-            message: 'La contraseña debe tener al menos 8 caracteres',
-          },
         })}
       />
 

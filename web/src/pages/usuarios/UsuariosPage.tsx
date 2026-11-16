@@ -31,6 +31,18 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { Usuario, Rol } from '../../types';
 
+function getBackendErrorMessage(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (Array.isArray(message)) {
+    const messages = message.filter((item): item is string => typeof item === 'string');
+    return messages.length > 0 ? messages.join('. ') : fallback;
+  }
+  return typeof message === 'string' && message.trim().length > 0 && message.length <= 300
+    ? message
+    : fallback;
+}
+
 const rolLabels: Record<Rol, string> = {
   ADMIN_EMPRESA: 'Administrador',
   SUPERVISOR: 'Supervisor',
@@ -83,8 +95,8 @@ export default function UsuariosPage() {
       setCreateDialogOpen(false);
       resetCreate();
     },
-    onError: () => {
-      showError('Error al crear el usuario');
+    onError: (error) => {
+      showError(getBackendErrorMessage(error, 'Error al crear el usuario'));
     },
   });
 
@@ -96,8 +108,8 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       setEditDialogOpen(false);
     },
-    onError: () => {
-      showError('Error al actualizar el usuario');
+    onError: (error) => {
+      showError(getBackendErrorMessage(error, 'Error al actualizar el usuario'));
     },
   });
 
@@ -121,8 +133,8 @@ export default function UsuariosPage() {
       setResetPasswordDialogOpen(false);
       setNewPassword('');
     },
-    onError: () => {
-      showError('Error al cambiar la contraseña');
+    onError: (error) => {
+      showError(getBackendErrorMessage(error, 'Error al cambiar la contraseña'));
     },
   });
 

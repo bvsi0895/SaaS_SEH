@@ -1,8 +1,14 @@
 import { validate } from 'class-validator';
 import { CreateUsuarioDto, ChangePasswordDto, AdminChangePasswordDto } from './index';
 import { RegisterDto } from '../../auth/dto/register.dto';
+import { LoginDto } from '../../auth/dto/login.dto';
 
 describe('password DTO policy', () => {
+  it('allows existing short passwords at login', async () => {
+    const dto = Object.assign(new LoginDto(), { email: 'legacy@example.com', password: 'legacy' });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+
   it('accepts any composition with at least eight characters', async () => {
     const create = Object.assign(new CreateUsuarioDto(), {
       email: 'user@example.com', password: 'abcdefgh', nombre: 'Ana', apellido: 'Pérez',

@@ -135,4 +135,40 @@ describe('UsuariosService.create', () => {
     }, 'company-authenticated', 'org-1', 'org-company-other')).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('makes a created technician visible only to its tenant user and selector queries', async () => {
+    const users = new Map<string, { id: string; email: string; rol: string; empresaId: string }>();
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockImplementation(({ where }: { where: { email?: string } }) =>
+          where.email ? users.get(where.email) ?? null : null),
+        findMany: jest.fn().mockImplementation(({ where }: { where: { empresaId: string; rol?: string } }) =>
+          [...users.values()].filter((user) => user.empresaId === where.empresaId && (!where.rol || user.rol === where.rol))),
+      },
+      empresa: { findUnique: jest.fn().mockResolvedValue({ id: 'company-a' }) },
+      organizacionEmpresa: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'org-company-a', organizacionId: 'org-a', empresaId: 'company-a', estado: 'ACTIVA' }),
+      },
+      $transaction: jest.fn().mockImplementation(async (callback) => callback({
+        usuario: {
+          create: jest.fn().mockImplementation(async ({ data }: { data: { email: string; rol: string; empresaId: string } }) => {
+            const created = { id: 'technician-a', email: data.email, rol: data.rol, empresaId: data.empresaId };
+            users.set(created.email, created);
+            return created;
+          }),
+        },
+        organizacionMiembro: { create: jest.fn().mockResolvedValue({ id: 'membership-a' }) },
+        accesoEmpresa: { create: jest.fn().mockResolvedValue({ id: 'access-a' }) },
+      })),
+    };
+    const service = new UsuariosService(prisma as never);
+
+    await service.create({
+      email: 'tecnico-a@demo.local', password: 'simplepass', nombre: 'Ana', apellido: 'Técnica', rol: 'TECNICO',
+    }, 'company-a', 'org-a', 'org-company-a');
+
+    expect(await service.findAll('company-a', undefined, 'org-a')).toHaveLength(1);
+    expect(await service.findAll('company-a', { rol: 'TECNICO' as never }, 'org-a')).toHaveLength(1);
+    expect(await service.findAll('company-b', { rol: 'TECNICO' as never }, 'org-b')).toHaveLength(0);
+  });
 });

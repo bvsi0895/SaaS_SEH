@@ -45,3 +45,20 @@ describe('UsuariosController.create', () => {
     );
   });
 });
+
+describe('UsuariosController user list scoping', () => {
+  it('uses the authenticated company and organization for both user endpoints', async () => {
+    const usuariosService = { findAll: jest.fn().mockResolvedValue([]) };
+    const controller = new UsuariosController(usuariosService as never);
+
+    await controller.findAll('company-a', 'org-a');
+    await controller.findTechnicians('company-a', 'org-a');
+
+    expect(usuariosService.findAll).toHaveBeenNthCalledWith(
+      1, 'company-a', { rol: undefined, activo: undefined }, 'org-a',
+    );
+    expect(usuariosService.findAll).toHaveBeenNthCalledWith(
+      2, 'company-a', { rol: Rol.TECNICO }, 'org-a',
+    );
+  });
+});
