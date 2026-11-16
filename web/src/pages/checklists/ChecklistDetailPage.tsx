@@ -35,12 +35,15 @@ import PageHeader from '../../components/common/PageHeader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { ChecklistItem } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ChecklistDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
+  const { user, activeContextId } = useAuth();
+  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
 
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editItemDialogOpen, setEditItemDialogOpen] = useState(false);
@@ -53,7 +56,7 @@ export default function ChecklistDetailPage() {
   });
 
   const { data: checklist, isLoading } = useQuery({
-    queryKey: ['checklist', id],
+    queryKey: ['checklist', id, activeContextId, user?.id, user?.rol],
     queryFn: () => checklistsApi.getById(id!),
     enabled: !!id,
   });
@@ -235,13 +238,13 @@ export default function ChecklistDetailPage() {
                 }}
               >
                 <Typography variant="h6">Items del Checklist</Typography>
-                <Button
+                {canManageChecklists && <Button
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => setAddItemDialogOpen(true)}
                 >
                   Agregar Item
-                </Button>
+                </Button>}
               </Box>
               <Divider sx={{ mb: 2 }} />
 
@@ -270,7 +273,7 @@ export default function ChecklistDetailPage() {
                             primary={item.descripcion}
                             secondary={item.obligatorio ? 'Obligatorio' : 'Opcional'}
                           />
-                          <ListItemSecondaryAction>
+                          {canManageChecklists && <ListItemSecondaryAction>
                             <IconButton size="small" onClick={() => openEditDialog(item)}>
                               <EditIcon />
                             </IconButton>
@@ -281,7 +284,7 @@ export default function ChecklistDetailPage() {
                             >
                               <DeleteIcon />
                             </IconButton>
-                          </ListItemSecondaryAction>
+                          </ListItemSecondaryAction>}
                         </ListItem>
                       </Paper>
                     ))}

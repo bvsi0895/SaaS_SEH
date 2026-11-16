@@ -61,7 +61,7 @@ export class InspeccionesService {
   /**
    * Obtener inspección por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id },
       include: {
@@ -101,6 +101,9 @@ export class InspeccionesService {
       throw new NotFoundException('Inspección no encontrada');
     }
     if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Inspección no encontrada');
+    }
+    if (usuarioId && inspeccion.usuarioId !== usuarioId) {
       throw new NotFoundException('Inspección no encontrada');
     }
 
@@ -180,9 +183,9 @@ export class InspeccionesService {
   /**
    * Registrar cumplimiento de un item
    */
-  async registrarItem(inspeccionId: string, registrarItemDto: RegistrarItemDto, empresaId?: string, organizacionEmpresaId?: string) {
+  async registrarItem(inspeccionId: string, registrarItemDto: RegistrarItemDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     // Verificar que la inspección existe y está en progreso
-    const inspeccion = await this.findOne(inspeccionId, empresaId, organizacionEmpresaId);
+    const inspeccion = await this.findOne(inspeccionId, empresaId, organizacionEmpresaId, usuarioId);
 
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
       throw new BadRequestException('La inspección ya está finalizada');
@@ -215,8 +218,9 @@ export class InspeccionesService {
     items: RegistrarItemDto[],
     empresaId?: string,
     organizacionEmpresaId?: string,
+    usuarioId?: string,
   ) {
-    const inspeccion = await this.findOne(inspeccionId, empresaId, organizacionEmpresaId);
+    const inspeccion = await this.findOne(inspeccionId, empresaId, organizacionEmpresaId, usuarioId);
 
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
       throw new BadRequestException('La inspección ya está finalizada');
@@ -234,14 +238,14 @@ export class InspeccionesService {
 
     await this.prisma.$transaction(updates);
 
-    return this.findOne(inspeccionId, empresaId, organizacionEmpresaId);
+    return this.findOne(inspeccionId, empresaId, organizacionEmpresaId, usuarioId);
   }
 
   /**
    * Actualizar inspección
    */
-  async update(id: string, updateInspeccionDto: UpdateInspeccionDto, empresaId?: string, organizacionEmpresaId?: string) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async update(id: string, updateInspeccionDto: UpdateInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
       throw new BadRequestException('No se puede editar una inspección finalizada');
@@ -256,8 +260,8 @@ export class InspeccionesService {
   /**
    * Finalizar inspección
    */
-  async finalizar(id: string, finalizarDto: FinalizarInspeccionDto, empresaId?: string, organizacionEmpresaId?: string) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async finalizar(id: string, finalizarDto: FinalizarInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     if (inspeccion.estado === EstadoInspeccion.COMPLETADA) {
       throw new BadRequestException('La inspección ya está finalizada');
@@ -290,8 +294,8 @@ export class InspeccionesService {
   /**
    * Cancelar inspección
    */
-  async cancelar(id: string, empresaId?: string, organizacionEmpresaId?: string) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async cancelar(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
       throw new BadRequestException('Solo se pueden cancelar inspecciones en progreso');
@@ -309,8 +313,8 @@ export class InspeccionesService {
   /**
    * Obtener resumen de inspección
    */
-  async getResumen(id: string, empresaId?: string, organizacionEmpresaId?: string) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async getResumen(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
     const itemsCumplen = inspeccion.items.filter(
       (i) => i.cumplimiento === CumplimientoItem.CUMPLE,

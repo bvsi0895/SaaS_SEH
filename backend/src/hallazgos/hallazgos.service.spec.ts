@@ -18,6 +18,27 @@ const createHallazgo = () => ({
 });
 
 describe('HallazgosService authorization', () => {
+  it('allows a technician to see own-inspection findings but not another technician\'s finding', async () => {
+    const prisma = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...createHallazgo(),
+          inspeccion: {
+            ...createHallazgo().inspeccion,
+            usuario: { id: 'technician-a' },
+          },
+          accionesCorrectivas: [],
+        }),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-b'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-a'))
+      .resolves.toBeDefined();
+  });
+
   it('does not expose a finding from another company', async () => {
     const prisma = {
       hallazgo: {
@@ -51,6 +72,55 @@ describe('HallazgosService authorization', () => {
     await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-b')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('allows an assigned technician to read a finding but denies update and delete', async () => {
+    const persisted = {
+      ...createHallazgo(),
+      inspeccion: {
+        ...createHallazgo().inspeccion,
+        usuario: { id: 'technician-owner' },
+      },
+      accionesCorrectivas: [{ responsable: { id: 'technician-assigned' } }],
+    };
+    const prisma = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue(persisted),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.findOne('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-assigned'))
+      .resolves.toBeDefined();
+    await expect(service.update('hallazgo-1', { titulo: 'Cambio no autorizado' }, 'empresa-origen', 'contexto-a', 'technician-assigned'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.remove('hallazgo-1', 'empresa-origen', 'contexto-a', 'technician-assigned'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.hallazgo.update).not.toHaveBeenCalled();
+    expect(prisma.hallazgo.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows only the inspection owner to add technician evidence while in progress', async () => {
+    const persisted = {
+      ...createHallazgo(),
+      inspeccion: {
+        ...createHallazgo().inspeccion,
+        usuario: { id: 'technician-owner' },
+      },
+      accionesCorrectivas: [{ responsable: { id: 'technician-assigned' } }],
+    };
+    const prisma = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue(persisted),
+        update: jest.fn(),
+      },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.addPhoto('hallazgo-1', 'empresa-origen', { buffer: Buffer.from('bad'), originalname: 'x.jpg' }, 'contexto-a', 'technician-assigned'))
+      .rejects.toBeInstanceOf(NotFoundException);
   });
 });
 

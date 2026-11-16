@@ -67,7 +67,7 @@ export class AccionesCorrectivasService {
   /**
    * Obtener acción correctiva por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
     const accion = await this.prisma.accionCorrectiva.findUnique({
       where: { id },
       include: {
@@ -99,6 +99,9 @@ export class AccionesCorrectivasService {
       throw new NotFoundException('Acción correctiva no encontrada');
     }
     if (organizacionEmpresaId && accion.organizacionEmpresaId !== organizacionEmpresaId) {
+      throw new NotFoundException('Acción correctiva no encontrada');
+    }
+    if (responsableId && accion.responsableId !== responsableId) {
       throw new NotFoundException('Acción correctiva no encontrada');
     }
 
@@ -133,8 +136,20 @@ export class AccionesCorrectivasService {
 
     // Verificar responsable si se proporciona ID
     if (createDto.responsableId) {
-      const responsable = await this.prisma.usuario.findUnique({
-        where: { id: createDto.responsableId },
+      const responsable = await this.prisma.usuario.findFirst({
+        where: {
+          id: createDto.responsableId,
+          empresaId,
+          activo: true,
+          ...(organizacionEmpresaId && {
+            membresiasOrganizacion: {
+              some: {
+                activa: true,
+                accesosEmpresa: { some: { organizacionEmpresaId, activo: true } },
+              },
+            },
+          }),
+        },
       });
 
       if (!responsable || responsable.empresaId !== empresaId) {
@@ -197,8 +212,8 @@ export class AccionesCorrectivasService {
   /**
    * Cambiar estado a En Progreso
    */
-  async iniciar(id: string, empresaId?: string, organizacionEmpresaId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async iniciar(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId);
 
     if (accion.estado !== EstadoAccion.PENDIENTE) {
       throw new BadRequestException('La acción ya fue iniciada');
@@ -213,8 +228,8 @@ export class AccionesCorrectivasService {
   /**
    * Cerrar acción correctiva
    */
-  async cerrar(id: string, cerrarDto: CerrarAccionDto, empresaId?: string, organizacionEmpresaId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async cerrar(id: string, cerrarDto: CerrarAccionDto, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId);
 
     if (accion.estado === EstadoAccion.RESUELTA) {
       throw new BadRequestException('La acción ya está cerrada');
@@ -253,13 +268,18 @@ export class AccionesCorrectivasService {
   /**
    * Obtener acciones asignadas al usuario actual
    */
-  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoAccion }, organizacionEmpresaId?: string) {
+  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoAccion; vencidas?: boolean }, organizacionEmpresaId?: string) {
+    const now = new Date();
     return this.prisma.accionCorrectiva.findMany({
       where: {
         responsableId: usuarioId,
         empresaId,
         ...(organizacionEmpresaId && { organizacionEmpresaId }),
         ...(filters?.estado && { estado: filters.estado }),
+        ...(filters?.vencidas && {
+          fechaCompromiso: { lt: now },
+          estado: { in: [EstadoAccion.PENDIENTE, EstadoAccion.EN_PROGRESO] },
+        }),
       },
       include: {
         hallazgo: {

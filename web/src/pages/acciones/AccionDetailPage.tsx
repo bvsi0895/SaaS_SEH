@@ -24,18 +24,21 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AccionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
+  const { user, activeContextId } = useAuth();
+  const isTechnician = user?.rol === 'TECNICO';
 
   const [iniciarDialogOpen, setIniciarDialogOpen] = useState(false);
   const [resolverDialogOpen, setResolverDialogOpen] = useState(false);
 
   const { data: accion, isLoading } = useQuery({
-    queryKey: ['accion', id],
+    queryKey: ['accion', id, activeContextId, user?.id, user?.rol],
     queryFn: () => accionesApi.getById(id!),
     enabled: !!id,
   });
@@ -181,7 +184,7 @@ export default function AccionDetailPage() {
                 )}
               </Box>
 
-              {accion.estado === 'PENDIENTE' && (
+              {(!isTechnician || accion.responsableId === user?.id) && accion.estado === 'PENDIENTE' && (
                 <Button
                   variant="contained"
                   color="primary"
@@ -194,7 +197,7 @@ export default function AccionDetailPage() {
                 </Button>
               )}
 
-              {accion.estado === 'EN_PROGRESO' && (
+              {(!isTechnician || accion.responsableId === user?.id) && accion.estado === 'EN_PROGRESO' && (
                 <Button
                   variant="contained"
                   color="success"

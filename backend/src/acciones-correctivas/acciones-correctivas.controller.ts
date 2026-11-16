@@ -65,8 +65,9 @@ export class AccionesCorrectivasController {
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Query('estado') estado?: EstadoAccion,
+    @Query('vencidas') vencidas?: boolean,
   ) {
-    return this.accionesCorrectivasService.findMine(usuarioId, empresaId, { estado }, organizacionEmpresaId);
+    return this.accionesCorrectivasService.findMine(usuarioId, empresaId, { estado, vencidas }, organizacionEmpresaId);
   }
 
   @Get('estadisticas')
@@ -88,8 +89,10 @@ export class AccionesCorrectivasController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.accionesCorrectivasService.findOne(id, empresaId, organizacionEmpresaId);
+    return this.accionesCorrectivasService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post()
@@ -125,8 +128,10 @@ export class AccionesCorrectivasController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.accionesCorrectivasService.iniciar(id, empresaId, organizacionEmpresaId);
+    return this.accionesCorrectivasService.iniciar(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Post(':id/cerrar')
@@ -137,8 +142,10 @@ export class AccionesCorrectivasController {
     @Body() cerrarDto: CerrarAccionDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.accionesCorrectivasService.cerrar(id, cerrarDto, empresaId, organizacionEmpresaId);
+    return this.accionesCorrectivasService.cerrar(id, cerrarDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
   }
 
   @Patch(':id/reabrir')

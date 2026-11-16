@@ -23,14 +23,14 @@ export const inspeccionesApi = {
     limit?: number;
     estado?: string;
     checklistId?: string;
-  }): Promise<{ data: Inspeccion[]; total: number }> => {
+  }): Promise<{ data: Inspeccion[]; total: number; isPaginated: boolean }> => {
     const response = await apiClient.get<Inspeccion[] | { data: Inspeccion[]; total: number }>(
       '/inspecciones',
       { params },
     );
     return Array.isArray(response.data)
-      ? { data: response.data, total: response.data.length }
-      : response.data;
+      ? { data: response.data, total: response.data.length, isPaginated: false }
+      : { ...response.data, isPaginated: true };
   },
 
   getById: async (id: string): Promise<Inspeccion> => {

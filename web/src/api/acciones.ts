@@ -23,6 +23,7 @@ export const accionesApi = {
     limit?: number;
     estado?: EstadoAccion;
     responsableId?: string;
+    vencidas?: boolean;
   }): Promise<NormalizedAccionesResponse<AccionCorrectiva>> => {
     const response = await apiClient.get<AccionCorrectiva[] | { data: AccionCorrectiva[]; total: number }>(
       '/acciones-correctivas',
@@ -65,8 +66,8 @@ export const accionesApi = {
     return response.data;
   },
 
-  getMisAcciones: async (): Promise<AccionCorrectiva[]> => {
-    const response = await apiClient.get<AccionCorrectiva[]>('/acciones-correctivas/me');
+  getMisAcciones: async (params?: { estado?: EstadoAccion; vencidas?: boolean }): Promise<AccionCorrectiva[]> => {
+    const response = await apiClient.get<AccionCorrectiva[]>('/acciones-correctivas/me', { params });
     return response.data;
   },
 

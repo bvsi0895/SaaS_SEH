@@ -25,14 +25,14 @@ export const hallazgosApi = {
     limit?: number;
     nivelRiesgo?: string;
     inspeccionId?: string;
-  }): Promise<{ data: Hallazgo[]; total: number }> => {
+  }): Promise<{ data: Hallazgo[]; total: number; isPaginated: boolean }> => {
     const response = await apiClient.get<Hallazgo[] | { data: Hallazgo[]; total: number }>(
       '/hallazgos',
       { params },
     );
     return Array.isArray(response.data)
-      ? { data: response.data, total: response.data.length }
-      : response.data;
+      ? { data: response.data, total: response.data.length, isPaginated: false }
+      : { ...response.data, isPaginated: true };
   },
 
   getById: async (id: string): Promise<Hallazgo> => {

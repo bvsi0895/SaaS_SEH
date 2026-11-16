@@ -29,6 +29,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import EmptyState from '../../components/common/EmptyState';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { Checklist, TipoChecklist } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 const tipoColors: Record<TipoChecklist, string> = {
   GENERAL: '#1976d2',
@@ -45,6 +46,8 @@ export default function ChecklistsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
+  const { user, activeContextId } = useAuth();
+  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -58,7 +61,7 @@ export default function ChecklistsPage() {
   });
 
   const { data: checklists, isLoading } = useQuery({
-    queryKey: ['checklists'],
+    queryKey: ['checklists', activeContextId, user?.id, user?.rol],
     queryFn: () => checklistsApi.getAll(),
   });
 
@@ -132,14 +135,14 @@ export default function ChecklistsPage() {
       <PageHeader
         title="Checklists"
         subtitle="Gestiona los checklists de inspeccion"
-        action={{
+        action={canManageChecklists ? {
           label: 'Nuevo Checklist',
           onClick: () => {
             setFormData({ nombre: '', descripcion: '', tipo: 'GENERAL' });
             setCreateDialogOpen(true);
           },
           icon: 'add',
-        }}
+        } : undefined}
       />
 
       {isLoading ? (
@@ -148,10 +151,10 @@ export default function ChecklistsPage() {
         <EmptyState
           title="No hay checklists"
           description="Crea tu primer checklist para comenzar a realizar inspecciones"
-          action={{
+          action={canManageChecklists ? {
             label: 'Crear Checklist',
             onClick: () => setCreateDialogOpen(true),
-          }}
+          } : undefined}
         />
       ) : (
         <Grid container spacing={3}>
@@ -213,15 +216,15 @@ export default function ChecklistsPage() {
                       <ViewIcon />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Duplicar">
+                  {canManageChecklists && <Tooltip title="Duplicar">
                     <IconButton
                       size="small"
                       onClick={() => openDuplicateDialog(checklist)}
                     >
                       <DuplicateIcon />
                     </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Eliminar">
+                  </Tooltip>}
+                  {canManageChecklists && <Tooltip title="Eliminar">
                     <IconButton
                       size="small"
                       color="error"
@@ -229,7 +232,7 @@ export default function ChecklistsPage() {
                     >
                       <DeleteIcon />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip>}
                 </Box>
               </Card>
             </Grid>

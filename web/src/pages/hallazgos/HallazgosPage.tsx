@@ -20,6 +20,7 @@ import { hallazgosApi } from '../../api/hallazgos';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { Hallazgo } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 const getPhotoCount = (fotosUrls?: string) => {
   if (!fotosUrls) return 0;
@@ -36,9 +37,10 @@ export default function HallazgosPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [nivelRiesgoFilter, setNivelRiesgoFilter] = useState<string>('');
+  const { user, activeContextId } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['hallazgos', page, pageSize, nivelRiesgoFilter],
+    queryKey: ['hallazgos', activeContextId, user?.id, user?.rol, page, pageSize, nivelRiesgoFilter],
     queryFn: () =>
       hallazgosApi.getAll({
         page: page + 1,
@@ -132,7 +134,10 @@ export default function HallazgosPage() {
                 select
                 label="Nivel de Riesgo"
                 value={nivelRiesgoFilter}
-                onChange={(e) => setNivelRiesgoFilter(e.target.value)}
+                onChange={(e) => {
+                  setNivelRiesgoFilter(e.target.value);
+                  setPage(0);
+                }}
               >
                 <MenuItem value="">Todos</MenuItem>
                 <MenuItem value="BAJO">Bajo</MenuItem>
@@ -151,7 +156,7 @@ export default function HallazgosPage() {
           columns={columns}
           rowCount={data?.total || 0}
           loading={isLoading}
-          paginationMode="server"
+          paginationMode={data && !data.isPaginated ? 'client' : 'server'}
           paginationModel={{ page, pageSize }}
           onPaginationModelChange={(model) => {
             setPage(model.page);
