@@ -47,7 +47,7 @@ async function cleanup() {
 }
 
 async function mustReject(operation: Promise<unknown>, message: string) {
-  await assert.rejects(operation, /no encontrado/i, message);
+  await assert.rejects(operation, /no encontrad[oa]/i, message);
 }
 
 async function main() {
