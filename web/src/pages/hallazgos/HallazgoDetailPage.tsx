@@ -169,6 +169,7 @@ export default function HallazgoDetailPage() {
     onSuccess: () => {
       showSuccess('Accion correctiva creada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
+      queryClient.invalidateQueries({ queryKey: ['acciones'] });
       setAccionDialogOpen(false);
       setNuevaAccion({ fechaCompromiso: new Date().toISOString() });
     },

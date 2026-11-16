@@ -27,6 +27,7 @@ interface RegisterFormData extends RegisterData {
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { register: registerUser } = useAuth();
@@ -133,12 +134,12 @@ export default function RegisterPage() {
 
       <TextField
         fullWidth
-        label="Contrasena"
+        label="Contraseña"
         type={showPassword ? 'text' : 'password'}
         margin="normal"
         autoComplete="new-password"
         error={!!errors.password}
-        helperText={errors.password?.message}
+        helperText={errors.password?.message || 'Mínimo 8 caracteres'}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -157,22 +158,18 @@ export default function RegisterPage() {
           ),
         }}
         {...register('password', {
-          required: 'La contrasena es requerida',
+          required: 'La contraseña es requerida',
           minLength: {
             value: 8,
-            message: 'La contrasena debe tener al menos 8 caracteres',
-          },
-          pattern: {
-            value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-            message: 'Debe contener mayuscula, minuscula y numero',
+            message: 'La contraseña debe tener al menos 8 caracteres',
           },
         })}
       />
 
       <TextField
         fullWidth
-        label="Confirmar contrasena"
-        type={showPassword ? 'text' : 'password'}
+        label="Confirmar contraseña"
+        type={showConfirmPassword ? 'text' : 'password'}
         margin="normal"
         autoComplete="new-password"
         error={!!errors.confirmPassword}
@@ -183,11 +180,22 @@ export default function RegisterPage() {
               <Lock color="action" />
             </InputAdornment>
           ),
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton
+                aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                onClick={() => setShowConfirmPassword((visible) => !visible)}
+                edge="end"
+              >
+                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+              </IconButton>
+            </InputAdornment>
+          ),
         }}
         {...register('confirmPassword', {
-          required: 'Confirma tu contrasena',
+          required: 'Confirma tu contraseña',
           validate: (value) =>
-            value === password || 'Las contrasenas no coinciden',
+            value === password || 'Las contraseñas no coinciden',
         })}
       />
 

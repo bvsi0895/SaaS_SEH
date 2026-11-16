@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UsuariosService } from './usuarios.service';
 
@@ -68,5 +68,71 @@ describe('UsuariosService.changePassword', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(prisma.usuario.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsuariosService.create', () => {
+  it('uses the authenticated company and creates organization membership and access', async () => {
+    const prisma = {
+      usuario: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      empresa: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'company-authenticated' }),
+      },
+      organizacionEmpresa: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'org-company-1',
+          organizacionId: 'org-1',
+          empresaId: 'company-authenticated',
+          estado: 'ACTIVA',
+        }),
+      },
+      $transaction: jest.fn().mockImplementation(async (callback) => callback({
+        usuario: {
+          create: jest.fn().mockResolvedValue({ id: 'user-created', empresaId: 'company-authenticated' }),
+        },
+        organizacionMiembro: {
+          create: jest.fn().mockResolvedValue({ id: 'membership-1' }),
+        },
+        accesoEmpresa: {
+          create: jest.fn().mockResolvedValue({ id: 'access-1' }),
+        },
+      })),
+    };
+    const service = new UsuariosService(prisma as never);
+
+    await service.create({
+      email: 'tecnico@demo.local',
+      password: 'simplepass',
+      nombre: 'Ana',
+      apellido: 'Técnica',
+      rol: 'TECNICO',
+    }, 'company-authenticated', 'org-1', 'org-company-1');
+
+    expect(prisma.empresa.findUnique).toHaveBeenCalledWith({ where: { id: 'company-authenticated' } });
+    expect(prisma.organizacionEmpresa.findUnique).toHaveBeenCalledWith({
+      where: { id: 'org-company-1' },
+      select: { id: true, organizacionId: true, empresaId: true, estado: true },
+    });
+  });
+
+  it('rejects an organization-company relation from another tenant', async () => {
+    const prisma = {
+      usuario: { findUnique: jest.fn().mockResolvedValue(null) },
+      empresa: { findUnique: jest.fn().mockResolvedValue({ id: 'company-authenticated' }) },
+      organizacionEmpresa: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'org-company-other', organizacionId: 'org-other', empresaId: 'company-other', estado: 'ACTIVA',
+        }),
+      },
+      $transaction: jest.fn(),
+    };
+    const service = new UsuariosService(prisma as never);
+
+    await expect(service.create({
+      email: 'tecnico@demo.local', password: 'simplepass', nombre: 'Ana', apellido: 'Técnica', rol: 'TECNICO',
+    }, 'company-authenticated', 'org-1', 'org-company-other')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

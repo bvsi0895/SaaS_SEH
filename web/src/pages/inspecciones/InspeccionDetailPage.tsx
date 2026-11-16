@@ -158,6 +158,7 @@ export default function InspeccionDetailPage() {
     mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
     onSuccess: () => {
       showSuccess('Hallazgo y acción correctiva guardados exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['acciones'] });
       finalizarCreacionHallazgo();
     },
     onError: () => {
@@ -171,6 +172,7 @@ export default function InspeccionDetailPage() {
       accionesApi.update(accionId, data),
     onSuccess: () => {
       showSuccess('Hallazgo y acción correctiva actualizados exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['acciones'] });
       finalizarCreacionHallazgo();
     },
     onError: () => {

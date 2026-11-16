@@ -79,12 +79,12 @@ export default function LoginPage() {
 
       <TextField
         fullWidth
-        label="Contrasena"
+        label="Contraseña"
         type={showPassword ? 'text' : 'password'}
         margin="normal"
         autoComplete="current-password"
         error={!!errors.password}
-        helperText={errors.password?.message}
+        helperText={errors.password?.message || 'Mínimo 8 caracteres'}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -103,10 +103,10 @@ export default function LoginPage() {
           ),
         }}
         {...register('password', {
-          required: 'La contrasena es requerida',
+          required: 'La contraseña es requerida',
           minLength: {
-            value: 6,
-            message: 'La contrasena debe tener al menos 6 caracteres',
+            value: 8,
+            message: 'La contraseña debe tener al menos 8 caracteres',
           },
         })}
       />

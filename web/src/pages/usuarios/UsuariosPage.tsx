@@ -21,6 +21,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   LockReset as ResetIcon,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { usuariosApi, CreateUsuarioDto, UpdateUsuarioDto } from '../../api/usuarios';
@@ -51,6 +53,8 @@ export default function UsuariosPage() {
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const { data: usuarios, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -113,12 +117,12 @@ export default function UsuariosPage() {
     mutationFn: ({ id, password }: { id: string; password: string }) =>
       usuariosApi.changePassword(id, password),
     onSuccess: () => {
-      showSuccess('Contrasena actualizada exitosamente');
+      showSuccess('Contraseña actualizada exitosamente');
       setResetPasswordDialogOpen(false);
       setNewPassword('');
     },
     onError: () => {
-      showError('Error al cambiar la contrasena');
+      showError('Error al cambiar la contraseña');
     },
   });
 
@@ -203,7 +207,7 @@ export default function UsuariosPage() {
               <EditIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Cambiar contrasena">
+          <Tooltip title="Cambiar contraseña">
             <IconButton
               size="small"
               onClick={() => {
@@ -308,13 +312,24 @@ export default function UsuariosPage() {
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="Contrasena"
-                  type="password"
+                  label="Contraseña"
+                  type={showCreatePassword ? 'text' : 'password'}
                   error={!!errorsCreate.password}
-                  helperText={errorsCreate.password?.message}
+                  helperText={errorsCreate.password?.message || 'Mínimo 8 caracteres'}
+                  InputProps={{
+                    endAdornment: (
+                      <IconButton
+                        aria-label={showCreatePassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        onClick={() => setShowCreatePassword((visible) => !visible)}
+                        edge="end"
+                      >
+                        {showCreatePassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    ),
+                  }}
                   {...registerCreate('password', {
-                    required: 'Contrasena requerida',
-                    minLength: { value: 8, message: 'Minimo 8 caracteres' },
+                    required: 'Contraseña requerida',
+                    minLength: { value: 8, message: 'La contraseña debe tener al menos 8 caracteres' },
                   })}
                 />
               </Grid>
@@ -406,24 +421,36 @@ export default function UsuariosPage() {
         </form>
       </Dialog>
 
-      {/* Dialog para cambiar contrasena */}
+      {/* Dialog para cambiar contraseña */}
       <Dialog
         open={resetPasswordDialogOpen}
         onClose={() => setResetPasswordDialogOpen(false)}
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Cambiar Contrasena</DialogTitle>
+        <DialogTitle>Cambiar contraseña</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Ingrese la nueva contrasena para {selectedUser?.nombre} {selectedUser?.apellido}
+            Ingrese la nueva contraseña para {selectedUser?.nombre} {selectedUser?.apellido}
           </Typography>
           <TextField
             fullWidth
-            label="Nueva Contrasena"
-            type="password"
+            label="Nueva contraseña"
+            type={showResetPassword ? 'text' : 'password'}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            helperText="Mínimo 8 caracteres"
+            InputProps={{
+              endAdornment: (
+                <IconButton
+                  aria-label={showResetPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  onClick={() => setShowResetPassword((visible) => !visible)}
+                  edge="end"
+                >
+                  {showResetPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              ),
+            }}
           />
         </DialogContent>
         <DialogActions>
@@ -431,7 +458,7 @@ export default function UsuariosPage() {
           <Button
             variant="contained"
             onClick={handleResetPassword}
-            disabled={!newPassword || changePasswordMutation.isPending}
+            disabled={newPassword.length < 8 || changePasswordMutation.isPending}
           >
             {changePasswordMutation.isPending ? 'Cambiando...' : 'Cambiar'}
           </Button>
