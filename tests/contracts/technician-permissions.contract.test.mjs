@@ -5,17 +5,21 @@ import test from 'node:test';
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 test('backend scopes technicians and protects assigned actions/findings', async () => {
-  const [inspections, actions, findings, checklists] = await Promise.all([
+  const [inspections, actions, findings, checklists, checklistPage, checklistDetail] = await Promise.all([
     read('backend/src/inspecciones/inspecciones.controller.ts'),
     read('backend/src/acciones-correctivas/acciones-correctivas.controller.ts'),
     read('backend/src/hallazgos/hallazgos.service.ts'),
     read('backend/src/checklists/checklists.controller.ts'),
+    read('web/src/pages/checklists/ChecklistsPage.tsx'),
+    read('web/src/pages/checklists/ChecklistDetailPage.tsx'),
   ]);
   assert.match(inspections, /@Roles\(Rol\.ADMIN_EMPRESA, Rol\.SUPERVISOR, Rol\.TECNICO\)/);
   assert.match(inspections, /currentUserRole === Rol\.TECNICO \? currentUserId : usuarioId/);
   assert.match(actions, /currentUserRole === Rol\.TECNICO \? currentUserId : undefined/);
   assert.match(findings, /accionesCorrectivas: \{ some: \{ responsableId: usuarioId \} \}/);
   assert.match(checklists, /@Roles\(Rol\.ADMIN_EMPRESA\)/);
+  assert.match(checklistPage, /canManageChecklists = user\?\.rol === 'ADMIN_EMPRESA'/);
+  assert.match(checklistDetail, /canManageChecklists = user\?\.rol === 'ADMIN_EMPRESA'/);
 });
 
 test('frontend uses technician endpoints and valid overdue filters', async () => {

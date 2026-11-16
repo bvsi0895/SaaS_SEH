@@ -29,11 +29,13 @@ const ids = {
   hallazgoB: '00000000-0000-0000-0000-000000000417',
   accionA: '00000000-0000-0000-0000-000000000418',
   accionB: '00000000-0000-0000-0000-000000000419',
+  hallazgoC: '00000000-0000-0000-0000-000000000420',
+  accionC: '00000000-0000-0000-0000-000000000421',
 };
 
 async function cleanup() {
-  await prisma.accionCorrectiva.deleteMany({ where: { id: { in: [ids.accionA, ids.accionB] } } });
-  await prisma.hallazgo.deleteMany({ where: { id: { in: [ids.hallazgoA, ids.hallazgoB] } } });
+  await prisma.accionCorrectiva.deleteMany({ where: { id: { in: [ids.accionA, ids.accionB, ids.accionC] } } });
+  await prisma.hallazgo.deleteMany({ where: { id: { in: [ids.hallazgoA, ids.hallazgoB, ids.hallazgoC] } } });
   await prisma.inspeccionItem.deleteMany({ where: { inspeccionId: { in: [ids.inspeccionA, ids.inspeccionB] } } });
   await prisma.inspeccion.deleteMany({ where: { id: { in: [ids.inspeccionA, ids.inspeccionB] } } });
   await prisma.checklistItem.deleteMany({ where: { id: ids.checklistItem } });
@@ -82,10 +84,12 @@ async function main() {
     await prisma.hallazgo.createMany({ data: [
       { id: ids.hallazgoA, titulo: 'Finding A', descripcion: 'Finding owned by technician A', nivelRiesgo: NivelRiesgo.ALTO, ubicacionTexto: 'A', inspeccionId: ids.inspeccionA },
       { id: ids.hallazgoB, titulo: 'Finding B', descripcion: 'Finding owned by technician B', nivelRiesgo: NivelRiesgo.MEDIO, ubicacionTexto: 'B', inspeccionId: ids.inspeccionB },
+      { id: ids.hallazgoC, titulo: 'Finding C', descripcion: 'Finding owned by technician B and assigned to A', nivelRiesgo: NivelRiesgo.BAJO, ubicacionTexto: 'C', inspeccionId: ids.inspeccionB },
     ] });
     await prisma.accionCorrectiva.createMany({ data: [
       { id: ids.accionA, descripcion: 'Action assigned to technician A', fechaCompromiso: new Date(Date.now() + 86400000), empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, hallazgoId: ids.hallazgoA, creadorId: ids.usuarioA, responsableId: ids.usuarioA },
       { id: ids.accionB, descripcion: 'Action assigned to technician B', fechaCompromiso: new Date(Date.now() + 86400000), empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, hallazgoId: ids.hallazgoB, creadorId: ids.usuarioB, responsableId: ids.usuarioB },
+      { id: ids.accionC, descripcion: 'Action for B finding assigned to A', fechaCompromiso: new Date(Date.now() + 86400000), empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, hallazgoId: ids.hallazgoC, creadorId: ids.usuarioB, responsableId: ids.usuarioA },
     ] });
 
     const visibleInspections = await inspections.findAll(ids.empresa, { usuarioId: ids.usuarioA }, ids.relacionA);
@@ -93,19 +97,27 @@ async function main() {
     await mustReject(inspections.findOne(ids.inspeccionB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not open B inspection');
 
     const visibleActions = await actions.findMine(ids.usuarioA, ids.empresa, undefined, ids.relacionA);
-    assert.deepEqual(visibleActions.map((row) => row.id), [ids.accionA]);
+    assert.deepEqual(visibleActions.map((row) => row.id).sort(), [ids.accionA, ids.accionC].sort());
     await mustReject(actions.findOne(ids.accionB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not open B action');
     await mustReject(actions.iniciar(ids.accionB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not start B action');
     await actions.iniciar(ids.accionA, ids.empresa, ids.relacionA, ids.usuarioA);
     await actions.cerrar(ids.accionA, { notasCierre: 'done' }, ids.empresa, ids.relacionA, ids.usuarioA);
 
     const visibleFindings = await findings.findAll(ids.empresa, undefined, ids.relacionA, ids.usuarioA);
-    assert.deepEqual(visibleFindings.map((row) => row.id), [ids.hallazgoA]);
+    assert.deepEqual(visibleFindings.map((row) => row.id).sort(), [ids.hallazgoA, ids.hallazgoC].sort());
+    await expectReadOnlyAssignedFinding();
     await mustReject(findings.findOne(ids.hallazgoB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not open B finding');
     console.log('PostgreSQL integration passed: technician ownership, assigned actions, findings, and organization isolation');
   } finally {
     await cleanup();
   }
+}
+
+async function expectReadOnlyAssignedFinding() {
+  await assert.doesNotReject(findings.findOne(ids.hallazgoC, ids.empresa, ids.relacionA, ids.usuarioA));
+  await mustReject(findings.update(ids.hallazgoC, { titulo: 'unauthorized' }, ids.empresa, ids.relacionA, ids.usuarioA), 'assigned technician must not update another technician finding');
+  await mustReject(findings.remove(ids.hallazgoC, ids.empresa, ids.relacionA, ids.usuarioA), 'assigned technician must not delete another technician finding');
+  await mustReject(findings.addPhoto(ids.hallazgoC, ids.empresa, { buffer: Buffer.from('invalid'), originalname: 'evidence.jpg' }, ids.relacionA, ids.usuarioA), 'assigned technician must not add evidence to another technician finding');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await prisma.$disconnect(); });

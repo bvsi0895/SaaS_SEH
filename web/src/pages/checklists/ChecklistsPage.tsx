@@ -47,7 +47,7 @@ export default function ChecklistsPage() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
-  const isTechnician = user?.rol === 'TECNICO';
+  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -135,7 +135,7 @@ export default function ChecklistsPage() {
       <PageHeader
         title="Checklists"
         subtitle="Gestiona los checklists de inspeccion"
-        action={!isTechnician ? {
+        action={canManageChecklists ? {
           label: 'Nuevo Checklist',
           onClick: () => {
             setFormData({ nombre: '', descripcion: '', tipo: 'GENERAL' });
@@ -151,7 +151,7 @@ export default function ChecklistsPage() {
         <EmptyState
           title="No hay checklists"
           description="Crea tu primer checklist para comenzar a realizar inspecciones"
-          action={!isTechnician ? {
+          action={canManageChecklists ? {
             label: 'Crear Checklist',
             onClick: () => setCreateDialogOpen(true),
           } : undefined}
@@ -216,7 +216,7 @@ export default function ChecklistsPage() {
                       <ViewIcon />
                     </IconButton>
                   </Tooltip>
-                  {!isTechnician && <Tooltip title="Duplicar">
+                  {canManageChecklists && <Tooltip title="Duplicar">
                     <IconButton
                       size="small"
                       onClick={() => openDuplicateDialog(checklist)}
@@ -224,7 +224,7 @@ export default function ChecklistsPage() {
                       <DuplicateIcon />
                     </IconButton>
                   </Tooltip>}
-                  {!isTechnician && <Tooltip title="Eliminar">
+                  {canManageChecklists && <Tooltip title="Eliminar">
                     <IconButton
                       size="small"
                       color="error"

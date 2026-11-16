@@ -43,7 +43,7 @@ export default function ChecklistDetailPage() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
-  const isTechnician = user?.rol === 'TECNICO';
+  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
 
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editItemDialogOpen, setEditItemDialogOpen] = useState(false);
@@ -238,7 +238,7 @@ export default function ChecklistDetailPage() {
                 }}
               >
                 <Typography variant="h6">Items del Checklist</Typography>
-                {!isTechnician && <Button
+                {canManageChecklists && <Button
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => setAddItemDialogOpen(true)}
@@ -273,7 +273,7 @@ export default function ChecklistDetailPage() {
                             primary={item.descripcion}
                             secondary={item.obligatorio ? 'Obligatorio' : 'Opcional'}
                           />
-                          {!isTechnician && <ListItemSecondaryAction>
+                          {canManageChecklists && <ListItemSecondaryAction>
                             <IconButton size="small" onClick={() => openEditDialog(item)}>
                               <EditIcon />
                             </IconButton>

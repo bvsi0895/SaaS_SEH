@@ -88,6 +88,15 @@ export class HallazgosService {
 
   async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+    // Los técnicos solo pueden incorporar evidencias a hallazgos de sus propias
+    // inspecciones y mientras la inspección siga abierta. Los administradores
+    // conservan el comportamiento administrativo existente.
+    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
+    if (usuarioId && hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
+      throw new BadRequestException('No se pueden agregar evidencias a una inspección finalizada');
+    }
     if (!this.isSupportedImage(file.buffer)) {
       throw new BadRequestException('El contenido no corresponde a una imagen JPG, PNG o WEBP válida');
     }
@@ -304,6 +313,10 @@ export class HallazgosService {
   async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
+    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
+
     // Solo editar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
       throw new BadRequestException(
@@ -327,6 +340,10 @@ export class HallazgosService {
    */
   async remove(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+
+    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
 
     // Solo eliminar si la inspección está en progreso
     if (hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
