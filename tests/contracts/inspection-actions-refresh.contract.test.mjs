@@ -32,7 +32,10 @@ test('mutations invalidate related lists without dropping context-aware query ke
 });
 
 test('inspection finding form assigns authorized responsible users and supports safe retries', async () => {
-  const page = await read('web/src/pages/inspecciones/InspeccionDetailPage.tsx');
+  const [page, service] = await Promise.all([
+    read('web/src/pages/inspecciones/InspeccionDetailPage.tsx'),
+    read('backend/src/inspecciones/inspecciones.service.ts'),
+  ]);
   assert.match(page, /queryFn: usuariosApi\.getTecnicos/);
   assert.match(page, /label="Responsable \(opcional\)"/);
   assert.match(page, /responsableId: accionResponsableId/);
@@ -43,4 +46,6 @@ test('inspection finding form assigns authorized responsible users and supports 
   assert.match(page, /setEditingHallazgoId\(hallazgo\.id\)/);
   assert.match(page, /value=\{accionResponsableId\}/);
   assert.match(page, /Sin asignar/);
+  assert.match(page, /setHallazgoPhoto\(null\);\s+guardarAccionCorrectiva/);
+  assert.match(service, /responsableId: true,\s+fechaCompromiso: true/);
 });

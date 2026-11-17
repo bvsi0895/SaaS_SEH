@@ -123,4 +123,35 @@ describe('InspeccionesService respuestas', () => {
       }),
     }));
   });
+
+  it('returns action responsible and due date when loading an inspection', async () => {
+    const inspection = {
+      id: 'inspection-1',
+      empresaId: 'company-1',
+      organizacionEmpresaId: 'context-1',
+      usuarioId: 'user-1',
+      hallazgos: [],
+    };
+    prisma.inspeccion.findUnique.mockResolvedValue(inspection);
+
+    await expect(service.findOne('inspection-1', 'company-1', 'context-1')).resolves.toBe(inspection);
+
+    expect(prisma.inspeccion.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        hallazgos: {
+          include: {
+            accionesCorrectivas: {
+              select: {
+                id: true,
+                descripcion: true,
+                estado: true,
+                responsableId: true,
+                fechaCompromiso: true,
+              },
+            },
+          },
+        },
+      }),
+    }));
+  });
 });

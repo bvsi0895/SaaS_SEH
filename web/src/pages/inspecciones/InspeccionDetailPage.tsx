@@ -177,6 +177,7 @@ export default function InspeccionDetailPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.id] });
+      setHallazgoPhoto(null);
       guardarAccionCorrectiva(variables.id, variables.successMessage);
     },
     onError: () => {
