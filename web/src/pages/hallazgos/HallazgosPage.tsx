@@ -78,6 +78,29 @@ export default function HallazgosPage() {
       valueGetter: (params) => params.row.inspeccion?.sector || '-',
     },
     {
+      field: 'tecnicoInspector',
+      headerName: 'Técnico inspector',
+      flex: 1,
+      minWidth: 170,
+      valueGetter: (params) => {
+        const usuario = params.row.inspeccion?.usuario;
+        return usuario ? `${usuario.nombre} ${usuario.apellido}` : '-';
+      },
+    },
+    {
+      field: 'responsablesAcciones',
+      headerName: 'Responsables de acciones',
+      flex: 1,
+      minWidth: 190,
+      valueGetter: (params) => {
+        const responsables = (params.row.accionesCorrectivas || [])
+          .map((accion: any) => accion.responsable)
+          .filter(Boolean)
+          .map((responsable: any) => `${responsable.nombre} ${responsable.apellido}`);
+        return responsables.length > 0 ? Array.from(new Set(responsables)).join(', ') : 'Sin asignar';
+      },
+    },
+    {
       field: 'createdAt',
       headerName: 'Fecha',
       width: 130,

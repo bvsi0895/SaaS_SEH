@@ -290,6 +290,9 @@ export class AccionesCorrectivasService {
             inspeccion: { select: { sector: true } },
           },
         },
+        responsable: {
+          select: { id: true, nombre: true, apellido: true },
+        },
       },
       orderBy: { fechaCompromiso: 'asc' },
     });

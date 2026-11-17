@@ -45,4 +45,19 @@ describe('AccionesCorrectivasService technician authorization', () => {
       data: { estado: EstadoAccion.EN_PROGRESO },
     }));
   });
+
+  it('returns responsible identity in the technician action list', async () => {
+    const findMany = jest.fn().mockResolvedValue([action]);
+    const prisma = { accionCorrectiva: { findMany } };
+    const service = new AccionesCorrectivasService(prisma as never);
+
+    await service.findMine('technician-a', 'company-1', undefined, 'context-1');
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ responsableId: 'technician-a' }),
+      include: expect.objectContaining({
+        responsable: { select: { id: true, nombre: true, apellido: true } },
+      }),
+    }));
+  });
 });

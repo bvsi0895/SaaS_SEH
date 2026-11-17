@@ -156,12 +156,14 @@ export default function HallazgoDetailPage() {
         });
       }
       await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
+      await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       setSelectedFiles([]);
       setUploadProgress({});
       setUploadSuccess(`${selectedFiles.length} fotografía(s) cargada(s) correctamente`);
     } catch {
       setUploadError('No se pudieron cargar todas las fotografías. Las ya confirmadas se conservaron.');
       await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
+      await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
     } finally {
       setUploadingPhotos(false);
     }
@@ -173,6 +175,7 @@ export default function HallazgoDetailPage() {
       showSuccess('Accion correctiva creada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
       queryClient.invalidateQueries({ queryKey: ['acciones'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       setAccionDialogOpen(false);
       setNuevaAccion({ fechaCompromiso: new Date().toISOString() });
     },

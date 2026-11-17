@@ -111,6 +111,7 @@ export default function InspeccionDetailPage() {
   const crearHallazgoMutation = useMutation({
     mutationFn: (data: CreateHallazgoDto) => hallazgosApi.create(data),
     onSuccess: (hallazgo) => {
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       if (hallazgoPhoto) {
         subirFotoMutation.mutate({
           id: hallazgo.id,
@@ -130,6 +131,8 @@ export default function InspeccionDetailPage() {
     mutationFn: ({ id: hallazgoId, data }: { id: string; data: UpdateHallazgoDto }) =>
       hallazgosApi.update(hallazgoId, data),
     onSuccess: (hallazgo) => {
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgo', hallazgo.id] });
       if (hallazgoPhoto) {
         subirFotoMutation.mutate({
           id: hallazgo.id,
@@ -149,6 +152,8 @@ export default function InspeccionDetailPage() {
     mutationFn: ({ id: hallazgoId, file }: { id: string; file: File; successMessage: string }) =>
       hallazgosApi.uploadPhoto(hallazgoId, file),
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.id] });
       guardarAccionCorrectiva(variables.id, variables.successMessage);
     },
     onError: () => {
@@ -159,9 +164,11 @@ export default function InspeccionDetailPage() {
 
   const crearAccionMutation = useMutation({
     mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
-    onSuccess: () => {
+    onSuccess: (_accion, variables) => {
       showSuccess('Hallazgo y acción correctiva guardados exitosamente');
       queryClient.invalidateQueries({ queryKey: ['acciones'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
       finalizarCreacionHallazgo();
     },
     onError: () => {
@@ -171,11 +178,13 @@ export default function InspeccionDetailPage() {
   });
 
   const actualizarAccionMutation = useMutation({
-    mutationFn: ({ id: accionId, data }: { id: string; data: UpdateAccionDto }) =>
+    mutationFn: ({ id: accionId, data }: { id: string; data: UpdateAccionDto; hallazgoId: string }) =>
       accionesApi.update(accionId, data),
-    onSuccess: () => {
+    onSuccess: (_accion, variables) => {
       showSuccess('Hallazgo y acción correctiva actualizados exitosamente');
       queryClient.invalidateQueries({ queryKey: ['acciones'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
       finalizarCreacionHallazgo();
     },
     onError: () => {
@@ -196,7 +205,7 @@ export default function InspeccionDetailPage() {
         fechaCompromiso: accionFechaCompromiso,
       };
       if (editingAccionId) {
-        actualizarAccionMutation.mutate({ id: editingAccionId, data });
+        actualizarAccionMutation.mutate({ id: editingAccionId, data, hallazgoId });
       } else {
         crearAccionMutation.mutate({ ...data, hallazgoId });
       }
@@ -208,6 +217,7 @@ export default function InspeccionDetailPage() {
 
   const finalizarCreacionHallazgo = () => {
     queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+    queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
     setAccionDescripcion('');
