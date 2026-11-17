@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PDFInspeccionGenerator } from './generators/pdf-inspeccion.generator';
 import { PDFMensualGenerator } from './generators/pdf-mensual.generator';
-import { EstadoInspeccion } from '@prisma/client';
+import { EstadoInspeccion, Rol } from '@prisma/client';
 import { readFile } from 'fs/promises';
 import { basename, extname, relative, resolve } from 'path';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
@@ -115,7 +115,7 @@ export class ReportesService {
   /**
    * Generar PDF de una inspección
    */
-  async generarPDFInspeccion(inspeccionId: string, empresaId?: string, organizacionEmpresaId?: string): Promise<Buffer> {
+  async generarPDFInspeccion(inspeccionId: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, rol?: Rol): Promise<Buffer> {
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: inspeccionId },
       include: {
@@ -124,6 +124,9 @@ export class ReportesService {
         },
         checklist: {
           select: { nombre: true, tipo: true },
+        },
+        asignadoA: {
+          select: { nombre: true, apellido: true, email: true },
         },
         usuario: {
           select: { nombre: true, apellido: true, email: true },
@@ -158,6 +161,9 @@ export class ReportesService {
     if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
       throw new NotFoundException('Inspección no encontrada');
     }
+    if (rol === Rol.TECNICO && inspeccion.asignadoAId !== usuarioId) {
+      throw new NotFoundException('Inspección no encontrada');
+    }
 
     return this.pdfGenerator.generate(inspeccion);
   }
@@ -180,6 +186,7 @@ export class ReportesService {
       },
       include: {
         checklist: { select: { nombre: true } },
+        asignadoA: { select: { nombre: true, apellido: true } },
         usuario: { select: { nombre: true, apellido: true } },
         _count: { select: { hallazgos: true } },
       },
@@ -331,6 +338,7 @@ export class ReportesService {
             sector: true,
             fechaHoraInicio: true,
             checklist: { select: { nombre: true } },
+            asignadoA: { select: { nombre: true, apellido: true } },
             usuario: { select: { nombre: true, apellido: true } },
           },
         },
@@ -368,7 +376,7 @@ export class ReportesService {
         inspeccion: {
           sector: h.inspeccion.sector,
           checklist: h.inspeccion.checklist.nombre,
-          tecnico: `${h.inspeccion.usuario.nombre} ${h.inspeccion.usuario.apellido}`,
+          tecnico: `${(h.inspeccion.asignadoA ?? h.inspeccion.usuario).nombre} ${(h.inspeccion.asignadoA ?? h.inspeccion.usuario).apellido}`,
         },
         tieneAccionCorrectiva: h.accionesCorrectivas.length > 0,
       })),
@@ -444,3 +452,4 @@ export class ReportesService {
     };
   }
 }
+
