@@ -128,7 +128,12 @@ export interface Inspeccion {
   firmaUrl?: string;
   empresaId: string;
   usuarioId: string;
+  creadoPorId: string;
+  asignadoAId: string;
   checklistId: string;
+  fechaProgramada?: string;
+  creadoPor?: Usuario;
+  asignadoA?: Usuario;
   usuario?: Usuario;
   checklist?: Checklist;
   items?: InspeccionItem[];
@@ -237,3 +242,4 @@ export interface ApiError {
   statusCode: number;
   error?: string;
 }
+
