@@ -49,6 +49,7 @@ export default function AccionDetailPage() {
       showSuccess('Accion iniciada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['accion', id] });
       queryClient.invalidateQueries({ queryKey: ['acciones'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       if (accion?.hallazgoId) queryClient.invalidateQueries({ queryKey: ['hallazgo', accion.hallazgoId] });
       setIniciarDialogOpen(false);
     },
@@ -63,6 +64,7 @@ export default function AccionDetailPage() {
       showSuccess('Accion resuelta exitosamente');
       queryClient.invalidateQueries({ queryKey: ['accion', id] });
       queryClient.invalidateQueries({ queryKey: ['acciones'] });
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       if (accion?.hallazgoId) queryClient.invalidateQueries({ queryKey: ['hallazgo', accion.hallazgoId] });
       setResolverDialogOpen(false);
     },

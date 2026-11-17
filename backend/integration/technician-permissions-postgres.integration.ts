@@ -98,6 +98,7 @@ async function main() {
 
     const visibleActions = await actions.findMine(ids.usuarioA, ids.empresa, undefined, ids.relacionA);
     assert.deepEqual(visibleActions.map((row) => row.id).sort(), [ids.accionA, ids.accionC].sort());
+    assert.equal(visibleActions.find((row) => row.id === ids.accionA)?.responsable?.id, ids.usuarioA);
     await mustReject(actions.findOne(ids.accionB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not open B action');
     await mustReject(actions.iniciar(ids.accionB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not start B action');
     await actions.iniciar(ids.accionA, ids.empresa, ids.relacionA, ids.usuarioA);
@@ -105,6 +106,9 @@ async function main() {
 
     const visibleFindings = await findings.findAll(ids.empresa, undefined, ids.relacionA, ids.usuarioA);
     assert.deepEqual(visibleFindings.map((row) => row.id).sort(), [ids.hallazgoA, ids.hallazgoC].sort());
+    const assignedFinding = visibleFindings.find((row) => row.id === ids.hallazgoC);
+    assert.equal(assignedFinding?.inspeccion.usuario.id, ids.usuarioB);
+    assert.equal(assignedFinding?.accionesCorrectivas[0]?.responsable?.id, ids.usuarioA);
     await expectReadOnlyAssignedFinding();
     await mustReject(findings.findOne(ids.hallazgoB, ids.empresa, ids.relacionA, ids.usuarioA), 'technician A must not open B finding');
     console.log('PostgreSQL integration passed: technician ownership, assigned actions, findings, and organization isolation');

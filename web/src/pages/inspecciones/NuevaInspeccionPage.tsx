@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import {
   Box,
@@ -17,14 +17,17 @@ import { checklistsApi } from '../../api/checklists';
 import { inspeccionesApi, CreateInspeccionDto } from '../../api/inspecciones';
 import PageHeader from '../../components/common/PageHeader';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function NuevaInspeccionPage() {
   const navigate = useNavigate();
   const { showSuccess, showError } = useSnackbar();
+  const queryClient = useQueryClient();
+  const { user, activeContextId } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   const { data: checklists, isLoading: checklistsLoading } = useQuery({
-    queryKey: ['checklists', 'activos'],
+    queryKey: ['checklists', 'activos', activeContextId, user?.id, user?.rol],
     queryFn: () => checklistsApi.getAll({ activo: true }),
   });
 
@@ -38,6 +41,7 @@ export default function NuevaInspeccionPage() {
     mutationFn: inspeccionesApi.create,
     onSuccess: (inspeccion) => {
       showSuccess('Inspeccion creada exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
       navigate(`/inspecciones/${inspeccion.id}`);
     },
     onError: (err: any) => {
