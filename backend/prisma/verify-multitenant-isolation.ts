@@ -56,10 +56,10 @@ async function main() {
         data: { id: randomUUID(), nombre: 'Checklist prueba B', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: linkB.id },
       });
       await tx.inspeccion.create({
-        data: { id: randomUUID(), sector: 'Sector A', empresaId: empresa.id, organizacionEmpresaId: linkA.id, usuarioId: usuarios[0].id, checklistId: checklistA.id, estado: EstadoInspeccion.EN_PROGRESO },
+        data: { id: randomUUID(), sector: 'Sector A', empresaId: empresa.id, organizacionEmpresaId: linkA.id, usuarioId: usuarios[0].id, creadoPorId: usuarios[0].id, asignadoAId: usuarios[0].id, checklistId: checklistA.id, estado: EstadoInspeccion.EN_PROGRESO },
       });
       await tx.inspeccion.create({
-        data: { id: randomUUID(), sector: 'Sector B', empresaId: empresa.id, organizacionEmpresaId: linkB.id, usuarioId: usuarios[1].id, checklistId: checklistB.id, estado: EstadoInspeccion.EN_PROGRESO },
+        data: { id: randomUUID(), sector: 'Sector B', empresaId: empresa.id, organizacionEmpresaId: linkB.id, usuarioId: usuarios[1].id, creadoPorId: usuarios[1].id, asignadoAId: usuarios[1].id, checklistId: checklistB.id, estado: EstadoInspeccion.EN_PROGRESO },
       });
 
       const service = new InspeccionesService(tx as never);
@@ -85,3 +85,4 @@ main().catch((error) => {
   console.error('Verificación de aislamiento fallida:', error);
   process.exitCode = 1;
 }).finally(() => prisma.$disconnect());
+
