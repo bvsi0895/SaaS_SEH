@@ -42,6 +42,41 @@ export class UsuariosService {
     });
   }
 
+  async findAuthorizedTechnicians(empresaId: string, organizacionEmpresaId: string) {
+    return this.prisma.usuario.findMany({
+      where: {
+        empresaId,
+        rol: Rol.TECNICO,
+        activo: true,
+        membresiasOrganizacion: {
+          some: {
+            activa: true,
+            accesosEmpresa: {
+              some: {
+                empresaId,
+                organizacionEmpresaId,
+                activo: true,
+                organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        rol: true,
+        activo: true,
+        ultimoAcceso: true,
+        createdAt: true,
+        empresaId: true,
+      },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
   /**
    * Obtener un usuario por ID
    */
@@ -295,3 +330,4 @@ export class UsuariosService {
     return { message: 'Usuario eliminado exitosamente' };
   }
 }
+
