@@ -17,6 +17,11 @@ interface InspeccionData {
     apellido: string;
     email: string;
   };
+  asignadoA?: {
+    nombre: string;
+    apellido: string;
+    email: string;
+  } | null;
   empresa?: {
     nombre: string;
     logoUrl?: string | null;
@@ -61,7 +66,7 @@ export class PDFInspeccionGenerator {
           margin: 50,
           info: {
             Title: `Reporte de Inspección - ${inspeccion.sector}`,
-            Author: `${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`,
+            Author: `${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`,
             Subject: 'Reporte de Inspección de Seguridad e Higiene',
           },
         });
@@ -124,7 +129,7 @@ export class PDFInspeccionGenerator {
       ['Checklist:', inspeccion.checklist.nombre],
       ['Tipo:', inspeccion.checklist.tipo],
       ['Sector:', inspeccion.sector],
-      ['Técnico:', `${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`],
+      ['Técnico:', `${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`],
       ['Fecha Inicio:', this.formatDate(inspeccion.fechaHoraInicio)],
       ['Fecha Fin:', inspeccion.fechaHoraFin ? this.formatDate(inspeccion.fechaHoraFin) : '-'],
       ['Duración:', this.calcularDuracion(inspeccion.fechaHoraInicio, inspeccion.fechaHoraFin ?? undefined)],
@@ -295,10 +300,10 @@ export class PDFInspeccionGenerator {
       .text('Inspección realizada por:', { align: 'center' })
       .moveDown(2)
       .text('_______________________________', { align: 'center' })
-      .text(`${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`, { align: 'center' })
+      .text(`${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`, { align: 'center' })
       .fontSize(8)
       .fillColor(this.colors.gray)
-      .text(inspeccion.usuario.email, { align: 'center' })
+      .text((inspeccion.asignadoA ?? inspeccion.usuario).email, { align: 'center' })
       .moveDown(1);
 
     // Fecha de generación
@@ -371,3 +376,4 @@ export class PDFInspeccionGenerator {
     }
   }
 }
+
