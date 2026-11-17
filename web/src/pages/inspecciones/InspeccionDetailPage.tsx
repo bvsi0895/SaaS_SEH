@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
   ToggleButtonGroup,
   ToggleButton,
   Tooltip,
@@ -44,6 +45,19 @@ import StatusChip from '../../components/common/StatusChip';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { CumplimientoItem, NivelRiesgo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import { usuariosApi } from '../../api/usuarios';
+
+function getBackendErrorMessage(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (Array.isArray(message)) {
+    const messages = message.filter((item): item is string => typeof item === 'string');
+    return messages.length > 0 ? messages.join('. ') : fallback;
+  }
+  return typeof message === 'string' && message.trim().length > 0 && message.length <= 300
+    ? message
+    : fallback;
+}
 
 export default function InspeccionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,6 +79,8 @@ export default function InspeccionDetailPage() {
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
   const [accionDescripcion, setAccionDescripcion] = useState('');
   const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
+  const [accionResponsableId, setAccionResponsableId] = useState('');
+  const [accionError, setAccionError] = useState<string | null>(null);
   const [nuevoHallazgo, setNuevoHallazgo] = useState<Partial<CreateHallazgoDto>>({
     nivelRiesgo: 'MEDIO',
   });
@@ -73,6 +89,12 @@ export default function InspeccionDetailPage() {
     queryKey: ['inspeccion', id, activeContextId, user?.id, user?.rol],
     queryFn: () => inspeccionesApi.getById(id!),
     enabled: !!id,
+  });
+
+  const { data: tecnicos = [], isLoading: tecnicosLoading } = useQuery({
+    queryKey: ['usuarios', 'tecnicos', activeContextId, user?.id, user?.rol],
+    queryFn: usuariosApi.getTecnicos,
+    enabled: !isTechnician,
   });
 
   const registrarItemMutation = useMutation({
@@ -111,6 +133,7 @@ export default function InspeccionDetailPage() {
   const crearHallazgoMutation = useMutation({
     mutationFn: (data: CreateHallazgoDto) => hallazgosApi.create(data),
     onSuccess: (hallazgo) => {
+      setEditingHallazgoId(hallazgo.id);
       queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       if (hallazgoPhoto) {
         subirFotoMutation.mutate({
@@ -154,6 +177,7 @@ export default function InspeccionDetailPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
       queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.id] });
+      setHallazgoPhoto(null);
       guardarAccionCorrectiva(variables.id, variables.successMessage);
     },
     onError: () => {
@@ -171,9 +195,11 @@ export default function InspeccionDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
       finalizarCreacionHallazgo();
     },
-    onError: () => {
-      showError('Hallazgo guardado, pero no se pudo crear la acción correctiva');
-      finalizarCreacionHallazgo();
+    onError: (error) => {
+      const message = getBackendErrorMessage(error, 'No se pudo crear la acción correctiva');
+      const fullMessage = `El hallazgo ya fue guardado, pero no se pudo crear la acción correctiva: ${message}`;
+      setAccionError(fullMessage);
+      showError(fullMessage);
     },
   });
 
@@ -187,9 +213,11 @@ export default function InspeccionDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
       finalizarCreacionHallazgo();
     },
-    onError: () => {
-      showError('Hallazgo actualizado, pero no se pudo actualizar la acción correctiva');
-      finalizarCreacionHallazgo();
+    onError: (error) => {
+      const message = getBackendErrorMessage(error, 'No se pudo actualizar la acción correctiva');
+      const fullMessage = `El hallazgo ya fue guardado, pero no se pudo actualizar la acción correctiva: ${message}`;
+      setAccionError(fullMessage);
+      showError(fullMessage);
     },
   });
 
@@ -203,6 +231,7 @@ export default function InspeccionDetailPage() {
       const data = {
         descripcion: accionDescripcion.trim(),
         fechaCompromiso: accionFechaCompromiso,
+        ...(accionResponsableId ? { responsableId: accionResponsableId } : {}),
       };
       if (editingAccionId) {
         actualizarAccionMutation.mutate({ id: editingAccionId, data, hallazgoId });
@@ -222,6 +251,8 @@ export default function InspeccionDetailPage() {
     setHallazgoPhoto(null);
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
+    setAccionResponsableId('');
+    setAccionError(null);
     setEditingHallazgoId(null);
     setEditingAccionId(null);
     setHallazgoOriginItemId(null);
@@ -238,6 +269,8 @@ export default function InspeccionDetailPage() {
     setEditingAccionId(existingAction?.id || null);
     setAccionDescripcion(existingAction?.descripcion || '');
     setAccionFechaCompromiso(existingAction?.fechaCompromiso?.slice(0, 10) || new Date().toISOString().slice(0, 10));
+    setAccionResponsableId(existingAction?.responsableId || '');
+    setAccionError(null);
     setNuevoHallazgo(existing
       ? {
           titulo: existing.titulo,
@@ -270,6 +303,8 @@ export default function InspeccionDetailPage() {
     setHallazgoPhoto(null);
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
+    setAccionResponsableId('');
+    setAccionError(null);
     setEditingHallazgoId(null);
     setEditingAccionId(null);
     setHallazgoOriginItemId(null);
@@ -304,13 +339,29 @@ export default function InspeccionDetailPage() {
   };
 
   const handleCrearHallazgo = () => {
-    if (nuevoHallazgo.titulo && nuevoHallazgo.descripcion && nuevoHallazgo.ubicacionTexto) {
-      const data = nuevoHallazgo as CreateHallazgoDto;
-      if (editingHallazgoId) {
-        actualizarHallazgoMutation.mutate({ id: editingHallazgoId, data });
-      } else {
-        crearHallazgoMutation.mutate({ ...data, inspeccionId: id! });
+    setAccionError(null);
+    if (!nuevoHallazgo.titulo || !nuevoHallazgo.descripcion || !nuevoHallazgo.ubicacionTexto) return;
+
+    if (!isTechnician && accionDescripcion.trim()) {
+      if (accionDescripcion.trim().length < 10) {
+        setAccionError('La descripción de la acción correctiva debe tener al menos 10 caracteres.');
+        return;
       }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(accionFechaCompromiso) || Number.isNaN(Date.parse(`${accionFechaCompromiso}T00:00:00`))) {
+        setAccionError('La fecha de compromiso no es válida.');
+        return;
+      }
+      if (accionResponsableId && !tecnicos.some((tecnico) => tecnico.id === accionResponsableId && tecnico.activo)) {
+        setAccionError('El responsable seleccionado no está autorizado para esta empresa y organización.');
+        return;
+      }
+    }
+
+    const data = nuevoHallazgo as CreateHallazgoDto;
+    if (editingHallazgoId) {
+      actualizarHallazgoMutation.mutate({ id: editingHallazgoId, data });
+    } else {
+      crearHallazgoMutation.mutate({ ...data, inspeccionId: id! });
     }
   };
 
@@ -780,9 +831,36 @@ export default function InspeccionDetailPage() {
                 rows={3}
                 label="Acción correctiva (opcional)"
                 value={accionDescripcion}
-                onChange={(e) => setAccionDescripcion(e.target.value)}
+                onChange={(e) => {
+                  setAccionDescripcion(e.target.value);
+                  setAccionError(null);
+                }}
                 helperText="Si la completa, se creará una acción pendiente vinculada al hallazgo."
+                error={Boolean(accionError)}
               />
+            </Grid>}
+            {!isTechnician && <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="Responsable (opcional)"
+                value={accionResponsableId}
+                onChange={(e) => {
+                  setAccionResponsableId(e.target.value);
+                  setAccionError(null);
+                }}
+                disabled={tecnicosLoading}
+                helperText={tecnicosLoading
+                  ? 'Cargando técnicos autorizados...'
+                  : 'Solo técnicos activos de la empresa y organización actuales'}
+              >
+                <MenuItem value="">Sin asignar</MenuItem>
+                {tecnicos.filter((tecnico) => tecnico.activo).map((tecnico) => (
+                  <MenuItem key={tecnico.id} value={tecnico.id}>
+                    {tecnico.nombre} {tecnico.apellido}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>}
             {!isTechnician && <Grid item xs={12} md={6}>
               <TextField
@@ -790,10 +868,16 @@ export default function InspeccionDetailPage() {
                 type="date"
                 label="Fecha compromiso"
                 value={accionFechaCompromiso}
-                onChange={(e) => setAccionFechaCompromiso(e.target.value)}
+                onChange={(e) => {
+                  setAccionFechaCompromiso(e.target.value);
+                  setAccionError(null);
+                }}
                 InputLabelProps={{ shrink: true }}
                 disabled={!accionDescripcion.trim()}
               />
+            </Grid>}
+            {!isTechnician && accionError && <Grid item xs={12}>
+              <Alert severity="error">{accionError}</Alert>
             </Grid>}
           </Grid>
         </DialogContent>

@@ -86,7 +86,13 @@ export class InspeccionesService {
         hallazgos: {
           include: {
             accionesCorrectivas: {
-              select: { id: true, descripcion: true, estado: true },
+              select: {
+                id: true,
+                descripcion: true,
+                estado: true,
+                responsableId: true,
+                fechaCompromiso: true,
+              },
             },
           },
         },
