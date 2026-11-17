@@ -78,8 +78,8 @@ async function main() {
     ] });
     await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Permissions checklist', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
     await prisma.inspeccion.createMany({ data: [
-      { id: ids.inspeccionA, sector: 'A', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, checklistId: ids.checklist, usuarioId: ids.usuarioA, estado: EstadoInspeccion.EN_PROGRESO },
-      { id: ids.inspeccionB, sector: 'B', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, checklistId: ids.checklist, usuarioId: ids.usuarioB, estado: EstadoInspeccion.EN_PROGRESO },
+      { id: ids.inspeccionA, sector: 'A', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, checklistId: ids.checklist, usuarioId: ids.usuarioA, creadoPorId: ids.usuarioA, asignadoAId: ids.usuarioA, estado: EstadoInspeccion.EN_PROGRESO },
+      { id: ids.inspeccionB, sector: 'B', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, checklistId: ids.checklist, usuarioId: ids.usuarioB, creadoPorId: ids.usuarioB, asignadoAId: ids.usuarioB, estado: EstadoInspeccion.EN_PROGRESO },
     ] });
     await prisma.hallazgo.createMany({ data: [
       { id: ids.hallazgoA, titulo: 'Finding A', descripcion: 'Finding owned by technician A', nivelRiesgo: NivelRiesgo.ALTO, ubicacionTexto: 'A', inspeccionId: ids.inspeccionA },
@@ -125,3 +125,4 @@ async function expectReadOnlyAssignedFinding() {
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await prisma.$disconnect(); });
+
