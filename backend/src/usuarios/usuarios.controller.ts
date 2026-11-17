@@ -53,9 +53,9 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Listar técnicos de la empresa' })
   async findTechnicians(
     @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.findAll(empresaId, { rol: Rol.TECNICO }, organizacionId);
+    return this.usuariosService.findAuthorizedTechnicians(empresaId, organizacionEmpresaId);
   }
 
   @Get(':id')
@@ -159,3 +159,4 @@ export class UsuariosController {
     return this.usuariosService.remove(id, empresaId, organizacionId);
   }
 }
+
