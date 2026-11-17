@@ -30,3 +30,17 @@ test('mutations invalidate related lists without dropping context-aware query ke
   assert.match(actionDetail, /queryClient\.invalidateQueries\(\{ queryKey: \['hallazgos'\] \}\)/);
   assert.match(actionDetail, /queryKey: \['accion', id, activeContextId, user\?\.id, user\?\.rol\]/);
 });
+
+test('inspection finding form assigns authorized responsible users and supports safe retries', async () => {
+  const page = await read('web/src/pages/inspecciones/InspeccionDetailPage.tsx');
+  assert.match(page, /queryFn: usuariosApi\.getTecnicos/);
+  assert.match(page, /label="Responsable \(opcional\)"/);
+  assert.match(page, /responsableId: accionResponsableId/);
+  assert.match(page, /accionDescripcion\.trim\(\)\.length < 10/);
+  assert.match(page, /Date\.parse\(`\$\{accionFechaCompromiso\}T00:00:00`\)/);
+  assert.match(page, /tecnicos\.some\(\(tecnico\) => tecnico\.id === accionResponsableId && tecnico\.activo\)/);
+  assert.match(page, /El hallazgo ya fue guardado, pero no se pudo crear la acción correctiva/);
+  assert.match(page, /setEditingHallazgoId\(hallazgo\.id\)/);
+  assert.match(page, /value=\{accionResponsableId\}/);
+  assert.match(page, /Sin asignar/);
+});
