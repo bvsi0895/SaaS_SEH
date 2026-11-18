@@ -50,6 +50,7 @@ enum TipoChecklist {
 }
 
 enum EstadoInspeccion {
+  PENDIENTE
   EN_PROGRESO
   COMPLETADA
   CANCELADA
@@ -122,10 +123,15 @@ model Usuario {
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   // Relaciones
-  inspecciones           Inspeccion[]
-  accionesAsignadas      AccionCorrectiva[]    @relation("AccionAsignada")
-  accionesCreadoras      AccionCorrectiva[]    @relation("AccionCreador")
-  membresiasOrganizacion OrganizacionMiembro[]
+  inspeccionesCreadas      Inspeccion[]             @relation("InspeccionCreadaPor")
+  inspeccionesAsignadas    Inspeccion[]             @relation("InspeccionAsignadaA")
+  inspeccionesLegacy       Inspeccion[]             @relation("InspeccionUsuarioLegacy")
+  reasignacionesOrigen     InspeccionReasignacion[] @relation("ReasignacionDesde")
+  reasignacionesDestino    InspeccionReasignacion[] @relation("ReasignacionHacia")
+  reasignacionesRealizadas InspeccionReasignacion[] @relation("ReasignacionEfectuadaPor")
+  accionesAsignadas        AccionCorrectiva[]       @relation("AccionAsignada")
+  accionesCreadoras        AccionCorrectiva[]       @relation("AccionCreador")
+  membresiasOrganizacion   OrganizacionMiembro[]
 
   @@index([email])
   @@index([empresaId])
@@ -177,9 +183,11 @@ model Inspeccion {
   id              String           @id @default(uuid())
   sector          String // Área de la planta
   descripcion     String?
-  fechaHoraInicio DateTime         @default(now())
+  // Null until the assigned user actually starts the inspection.
+  fechaHoraInicio DateTime?
   fechaHoraFin    DateTime?
-  estado          EstadoInspeccion @default(EN_PROGRESO)
+  estado          EstadoInspeccion @default(PENDIENTE)
+  fechaProgramada DateTime?
 
   // Ubicación (opcional)
   ubicacionTexto String?
@@ -204,9 +212,18 @@ model Inspeccion {
   checklistId String
   checklist   Checklist @relation(fields: [checklistId], references: [id])
 
-  // Relación con usuario (técnico)
+  // Responsabilidad explícita de la inspección.
+  creadoPorId String
+  creadoPor   Usuario @relation("InspeccionCreadaPor", fields: [creadoPorId], references: [id])
+  asignadoAId String
+  asignadoA   Usuario @relation("InspeccionAsignadaA", fields: [asignadoAId], references: [id])
+
+  // Compatibilidad con integraciones y datos históricos anteriores a la delegación.
+  // Las nuevas operaciones mantienen este alias sincronizado con asignadoAId.
   usuarioId String
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario @relation("InspeccionUsuarioLegacy", fields: [usuarioId], references: [id])
+
+  reasignaciones InspeccionReasignacion[]
 
   // Relaciones
   items     InspeccionItem[]
@@ -216,10 +233,32 @@ model Inspeccion {
   @@index([organizacionEmpresaId])
   @@index([establecimientoId])
   @@index([usuarioId])
+  @@index([creadoPorId])
+  @@index([asignadoAId])
+  @@index([fechaProgramada])
   @@index([checklistId])
   @@index([estado])
   @@index([fechaHoraInicio])
   @@map("inspecciones")
+}
+
+model InspeccionReasignacion {
+  id             String   @id @default(uuid())
+  inspeccionId   String
+  desdeUsuarioId String?
+  haciaUsuarioId String
+  efectuadaPorId String
+  createdAt      DateTime @default(now())
+
+  inspeccion   Inspeccion @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  desdeUsuario Usuario?   @relation("ReasignacionDesde", fields: [desdeUsuarioId], references: [id])
+  haciaUsuario Usuario    @relation("ReasignacionHacia", fields: [haciaUsuarioId], references: [id])
+  efectuadaPor Usuario    @relation("ReasignacionEfectuadaPor", fields: [efectuadaPorId], references: [id])
+
+  @@index([inspeccionId])
+  @@index([haciaUsuarioId])
+  @@index([efectuadaPorId])
+  @@map("inspeccion_reasignaciones")
 }
 
 model InspeccionItem {
@@ -262,7 +301,7 @@ model Hallazgo {
   inspeccion   Inspeccion @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
 
   // Vínculo opcional con el incumplimiento que originó el hallazgo.
-  inspeccionItemId String? @unique
+  inspeccionItemId String?         @unique
   inspeccionItem   InspeccionItem? @relation(fields: [inspeccionItemId], references: [id], onDelete: SetNull)
 
   // Relaciones
@@ -416,3 +455,4 @@ model AccesoEstablecimiento {
   @@index([establecimientoId])
   @@map("accesos_establecimiento")
 }
+

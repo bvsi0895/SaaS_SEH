@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsLatitude,
   IsLongitude,
+  IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -58,4 +59,21 @@ export class CreateInspeccionDto {
   @IsNumber()
   @IsLongitude()
   longitud?: number;
+
+  @ApiPropertyOptional({
+    example: '2026-11-20T14:00:00.000Z',
+    description: 'Fecha prevista para ejecutar la inspección',
+  })
+  @IsOptional()
+  @IsDateString()
+  fechaProgramada?: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Técnico autorizado responsable. Si se omite, se asigna al creador.',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  asignadoAId?: string;
 }
+

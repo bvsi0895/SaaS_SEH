@@ -1,0 +1,124 @@
+name: Inspection delegation PostgreSQL 16
+
+on:
+  pull_request:
+    branches:
+      - feature/demo-online
+    paths:
+      - 'backend/**'
+      - 'web/**'
+      - 'tests/contracts/**'
+      - '.github/workflows/inspection-delegation-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql://seh_pr12:seh_pr12_password@localhost:5432/seh_pr12?schema=public
+
+jobs:
+  postgres-16:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seh_pr12
+          POSTGRES_PASSWORD: seh_pr12_password
+          POSTGRES_DB: seh_pr12
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U seh_pr12 -d seh_pr12"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prisma validate and generate
+        run: |
+          pnpm --filter seh-backend exec prisma validate
+          pnpm --filter seh-backend exec prisma generate
+      - name: Apply current migrations
+        run: pnpm --filter seh-backend exec prisma migrate deploy
+      - name: Run Jest
+        run: pnpm --filter seh-backend test -- --runInBand
+      - name: Run backend build
+        run: pnpm --filter seh-backend build
+      - name: Run frontend typecheck and build
+        run: pnpm --filter seh-web build
+      - name: Run contract tests
+        run: node --test tests/contracts/*.mjs
+      - name: Run PostgreSQL delegation integration
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/inspection-delegation-postgres.integration.ts
+      - name: Run PostgreSQL technician authorization integration
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/technician-permissions-postgres.integration.ts
+
+  migration-preservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seh_pr12_migration
+          POSTGRES_PASSWORD: seh_pr12_migration_password
+          POSTGRES_DB: seh_pr12_migration
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U seh_pr12_migration -d seh_pr12_migration"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DATABASE_URL: postgresql://seh_pr12_migration:seh_pr12_migration_password@localhost:5433/seh_pr12_migration?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter seh-backend exec prisma generate
+      - name: Apply pre-delegation migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/seh-pr12-new-migrations
+          mv backend/prisma/migrations/20261117090000_add_pending_inspection_status /tmp/seh-pr12-new-migrations/
+          mv backend/prisma/migrations/20261117100000_inspection_delegation /tmp/seh-pr12-new-migrations/
+          mv backend/prisma/migrations/20261117110000_pending_inspection_start_date /tmp/seh-pr12-new-migrations/
+          pnpm --filter seh-backend exec prisma migrate deploy
+          mv /tmp/seh-pr12-new-migrations/20261117090000_add_pending_inspection_status backend/prisma/migrations/
+          mv /tmp/seh-pr12-new-migrations/20261117100000_inspection_delegation backend/prisma/migrations/
+          mv /tmp/seh-pr12-new-migrations/20261117110000_pending_inspection_start_date backend/prisma/migrations/
+      - name: Seed legacy inspection before PR #12
+        run: psql "postgresql://seh_pr12_migration:seh_pr12_migration_password@localhost:5433/seh_pr12_migration" --file=backend/integration/legacy-inspection-seed.sql
+      - name: Apply delegation migrations and verify preservation
+        run: |
+          pnpm --filter seh-backend exec prisma migrate deploy
+          pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-inspection-delegation-migration.ts
+

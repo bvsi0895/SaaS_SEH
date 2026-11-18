@@ -91,7 +91,7 @@ export class HallazgosService {
     // Los técnicos solo pueden incorporar evidencias a hallazgos de sus propias
     // inspecciones y mientras la inspección siga abierta. Los administradores
     // conservan el comportamiento administrativo existente.
-    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+    if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
     if (usuarioId && hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
@@ -162,7 +162,7 @@ export class HallazgosService {
         ...(filters?.fechaHasta && { createdAt: { lte: filters.fechaHasta } }),
         ...(usuarioId && {
           OR: [
-            { inspeccion: { usuarioId } },
+            { inspeccion: { asignadoAId: usuarioId } },
             { accionesCorrectivas: { some: { responsableId: usuarioId } } },
           ],
         }),
@@ -174,6 +174,7 @@ export class HallazgosService {
             sector: true,
             fechaHoraInicio: true,
             checklist: { select: { nombre: true } },
+            asignadoA: { select: { id: true, nombre: true, apellido: true } },
             usuario: { select: { id: true, nombre: true, apellido: true } },
           },
         },
@@ -207,6 +208,7 @@ export class HallazgosService {
             empresaId: true,
             organizacionEmpresaId: true,
             checklist: { select: { id: true, nombre: true } },
+            asignadoA: { select: { id: true, nombre: true, apellido: true } },
             usuario: { select: { id: true, nombre: true, apellido: true } },
           },
         },
@@ -231,7 +233,7 @@ export class HallazgosService {
     }
     if (
       usuarioId &&
-      hallazgo.inspeccion.usuario.id !== usuarioId &&
+      (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId &&
       !hallazgo.accionesCorrectivas.some((accion) => accion.responsable?.id === usuarioId)
     ) {
       throw new NotFoundException('Hallazgo no encontrado');
@@ -259,7 +261,7 @@ export class HallazgosService {
     if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
       throw new NotFoundException('Inspección no encontrada');
     }
-    if (usuarioId && inspeccion.usuarioId !== usuarioId) {
+    if (usuarioId && inspeccion.asignadoAId !== usuarioId) {
       throw new NotFoundException('Inspección no encontrada');
     }
 
@@ -319,7 +321,7 @@ export class HallazgosService {
   async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
-    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+    if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
 
@@ -347,7 +349,7 @@ export class HallazgosService {
   async remove(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
 
-    if (usuarioId && hallazgo.inspeccion.usuario.id !== usuarioId) {
+    if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
 
@@ -411,3 +413,4 @@ export class HallazgosService {
     };
   }
 }
+

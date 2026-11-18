@@ -35,9 +35,11 @@ export class ReportesController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId);
+    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -56,9 +58,11 @@ export class ReportesController {
     @Param('id') id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId);
+    const pdfBuffer = await this.reportesService.generarPDFInspeccion(id, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -165,3 +169,4 @@ export class ReportesController {
     }, organizacionEmpresaId);
   }
 }
+

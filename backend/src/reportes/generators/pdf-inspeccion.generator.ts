@@ -5,8 +5,10 @@ interface InspeccionData {
   id: string;
   sector: string;
   descripcion?: string | null;
-  fechaHoraInicio: Date;
+  fechaHoraInicio?: Date | null;
   fechaHoraFin?: Date | null;
+  createdAt: Date;
+  fechaProgramada?: Date | null;
   observaciones?: string | null;
   checklist: {
     nombre: string;
@@ -17,6 +19,11 @@ interface InspeccionData {
     apellido: string;
     email: string;
   };
+  asignadoA?: {
+    nombre: string;
+    apellido: string;
+    email: string;
+  } | null;
   empresa?: {
     nombre: string;
     logoUrl?: string | null;
@@ -61,7 +68,7 @@ export class PDFInspeccionGenerator {
           margin: 50,
           info: {
             Title: `Reporte de Inspección - ${inspeccion.sector}`,
-            Author: `${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`,
+            Author: `${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`,
             Subject: 'Reporte de Inspección de Seguridad e Higiene',
           },
         });
@@ -124,8 +131,10 @@ export class PDFInspeccionGenerator {
       ['Checklist:', inspeccion.checklist.nombre],
       ['Tipo:', inspeccion.checklist.tipo],
       ['Sector:', inspeccion.sector],
-      ['Técnico:', `${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`],
-      ['Fecha Inicio:', this.formatDate(inspeccion.fechaHoraInicio)],
+      ['Técnico:', `${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`],
+      ['Fecha Creación:', this.formatDate(inspeccion.createdAt)],
+      ['Fecha Programada:', inspeccion.fechaProgramada ? this.formatDate(inspeccion.fechaProgramada) : '-'],
+      ['Inicio Real:', inspeccion.fechaHoraInicio ? this.formatDate(inspeccion.fechaHoraInicio) : 'No iniciada'],
       ['Fecha Fin:', inspeccion.fechaHoraFin ? this.formatDate(inspeccion.fechaHoraFin) : '-'],
       ['Duración:', this.calcularDuracion(inspeccion.fechaHoraInicio, inspeccion.fechaHoraFin ?? undefined)],
     ];
@@ -295,10 +304,10 @@ export class PDFInspeccionGenerator {
       .text('Inspección realizada por:', { align: 'center' })
       .moveDown(2)
       .text('_______________________________', { align: 'center' })
-      .text(`${inspeccion.usuario.nombre} ${inspeccion.usuario.apellido}`, { align: 'center' })
+      .text(`${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`, { align: 'center' })
       .fontSize(8)
       .fillColor(this.colors.gray)
-      .text(inspeccion.usuario.email, { align: 'center' })
+      .text((inspeccion.asignadoA ?? inspeccion.usuario).email, { align: 'center' })
       .moveDown(1);
 
     // Fecha de generación
@@ -317,7 +326,8 @@ export class PDFInspeccionGenerator {
     });
   }
 
-  private calcularDuracion(inicio: Date, fin?: Date): string {
+  private calcularDuracion(inicio?: Date | null, fin?: Date): string {
+    if (!inicio) return 'No iniciada';
     if (!fin) return 'En progreso';
     const diff = new Date(fin).getTime() - new Date(inicio).getTime();
     const minutos = Math.floor(diff / 60000);
@@ -371,3 +381,4 @@ export class PDFInspeccionGenerator {
     }
   }
 }
+

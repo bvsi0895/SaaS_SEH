@@ -72,6 +72,8 @@ export default function InspeccionDetailPage() {
   const [observacion, setObservacion] = useState('');
   const [finalizarDialogOpen, setFinalizarDialogOpen] = useState(false);
   const [observacionesFinal, setObservacionesFinal] = useState('');
+  const [reasignarDialogOpen, setReasignarDialogOpen] = useState(false);
+  const [reasignarUsuarioId, setReasignarUsuarioId] = useState('');
   const [hallazgoDialogOpen, setHallazgoDialogOpen] = useState(false);
   const [editingHallazgoId, setEditingHallazgoId] = useState<string | null>(null);
   const [editingAccionId, setEditingAccionId] = useState<string | null>(null);
@@ -83,6 +85,29 @@ export default function InspeccionDetailPage() {
   const [accionError, setAccionError] = useState<string | null>(null);
   const [nuevoHallazgo, setNuevoHallazgo] = useState<Partial<CreateHallazgoDto>>({
     nivelRiesgo: 'MEDIO',
+  });
+
+  const iniciarMutation = useMutation({
+    mutationFn: () => inspeccionesApi.iniciar(id!),
+    onSuccess: (inspection) => {
+      showSuccess('Inspección iniciada');
+      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      queryClient.invalidateQueries({ queryKey: ['inspeccion', inspection.id] });
+    },
+    onError: () => showError('No se pudo iniciar la inspección'),
+  });
+
+  const reasignarMutation = useMutation({
+    mutationFn: () => inspeccionesApi.reasignar(id!, reasignarUsuarioId),
+    onSuccess: () => {
+      showSuccess('Inspección reasignada');
+      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      setReasignarDialogOpen(false);
+      setReasignarUsuarioId('');
+    },
+    onError: () => showError('No se pudo reasignar la inspección'),
   });
 
   const { data: inspeccion, isLoading } = useQuery({
@@ -418,6 +443,10 @@ export default function InspeccionDetailPage() {
   }
 
   const isEditable = inspeccion.estado === 'EN_PROGRESO';
+  const isPending = inspeccion.estado === 'PENDIENTE';
+  const canStart = isPending && inspeccion.asignadoAId === user?.id;
+  const assigned = inspeccion.asignadoA || inspeccion.usuario;
+  const creator = inspeccion.creadoPor;
 
   return (
     <Box>
@@ -463,21 +492,44 @@ export default function InspeccionDetailPage() {
 
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Tecnico
+                    Creada por
                   </Typography>
                   <Typography variant="body2">
-                    {inspeccion.usuario?.nombre} {inspeccion.usuario?.apellido}
+                    {creator?.nombre || '-'} {creator?.apellido || ''}
                   </Typography>
                 </Box>
 
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Fecha Inicio
+                    Asignada a
                   </Typography>
                   <Typography variant="body2">
-                    {format(new Date(inspeccion.fechaHoraInicio), "dd/MM/yyyy HH:mm", {
-                      locale: es,
-                    })}
+                    {assigned?.nombre || '-'} {assigned?.apellido || ''}
+                  </Typography>
+                </Box>
+
+                {inspeccion.fechaProgramada && <Box>
+                  <Typography variant="caption" color="text.secondary">Fecha programada</Typography>
+                  <Typography variant="body2">{format(new Date(inspeccion.fechaProgramada), "dd/MM/yyyy", { locale: es })}</Typography>
+                </Box>}
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Fecha de creación
+                  </Typography>
+                  <Typography variant="body2">
+                    {format(new Date(inspeccion.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Inicio real
+                  </Typography>
+                  <Typography variant="body2">
+                    {inspeccion.fechaHoraInicio
+                      ? format(new Date(inspeccion.fechaHoraInicio), "dd/MM/yyyy HH:mm", { locale: es })
+                      : 'No iniciada'}
                   </Typography>
                 </Box>
 
@@ -531,6 +583,26 @@ export default function InspeccionDetailPage() {
                   Descargar PDF
                 </Button>
               )}
+
+              {canStart && <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                sx={{ mt: 2 }}
+                onClick={() => iniciarMutation.mutate()}
+                disabled={iniciarMutation.isPending}
+              >
+                {iniciarMutation.isPending ? 'Iniciando...' : 'Iniciar inspección'}
+              </Button>}
+
+              {!isTechnician && isPending && <Button
+                variant="outlined"
+                fullWidth
+                sx={{ mt: 1 }}
+                onClick={() => setReasignarDialogOpen(true)}
+              >
+                Reasignar inspección
+              </Button>}
 
               {isEditable && (
                 <>
@@ -719,6 +791,31 @@ export default function InspeccionDetailPage() {
       </Dialog>
 
       {/* Dialog para finalizar */}
+      <Dialog open={reasignarDialogOpen} onClose={() => setReasignarDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reasignar inspección</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            select
+            label="Nuevo técnico responsable"
+            value={reasignarUsuarioId}
+            onChange={(event) => setReasignarUsuarioId(event.target.value)}
+            sx={{ mt: 1 }}
+          >
+            {tecnicos.filter((tecnico) => tecnico.activo && tecnico.id !== inspeccion.asignadoAId).map((tecnico) => (
+              <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReasignarDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" disabled={!reasignarUsuarioId || reasignarMutation.isPending} onClick={() => reasignarMutation.mutate()}>
+            {reasignarMutation.isPending ? 'Reasignando...' : 'Reasignar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog para finalizar */}
       <Dialog
         open={finalizarDialogOpen}
         onClose={() => setFinalizarDialogOpen(false)}
@@ -897,3 +994,4 @@ export default function InspeccionDetailPage() {
     </Box>
   );
 }
+

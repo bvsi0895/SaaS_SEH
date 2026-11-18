@@ -49,3 +49,4 @@ test('inspection finding form assigns authorized responsible users and supports 
   assert.match(page, /setHallazgoPhoto\(null\);\s+guardarAccionCorrectiva/);
   assert.match(service, /responsableId: true,\s+fechaCompromiso: true/);
 });
+

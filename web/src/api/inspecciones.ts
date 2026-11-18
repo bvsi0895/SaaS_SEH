@@ -5,6 +5,8 @@ export interface CreateInspeccionDto {
   checklistId: string;
   sector: string;
   descripcion?: string;
+  asignadoAId?: string;
+  fechaProgramada?: string;
 }
 
 export interface RegistrarItemDto {
@@ -23,6 +25,7 @@ export const inspeccionesApi = {
     limit?: number;
     estado?: string;
     checklistId?: string;
+    asignadoAId?: string;
   }): Promise<{ data: Inspeccion[]; total: number; isPaginated: boolean }> => {
     const response = await apiClient.get<Inspeccion[] | { data: Inspeccion[]; total: number }>(
       '/inspecciones',
@@ -65,6 +68,16 @@ export const inspeccionesApi = {
     return response.data;
   },
 
+  iniciar: async (id: string): Promise<Inspeccion> => {
+    const response = await apiClient.post<Inspeccion>(`/inspecciones/${id}/iniciar`);
+    return response.data;
+  },
+
+  reasignar: async (id: string, asignadoAId: string): Promise<Inspeccion> => {
+    const response = await apiClient.post<Inspeccion>(`/inspecciones/${id}/reasignar`, { asignadoAId });
+    return response.data;
+  },
+
   getMisInspecciones: async (): Promise<Inspeccion[]> => {
     const response = await apiClient.get<Inspeccion[]>('/inspecciones/me');
     return response.data;
@@ -82,3 +95,4 @@ export const inspeccionesApi = {
     return response.data;
   },
 };
+
