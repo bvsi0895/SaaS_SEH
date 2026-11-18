@@ -16,6 +16,8 @@ test('inspection delegation schema keeps the legacy owner and adds explicit resp
 });
 
 test('delegation migration backfills both owners before making them required', async () => {
+  const enumMigration = await read('backend/prisma/migrations/20261117090000_add_pending_inspection_status/migration.sql');
+  assert.match(enumMigration, /ALTER TYPE "EstadoInspeccion" ADD VALUE IF NOT EXISTS 'PENDIENTE'/);
   const migration = await read('backend/prisma/migrations/20261117100000_inspection_delegation/migration.sql');
   assert.match(migration, /ADD COLUMN "creadoPorId" TEXT/);
   assert.match(migration, /ADD COLUMN "asignadoAId" TEXT/);
