@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { PrismaClient, Rol, RolOrganizacion, TipoOrganizacion, EstadoRelacionEmpresa, EstadoInspeccion } from '@prisma/client';
+import { PrismaClient, Rol, RolOrganizacion, TipoOrganizacion, EstadoRelacionEmpresa, EstadoInspeccion, CumplimientoItem } from '@prisma/client';
 import { InspeccionesService } from '../src/inspecciones/inspecciones.service';
 
 const prisma = new PrismaClient();
@@ -68,6 +68,7 @@ async function main() {
 
     const adminDelegated = await service.create({ checklistId: ids.checklist, sector: 'Admin sector', asignadoAId: ids.tecnicoA }, ids.admin, ids.empresa, ids.contexto, Rol.ADMIN_EMPRESA);
     assert.equal(adminDelegated.estado, EstadoInspeccion.PENDIENTE, 'admin delegation must remain pending');
+    assert.equal(adminDelegated.fechaHoraInicio, null, 'pending delegation must not have a real start date');
     const supervisorDelegated = await service.create({ checklistId: ids.checklist, sector: 'Supervisor sector', asignadoAId: ids.tecnicoB }, ids.supervisor, ids.empresa, ids.contexto, Rol.SUPERVISOR);
     assert.equal(supervisorDelegated.estado, EstadoInspeccion.PENDIENTE, 'supervisor delegation must remain pending');
     const technicianOwn = await service.create({ checklistId: ids.checklist, sector: 'Own sector' }, ids.tecnicoA, ids.empresa, ids.contexto, Rol.TECNICO);
@@ -77,13 +78,23 @@ async function main() {
     const assigned = await service.findAll(ids.empresa, undefined, ids.contexto, Rol.TECNICO, ids.tecnicoA);
     assert.deepEqual(assigned.map((inspection) => inspection.id).sort(), [adminDelegated.id, technicianOwn.id].sort());
     await assert.rejects(service.findOne(supervisorDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO), /no encontrada/i);
+    await assert.rejects(service.iniciar(adminDelegated.id, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
     const started = await service.iniciar(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
     assert.equal(started.estado, EstadoInspeccion.EN_PROGRESO);
+    assert.ok(started.fechaHoraInicio, 'starting must set the real start date');
+    const startedDetail = await service.findOne(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    const inspectionItemId = startedDetail.items[0].id;
+    await assert.rejects(service.registrarItem(adminDelegated.id, { inspeccionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
+    await service.registrarItem(adminDelegated.id, { inspeccionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    await assert.rejects(service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.supervisor, Rol.SUPERVISOR), /no encontrada/i);
+    const completed = await service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    assert.equal(completed.estado, EstadoInspeccion.COMPLETADA);
 
     const reassigned = await service.reasignar(supervisorDelegated.id, { asignadoAId: ids.tecnicoA }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA);
     assert.equal(reassigned.asignadoAId, ids.tecnicoA);
     assert.equal(await prisma.inspeccionReasignacion.count({ where: { inspeccionId: supervisorDelegated.id, efectuadaPorId: ids.admin } }), 1);
     await assert.rejects(service.reasignar(supervisorDelegated.id, { asignadoAId: ids.tecnicoAjeno }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no está autorizado/i);
+    await assert.rejects(service.findOne(adminDelegated.id, ids.empresaAjena, ids.contexto, ids.tecnicoA, Rol.TECNICO), /no encontrada/i);
     console.log('PostgreSQL integration passed: admin/supervisor delegation, technician visibility/start, reassignment audit, and company isolation');
   } finally {
     await cleanup();
