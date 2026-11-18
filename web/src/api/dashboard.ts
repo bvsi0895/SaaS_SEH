@@ -58,7 +58,8 @@ export const dashboardApi = {
       inspecciones: Array<{
         id: string;
         sector: string;
-        fechaHoraInicio: string;
+        fechaHoraInicio: string | null;
+        createdAt: string;
         usuario: { nombre: string; apellido: string };
         checklist: { nombre: string };
       }>;
@@ -83,7 +84,8 @@ export const dashboardApi = {
         id: item.id,
         tipo: 'inspeccion' as const,
         descripcion: `Inspección ${item.checklist.nombre} - ${item.sector}`,
-        fecha: item.fechaHoraInicio,
+        // A pending inspection has no real start; activity falls back to creation time.
+        fecha: item.fechaHoraInicio ?? item.createdAt,
         usuario: `${item.usuario.nombre} ${item.usuario.apellido}`,
       })),
       ...hallazgos.map((item) => ({
@@ -103,3 +105,4 @@ export const dashboardApi = {
     ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   },
 };
+
