@@ -108,9 +108,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/seh-pr12-new-migrations
+          mv backend/prisma/migrations/20261117090000_add_pending_inspection_status /tmp/seh-pr12-new-migrations/
           mv backend/prisma/migrations/20261117100000_inspection_delegation /tmp/seh-pr12-new-migrations/
           mv backend/prisma/migrations/20261117110000_pending_inspection_start_date /tmp/seh-pr12-new-migrations/
           pnpm --filter seh-backend exec prisma migrate deploy
+          mv /tmp/seh-pr12-new-migrations/20261117090000_add_pending_inspection_status backend/prisma/migrations/
           mv /tmp/seh-pr12-new-migrations/20261117100000_inspection_delegation backend/prisma/migrations/
           mv /tmp/seh-pr12-new-migrations/20261117110000_pending_inspection_start_date backend/prisma/migrations/
       - name: Seed legacy inspection before PR #12
