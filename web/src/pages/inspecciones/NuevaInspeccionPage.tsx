@@ -45,7 +45,16 @@ export default function NuevaInspeccionPage() {
 
   const onSubmit = (data: CreateInspeccionDto) => {
     setError(null);
-    createMutation.mutate({ ...data, ...(data.fechaProgramada ? { fechaProgramada: new Date(`${data.fechaProgramada}T00:00:00`).toISOString() } : {}) });
+    const { fechaProgramada, asignadoAId, ...requiredFields } = data;
+    const normalizedAssignee = asignadoAId?.trim();
+    const payload: CreateInspeccionDto = {
+      ...requiredFields,
+      ...(fechaProgramada?.trim()
+        ? { fechaProgramada: new Date(`${fechaProgramada}T00:00:00.000Z`).toISOString() }
+        : {}),
+      ...(normalizedAssignee ? { asignadoAId: normalizedAssignee } : {}),
+    };
+    createMutation.mutate(payload);
   };
 
   return (
