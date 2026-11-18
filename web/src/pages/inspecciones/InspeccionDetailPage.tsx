@@ -444,7 +444,7 @@ export default function InspeccionDetailPage() {
 
   const isEditable = inspeccion.estado === 'EN_PROGRESO';
   const isPending = inspeccion.estado === 'PENDIENTE';
-  const canStart = isPending && (!isTechnician || inspeccion.asignadoAId === user?.id);
+  const canStart = isPending && inspeccion.asignadoAId === user?.id;
   const assigned = inspeccion.asignadoA || inspeccion.usuario;
   const creator = inspeccion.creadoPor;
 
@@ -515,12 +515,21 @@ export default function InspeccionDetailPage() {
 
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Fecha Inicio
+                    Fecha de creación
                   </Typography>
                   <Typography variant="body2">
-                    {format(new Date(inspeccion.fechaHoraInicio), "dd/MM/yyyy HH:mm", {
-                      locale: es,
-                    })}
+                    {format(new Date(inspeccion.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Inicio real
+                  </Typography>
+                  <Typography variant="body2">
+                    {inspeccion.fechaHoraInicio
+                      ? format(new Date(inspeccion.fechaHoraInicio), "dd/MM/yyyy HH:mm", { locale: es })
+                      : 'No iniciada'}
                   </Typography>
                 </Box>
 
