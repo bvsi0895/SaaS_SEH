@@ -5,7 +5,7 @@ import { InspeccionesService } from './inspecciones.service';
 describe('InspeccionesService respuestas', () => {
   const prisma = {
     checklist: { findUnique: jest.fn() },
-    inspeccion: { findUnique: jest.fn(), create: jest.fn() },
+    inspeccion: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     inspeccionItem: { update: jest.fn() },
     usuario: { findFirst: jest.fn() },
     inspeccionReasignacion: { create: jest.fn() },
@@ -125,6 +125,7 @@ describe('InspeccionesService respuestas', () => {
         creadoPorId: 'user-1',
         asignadoAId: 'user-1',
         estado: EstadoInspeccion.EN_PROGRESO,
+        fechaHoraInicio: expect.any(Date),
         items: { create: [{ checklistItemId: 'checklist-item-1', cumplimiento: CumplimientoItem.PENDIENTE }] },
       }),
     }));
@@ -147,7 +148,7 @@ describe('InspeccionesService respuestas', () => {
       where: expect.objectContaining({ id: 'technician-2', empresaId: 'company-1', rol: Rol.TECNICO, activo: true }),
     }));
     expect(prisma.inspeccion.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ creadoPorId: 'supervisor-1', asignadoAId: 'technician-2', estado: EstadoInspeccion.PENDIENTE }),
+      data: expect.objectContaining({ creadoPorId: 'supervisor-1', asignadoAId: 'technician-2', estado: EstadoInspeccion.PENDIENTE, fechaHoraInicio: null }),
     }));
   });
 
@@ -182,6 +183,65 @@ describe('InspeccionesService respuestas', () => {
       data: expect.objectContaining({ desdeUsuarioId: 'technician-1', haciaUsuarioId: 'technician-2', efectuadaPorId: 'admin-1' }),
     }));
     expect(tx.inspeccion.update).toHaveBeenCalledWith(expect.objectContaining({ data: { asignadoAId: 'technician-2', usuarioId: 'technician-2' } }));
+  });
+
+  it('only lets the assigned user start a delegated pending inspection', async () => {
+    prisma.inspeccion.findUnique.mockResolvedValue({
+      id: 'inspection-1',
+      empresaId: 'company-1',
+      organizacionEmpresaId: 'context-1',
+      estado: EstadoInspeccion.PENDIENTE,
+      asignadoAId: 'technician-1',
+    });
+    prisma.inspeccion.update.mockResolvedValue({ id: 'inspection-1', estado: EstadoInspeccion.EN_PROGRESO });
+
+    await expect(service.iniciar('inspection-1', 'company-1', 'context-1', 'supervisor-1', Rol.SUPERVISOR))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.inspeccion.update).not.toHaveBeenCalled();
+
+    await service.iniciar('inspection-1', 'company-1', 'context-1', 'technician-1', Rol.TECNICO);
+    expect(prisma.inspeccion.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ estado: EstadoInspeccion.EN_PROGRESO, fechaHoraInicio: expect.any(Date) }),
+    }));
+  });
+
+  it('only lets the assigned user answer and finalize a delegated inspection', async () => {
+    prisma.inspeccion.findUnique.mockResolvedValue({
+      id: 'inspection-1',
+      empresaId: 'company-1',
+      organizacionEmpresaId: 'context-1',
+      estado: EstadoInspeccion.EN_PROGRESO,
+      asignadoAId: 'technician-1',
+      items: [{ id: 'inspection-item-1' }],
+      hallazgos: [],
+    });
+    prisma.inspeccionItem.update.mockResolvedValue({ id: 'inspection-item-1' });
+    prisma.inspeccion.update.mockResolvedValue({ id: 'inspection-1', estado: EstadoInspeccion.COMPLETADA });
+
+    await expect(service.registrarItem(
+      'inspection-1',
+      { inspeccionItemId: 'inspection-item-1', cumplimiento: CumplimientoItem.CUMPLE },
+      'company-1', 'context-1', 'admin-1', Rol.ADMIN_EMPRESA,
+    )).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.inspeccionItem.update).not.toHaveBeenCalled();
+
+    await service.registrarItem(
+      'inspection-1',
+      { inspeccionItemId: 'inspection-item-1', cumplimiento: CumplimientoItem.CUMPLE },
+      'company-1', 'context-1', 'technician-1', Rol.TECNICO,
+    );
+    expect(prisma.inspeccionItem.update).toHaveBeenCalled();
+
+    await expect(service.finalizar(
+      'inspection-1', {}, 'company-1', 'context-1', 'supervisor-1', Rol.SUPERVISOR,
+    )).rejects.toBeInstanceOf(NotFoundException);
+
+    await service.finalizar(
+      'inspection-1', {}, 'company-1', 'context-1', 'technician-1', Rol.TECNICO,
+    );
+    expect(prisma.inspeccion.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ estado: EstadoInspeccion.COMPLETADA, fechaHoraFin: expect.any(Date) }),
+    }));
   });
 
   it('returns action responsible and due date when loading an inspection', async () => {
