@@ -10,6 +10,7 @@ test('inspection delegation schema keeps the legacy owner and adds explicit resp
   assert.match(schema, /creadoPorId String/);
   assert.match(schema, /asignadoAId String/);
   assert.match(schema, /fechaProgramada DateTime\?/);
+  assert.match(schema, /fechaHoraInicio DateTime\?/);
   assert.match(schema, /usuarioId String\s+usuario\s+Usuario @relation\("InspeccionUsuarioLegacy"/);
   assert.match(schema, /model InspeccionReasignacion/);
 });
@@ -22,6 +23,9 @@ test('delegation migration backfills both owners before making them required', a
   assert.match(migration, /ALTER COLUMN "creadoPorId" SET NOT NULL/);
   assert.match(migration, /ALTER COLUMN "asignadoAId" SET NOT NULL/);
   assert.match(migration, /CREATE TABLE "inspeccion_reasignaciones"/);
+  const startDateMigration = await read('backend/prisma/migrations/20261117110000_pending_inspection_start_date/migration.sql');
+  assert.match(startDateMigration, /ALTER COLUMN "fechaHoraInicio" DROP DEFAULT/);
+  assert.match(startDateMigration, /ALTER COLUMN "fechaHoraInicio" DROP NOT NULL/);
 });
 
 test('delegation API exposes pending start and reassignment operations', async () => {
