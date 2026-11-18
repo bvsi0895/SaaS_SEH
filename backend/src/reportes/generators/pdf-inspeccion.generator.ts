@@ -5,8 +5,10 @@ interface InspeccionData {
   id: string;
   sector: string;
   descripcion?: string | null;
-  fechaHoraInicio: Date;
+  fechaHoraInicio?: Date | null;
   fechaHoraFin?: Date | null;
+  createdAt: Date;
+  fechaProgramada?: Date | null;
   observaciones?: string | null;
   checklist: {
     nombre: string;
@@ -130,7 +132,9 @@ export class PDFInspeccionGenerator {
       ['Tipo:', inspeccion.checklist.tipo],
       ['Sector:', inspeccion.sector],
       ['Técnico:', `${(inspeccion.asignadoA ?? inspeccion.usuario).nombre} ${(inspeccion.asignadoA ?? inspeccion.usuario).apellido}`],
-      ['Fecha Inicio:', this.formatDate(inspeccion.fechaHoraInicio)],
+      ['Fecha Creación:', this.formatDate(inspeccion.createdAt)],
+      ['Fecha Programada:', inspeccion.fechaProgramada ? this.formatDate(inspeccion.fechaProgramada) : '-'],
+      ['Inicio Real:', inspeccion.fechaHoraInicio ? this.formatDate(inspeccion.fechaHoraInicio) : 'No iniciada'],
       ['Fecha Fin:', inspeccion.fechaHoraFin ? this.formatDate(inspeccion.fechaHoraFin) : '-'],
       ['Duración:', this.calcularDuracion(inspeccion.fechaHoraInicio, inspeccion.fechaHoraFin ?? undefined)],
     ];
@@ -322,7 +326,8 @@ export class PDFInspeccionGenerator {
     });
   }
 
-  private calcularDuracion(inicio: Date, fin?: Date): string {
+  private calcularDuracion(inicio?: Date | null, fin?: Date): string {
+    if (!inicio) return 'No iniciada';
     if (!fin) return 'En progreso';
     const diff = new Date(fin).getTime() - new Date(inicio).getTime();
     const minutos = Math.floor(diff / 60000);
