@@ -205,7 +205,7 @@ export class ReportesService {
         sector: i.sector,
         checklist: i.checklist.nombre,
         tecnico: `${i.usuario.nombre} ${i.usuario.apellido}`,
-        fecha: i.fechaHoraInicio,
+        fecha: i.fechaHoraInicio!,
         hallazgos: i._count.hallazgos,
       })),
     };
@@ -296,7 +296,7 @@ export class ReportesService {
       periodo: { desde: params.fechaDesde, hasta: params.fechaHasta },
       responsable: primaryResponsible,
       inspecciones: inspections.map((inspection) => ({
-        fecha: inspection.fechaHoraInicio,
+        fecha: inspection.fechaHoraInicio!,
         establecimiento: inspection.establecimiento?.nombre,
         sector: inspection.sector,
         checklist: inspection.checklist.nombre,
