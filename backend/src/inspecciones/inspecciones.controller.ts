@@ -178,7 +178,7 @@ export class InspeccionesController {
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
   }
 
   @Patch(':id/items')
@@ -192,7 +192,7 @@ export class InspeccionesController {
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
   }
 
   @Post(':id/finalizar')
@@ -207,7 +207,7 @@ export class InspeccionesController {
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
   ) {
-    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
   }
 
   @Post(':id/cancelar')
