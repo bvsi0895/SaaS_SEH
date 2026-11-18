@@ -47,6 +47,29 @@ import type { CumplimientoItem, NivelRiesgo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuariosApi } from '../../api/usuarios';
 
+const MAX_HALLAZGO_PHOTO_SIZE = 5 * 1024 * 1024;
+const HALLAZGO_PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp';
+const HALLAZGO_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function getHallazgoPhotoValidationError(file: File): string | null {
+  const extensionIsSupported = /\.(jpe?g|png|webp)$/i.test(file.name);
+  const isHeic = file.type === 'image/heic'
+    || file.type === 'image/heif'
+    || /\.heic?$/i.test(file.name)
+    || /\.heif$/i.test(file.name);
+
+  if (isHeic) {
+    return 'HEIC/HEIF no es compatible. Convertí la imagen a JPG, PNG o WEBP antes de seleccionarla.';
+  }
+  if (file.size > MAX_HALLAZGO_PHOTO_SIZE) {
+    return 'La fotografía supera el límite de 5 MiB. Elegí un archivo más pequeño.';
+  }
+  if (!HALLAZGO_PHOTO_TYPES.has(file.type) || !extensionIsSupported) {
+    return 'Formato no compatible. Solo se aceptan fotografías JPG, PNG o WEBP de hasta 5 MiB.';
+  }
+  return null;
+}
+
 function getBackendErrorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { message?: unknown } } })
     ?.response?.data?.message;
@@ -79,6 +102,7 @@ export default function InspeccionDetailPage() {
   const [editingAccionId, setEditingAccionId] = useState<string | null>(null);
   const [hallazgoOriginItemId, setHallazgoOriginItemId] = useState<string | null>(null);
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
+  const [hallazgoPhotoError, setHallazgoPhotoError] = useState<string | null>(null);
   const [accionDescripcion, setAccionDescripcion] = useState('');
   const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
   const [accionResponsableId, setAccionResponsableId] = useState('');
@@ -274,6 +298,7 @@ export default function InspeccionDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
+    setHallazgoPhotoError(null);
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
     setAccionResponsableId('');
@@ -326,6 +351,7 @@ export default function InspeccionDetailPage() {
     const hadLinkedNonCompliance = !!hallazgoOriginItemId;
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
+    setHallazgoPhotoError(null);
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
     setAccionResponsableId('');
@@ -336,6 +362,23 @@ export default function InspeccionDetailPage() {
     if (hadLinkedNonCompliance) {
       showSuccess('El incumplimiento quedó guardado sin hallazgo. Puede registrarlo nuevamente desde el ítem.');
     }
+  };
+
+  const handleHallazgoPhotoSelection = (files: FileList | null) => {
+    setHallazgoPhotoError(null);
+    if (!files || files.length === 0) {
+      setHallazgoPhotoError('No se seleccionó ninguna fotografía. Podés intentarlo nuevamente.');
+      return;
+    }
+
+    const [file] = Array.from(files);
+    const validationError = getHallazgoPhotoValidationError(file);
+    if (validationError) {
+      setHallazgoPhotoError(validationError);
+      return;
+    }
+
+    setHallazgoPhoto(file);
   };
 
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
@@ -908,18 +951,42 @@ export default function InspeccionDetailPage() {
               />
             </Grid>
             <Grid item xs={12}>
-              <Button component="label" variant="outlined">
-                {hallazgoPhoto ? `Fotografía: ${hallazgoPhoto.name}` : 'Adjuntar fotografía'}
-                <input
-                  hidden
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => setHallazgoPhoto(event.target.files?.[0] || null)}
-                />
-              </Button>
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
-                JPG, PNG o WEBP hasta 5 MiB
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <Button component="label" variant="outlined">
+                  Tomar fotografía
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onClick={(event) => { event.currentTarget.value = ''; }}
+                    onChange={(event) => handleHallazgoPhotoSelection(event.target.files)}
+                  />
+                </Button>
+                <Button component="label" variant="outlined">
+                  Elegir de galería
+                  <input
+                    hidden
+                    type="file"
+                    accept={HALLAZGO_PHOTO_ACCEPT}
+                    onClick={(event) => { event.currentTarget.value = ''; }}
+                    onChange={(event) => handleHallazgoPhotoSelection(event.target.files)}
+                  />
+                </Button>
+              </Box>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                JPG, PNG o WEBP hasta 5 MiB. HEIC/HEIF no es compatible.
               </Typography>
+              {hallazgoPhoto && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Fotografía seleccionada: {hallazgoPhoto.name}
+                </Typography>
+              )}
+              {hallazgoPhotoError && (
+                <Alert severity="warning" sx={{ mt: 1 }} role="alert">
+                  {hallazgoPhotoError}
+                </Alert>
+              )}
             </Grid>
             {!isTechnician && <Grid item xs={12}>
               <TextField
@@ -983,9 +1050,9 @@ export default function InspeccionDetailPage() {
           <Button
             variant="contained"
             onClick={handleCrearHallazgo}
-            disabled={crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending}
+            disabled={crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || subirFotoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending}
           >
-            {crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending
+            {crearHallazgoMutation.isPending || actualizarHallazgoMutation.isPending || subirFotoMutation.isPending || crearAccionMutation.isPending || actualizarAccionMutation.isPending
               ? 'Guardando...'
               : editingHallazgoId ? 'Guardar Hallazgo' : 'Crear Hallazgo'}
           </Button>

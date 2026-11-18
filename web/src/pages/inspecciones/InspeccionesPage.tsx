@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Box, Card, CardContent, TextField, MenuItem, IconButton, Tooltip, Grid, Button } from '@mui/material';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { Visibility as ViewIcon, PictureAsPdf as PdfIcon, PlayArrow as StartIcon } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { inspeccionesApi } from '../../api/inspecciones';
 import { usuariosApi } from '../../api/usuarios';
 import PageHeader from '../../components/common/PageHeader';
@@ -15,7 +13,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
 const personName = (person?: { nombre: string; apellido: string }) => person ? `${person.nombre} ${person.apellido}` : '-';
-const dateValue = (value?: string) => value ? format(new Date(value), 'dd/MM/yyyy HH:mm', { locale: es }) : '-';
+const dateValue = (value?: string) => {
+  if (!value) return '-';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '-';
+};
 
 export default function InspeccionesPage() {
   const navigate = useNavigate();
