@@ -82,6 +82,29 @@ function getBackendErrorMessage(error: unknown, fallback: string): string {
     : fallback;
 }
 
+function getPhotoUploadErrorMessage(error: unknown): string {
+  const response = (error as { response?: { status?: unknown } })?.response;
+  const status = typeof response?.status === 'number' ? response.status : undefined;
+  const backendMessage = getBackendErrorMessage(error, '');
+  const friendlyMessage = status === 413
+    ? 'La carga fue rechazada por superar el límite permitido. Elegí una fotografía de hasta 5 MiB.'
+    : status === 400
+      ? 'El servidor rechazó la fotografía. Verificá que sea JPG, PNG o WEBP y menor a 5 MiB.'
+      : status !== undefined && status >= 500
+        ? 'El servidor no pudo procesar la fotografía. Podés reintentarlo sin crear otro hallazgo.'
+        : status === undefined
+          ? 'No se pudo conectar con el servidor. Verificá la conexión y reintentá sin crear otro hallazgo.'
+          : 'No se pudo adjuntar la fotografía. Podés reintentarlo sin crear otro hallazgo.';
+  const statusMessage = status === undefined ? '' : `HTTP ${status}. `;
+  const safeBackendMessage = backendMessage
+    .replace(/Bearer\s+\S+/gi, 'Bearer [oculto]')
+    .replace(/(?:[A-Za-z]:\\|\/(?:app|var|tmp|home)\/)[^\s]+/g, '[ruta oculta]');
+  const serverMessage = safeBackendMessage ? ` Mensaje del servidor: ${safeBackendMessage}` : '';
+  return `${statusMessage}${friendlyMessage}${serverMessage}`;
+}
+
+type HallazgoRequiredField = 'titulo' | 'descripcion' | 'ubicacionTexto';
+
 export default function InspeccionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,6 +126,8 @@ export default function InspeccionDetailPage() {
   const [hallazgoOriginItemId, setHallazgoOriginItemId] = useState<string | null>(null);
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
   const [hallazgoPhotoError, setHallazgoPhotoError] = useState<string | null>(null);
+  const [hallazgoPhotoUploadError, setHallazgoPhotoUploadError] = useState<string | null>(null);
+  const [hallazgoFieldErrors, setHallazgoFieldErrors] = useState<Partial<Record<HallazgoRequiredField, string>>>({});
   const [accionDescripcion, setAccionDescripcion] = useState('');
   const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
   const [accionResponsableId, setAccionResponsableId] = useState('');
@@ -228,10 +253,12 @@ export default function InspeccionDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.id] });
       setHallazgoPhoto(null);
       guardarAccionCorrectiva(variables.id, variables.successMessage);
+      setHallazgoPhotoUploadError(null);
     },
-    onError: () => {
-      showError('Hallazgo creado, pero no se pudo adjuntar la fotografía');
-      finalizarCreacionHallazgo();
+    onError: (error) => {
+      const message = getPhotoUploadErrorMessage(error);
+      setHallazgoPhotoUploadError(message);
+      showError(`Hallazgo guardado, pero la fotografía no se pudo adjuntar. ${message}`);
     },
   });
 
@@ -299,6 +326,8 @@ export default function InspeccionDetailPage() {
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
     setHallazgoPhotoError(null);
+    setHallazgoPhotoUploadError(null);
+    setHallazgoFieldErrors({});
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
     setAccionResponsableId('');
@@ -321,6 +350,9 @@ export default function InspeccionDetailPage() {
     setAccionFechaCompromiso(existingAction?.fechaCompromiso?.slice(0, 10) || new Date().toISOString().slice(0, 10));
     setAccionResponsableId(existingAction?.responsableId || '');
     setAccionError(null);
+    setHallazgoPhotoError(null);
+    setHallazgoPhotoUploadError(null);
+    setHallazgoFieldErrors({});
     setNuevoHallazgo(existing
       ? {
           titulo: existing.titulo,
@@ -352,6 +384,8 @@ export default function InspeccionDetailPage() {
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
     setHallazgoPhotoError(null);
+    setHallazgoPhotoUploadError(null);
+    setHallazgoFieldErrors({});
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
     setAccionResponsableId('');
@@ -366,6 +400,7 @@ export default function InspeccionDetailPage() {
 
   const handleHallazgoPhotoSelection = (files: FileList | null) => {
     setHallazgoPhotoError(null);
+    setHallazgoPhotoUploadError(null);
     if (!files || files.length === 0) {
       setHallazgoPhotoError('No se seleccionó ninguna fotografía. Podés intentarlo nuevamente.');
       return;
@@ -379,6 +414,16 @@ export default function InspeccionDetailPage() {
     }
 
     setHallazgoPhoto(file);
+  };
+
+  const handleRetryHallazgoPhoto = () => {
+    if (!editingHallazgoId || !hallazgoPhoto || subirFotoMutation.isPending) return;
+    setHallazgoPhotoUploadError(null);
+    subirFotoMutation.mutate({
+      id: editingHallazgoId,
+      file: hallazgoPhoto,
+      successMessage: 'Hallazgo y fotografía guardados exitosamente',
+    });
   };
 
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
@@ -406,9 +451,27 @@ export default function InspeccionDetailPage() {
     }
   };
 
+  const clearHallazgoFieldError = (field: HallazgoRequiredField) => {
+    setHallazgoFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateHallazgoFields = () => {
+    const errors: Partial<Record<HallazgoRequiredField, string>> = {};
+    if (!nuevoHallazgo.titulo?.trim()) errors.titulo = 'El título es obligatorio.';
+    if (!nuevoHallazgo.descripcion?.trim()) errors.descripcion = 'La descripción es obligatoria.';
+    if (!nuevoHallazgo.ubicacionTexto?.trim()) errors.ubicacionTexto = 'La ubicación es obligatoria.';
+    setHallazgoFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCrearHallazgo = () => {
     setAccionError(null);
-    if (!nuevoHallazgo.titulo || !nuevoHallazgo.descripcion || !nuevoHallazgo.ubicacionTexto) return;
+    if (!validateHallazgoFields()) return;
 
     if (!isTechnician && accionDescripcion.trim()) {
       if (accionDescripcion.trim().length < 10) {
@@ -906,7 +969,12 @@ export default function InspeccionDetailPage() {
                 fullWidth
                 label="Titulo"
                 value={nuevoHallazgo.titulo || ''}
-                onChange={(e) => setNuevoHallazgo({ ...nuevoHallazgo, titulo: e.target.value })}
+                onChange={(e) => {
+                  setNuevoHallazgo({ ...nuevoHallazgo, titulo: e.target.value });
+                  clearHallazgoFieldError('titulo');
+                }}
+                error={Boolean(hallazgoFieldErrors.titulo)}
+                helperText={hallazgoFieldErrors.titulo}
               />
             </Grid>
             <Grid item xs={12}>
@@ -916,9 +984,12 @@ export default function InspeccionDetailPage() {
                 rows={3}
                 label="Descripcion"
                 value={nuevoHallazgo.descripcion || ''}
-                onChange={(e) =>
-                  setNuevoHallazgo({ ...nuevoHallazgo, descripcion: e.target.value })
-                }
+                onChange={(e) => {
+                  setNuevoHallazgo({ ...nuevoHallazgo, descripcion: e.target.value });
+                  clearHallazgoFieldError('descripcion');
+                }}
+                error={Boolean(hallazgoFieldErrors.descripcion)}
+                helperText={hallazgoFieldErrors.descripcion}
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -945,9 +1016,12 @@ export default function InspeccionDetailPage() {
                 fullWidth
                 label="Ubicacion"
                 value={nuevoHallazgo.ubicacionTexto || ''}
-                onChange={(e) =>
-                  setNuevoHallazgo({ ...nuevoHallazgo, ubicacionTexto: e.target.value })
-                }
+                onChange={(e) => {
+                  setNuevoHallazgo({ ...nuevoHallazgo, ubicacionTexto: e.target.value });
+                  clearHallazgoFieldError('ubicacionTexto');
+                }}
+                error={Boolean(hallazgoFieldErrors.ubicacionTexto)}
+                helperText={hallazgoFieldErrors.ubicacionTexto}
               />
             </Grid>
             <Grid item xs={12}>
@@ -985,6 +1059,25 @@ export default function InspeccionDetailPage() {
               {hallazgoPhotoError && (
                 <Alert severity="warning" sx={{ mt: 1 }} role="alert">
                   {hallazgoPhotoError}
+                </Alert>
+              )}
+              {hallazgoPhotoUploadError && (
+                <Alert
+                  severity="error"
+                  sx={{ mt: 1 }}
+                  role="alert"
+                  action={(
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={handleRetryHallazgoPhoto}
+                      disabled={!editingHallazgoId || !hallazgoPhoto || subirFotoMutation.isPending}
+                    >
+                      Reintentar fotografía
+                    </Button>
+                  )}
+                >
+                  {hallazgoPhotoUploadError}
                 </Alert>
               )}
             </Grid>
