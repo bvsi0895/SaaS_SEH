@@ -183,7 +183,8 @@ model Inspeccion {
   id              String           @id @default(uuid())
   sector          String // Área de la planta
   descripcion     String?
-  fechaHoraInicio DateTime         @default(now())
+  // Null until the assigned user actually starts the inspection.
+  fechaHoraInicio DateTime?
   fechaHoraFin    DateTime?
   estado          EstadoInspeccion @default(PENDIENTE)
   fechaProgramada DateTime?
