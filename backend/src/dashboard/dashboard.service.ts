@@ -209,6 +209,7 @@ export class DashboardService {
           sector: true,
           estado: true,
           fechaHoraInicio: true,
+          createdAt: true,
           usuario: { select: { nombre: true, apellido: true } },
           checklist: { select: { nombre: true } },
         },
@@ -361,3 +362,4 @@ export class DashboardService {
     return grupos;
   }
 }
+
