@@ -157,7 +157,7 @@ export class InspeccionesService {
         sector: dto.sector,
         descripcion: dto.descripcion,
         fechaProgramada: dto.fechaProgramada ? new Date(dto.fechaProgramada) : undefined,
-        fechaHoraInicio: new Date(),
+        fechaHoraInicio: estado === EstadoInspeccion.EN_PROGRESO ? new Date() : null,
         ubicacionTexto: dto.ubicacionTexto,
         latitud: dto.latitud,
         longitud: dto.longitud,
@@ -169,7 +169,7 @@ export class InspeccionesService {
   }
 
   async iniciar(id: string, empresaId: string, organizacionEmpresaId: string, usuarioId: string, currentUserRole: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, this.isTechnician(currentUserRole) ? usuarioId : undefined, currentUserRole);
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
     if (inspeccion.estado !== EstadoInspeccion.PENDIENTE) throw new BadRequestException('Solo se pueden iniciar inspecciones pendientes');
     return this.prisma.inspeccion.update({ where: { id }, data: { estado: EstadoInspeccion.EN_PROGRESO, fechaHoraInicio: new Date(), fechaHoraFin: null }, include: this.listInclude });
   }
