@@ -1,6 +1,4 @@
 -- Delegación de inspecciones: migración aditiva y segura para datos existentes.
-ALTER TYPE "EstadoInspeccion" ADD VALUE IF NOT EXISTS 'PENDIENTE';
-
 ALTER TABLE "inspecciones"
   ADD COLUMN "creadoPorId" TEXT,
   ADD COLUMN "asignadoAId" TEXT,
