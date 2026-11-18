@@ -84,8 +84,8 @@ async function main() {
     assert.ok(started.fechaHoraInicio, 'starting must set the real start date');
     const startedDetail = await service.findOne(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
     const inspectionItemId = startedDetail.items[0].id;
-    await assert.rejects(service.registrarItem(adminDelegated.id, { inspeccionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
-    await service.registrarItem(adminDelegated.id, { inspeccionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    await assert.rejects(service.registrarItem(adminDelegated.id, { inspeccionItemId: inspectionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
+    await service.registrarItem(adminDelegated.id, { inspeccionItemId: inspectionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
     await assert.rejects(service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.supervisor, Rol.SUPERVISOR), /no encontrada/i);
     const completed = await service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
     assert.equal(completed.estado, EstadoInspeccion.COMPLETADA);
