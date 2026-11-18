@@ -122,7 +122,7 @@ export interface Inspeccion {
   sector: string;
   descripcion?: string;
   estado: EstadoInspeccion;
-  fechaHoraInicio: string;
+  fechaHoraInicio: string | null;
   fechaHoraFin?: string;
   observaciones?: string;
   firmaUrl?: string;
