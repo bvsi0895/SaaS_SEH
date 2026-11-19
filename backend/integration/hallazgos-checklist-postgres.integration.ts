@@ -66,6 +66,7 @@ async function main() {
         creadoPorId: ids.tecnico,
         asignadoAId: ids.tecnico,
         usuarioId: ids.tecnico,
+        items: { create: { id: ids.checklistItem, checklistItemId: ids.checklistItem } },
       },
     });
 
