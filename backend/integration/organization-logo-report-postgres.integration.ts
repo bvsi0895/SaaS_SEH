@@ -71,7 +71,7 @@ async function main() {
     await prisma.accesoEmpresa.create({ data: { id: ids.accessA, organizacionEmpresaId: ids.contextoA, organizacionMiembroId: ids.memberA, organizacionId: ids.organizacionA, empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA } });
 
     const storedA = await administration.uploadLogo(ids.organizacionA, ids.adminA, { buffer: logo, originalname: 'logo-a.jpg', mimetype: 'image/jpeg' });
-    assert.match(storedA.logoUrl || '', /^uploads\/logos\/00000000-0000-0000-0000-000000000802-/);
+    assert.match(storedA.logoUrl || '', /\.test-uploads-logo-report[\\/]logos[\\/]00000000-0000-0000-0000-000000000802-/);
     const recoveredA = await administration.getLogo(ids.organizacionA, ids.adminA);
     assert.equal(recoveredA.contentType, 'image/png');
     assert.ok(recoveredA.buffer.length > 0);

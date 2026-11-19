@@ -8,7 +8,7 @@ import {
 import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
-import { basename, join, resolve } from 'path';
+import { basename, join, relative, resolve } from 'path';
 // Sharp valida el contenido real y normaliza el logo a PNG antes de persistirlo.
 const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
@@ -94,10 +94,10 @@ export class AdministracionService {
 
     const current = await this.prisma.organizacion.findUniqueOrThrow({ where: { id: organizacionId }, select: { logoUrl: true } });
     const filename = `${organizacionId}-${randomUUID()}.png`;
-    const relativePath = join('uploads', 'logos', filename).replace(/\\/g, '/');
     const directory = this.getLogoDir();
     await mkdir(directory, { recursive: true });
     const destination = join(directory, filename);
+    const relativePath = relative(process.cwd(), destination).replace(/\\/g, '/');
     await writeFile(destination, normalized, { flag: 'wx' });
     try {
       const organization = await this.prisma.organizacion.update({ where: { id: organizacionId }, data: { logoUrl: relativePath } });
