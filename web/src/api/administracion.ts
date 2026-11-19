@@ -8,6 +8,13 @@ export interface CreateEstablecimientoDto { nombre: string; codigo?: string; dir
 export const administracionApi = {
   getOrganization: async () => (await apiClient.get<Organizacion>('/organizaciones/me')).data,
   updateOrganization: async (data: UpdateOrganizacionDto) => (await apiClient.patch<Organizacion>('/organizaciones/me', data)).data,
+  uploadLogo: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return (await apiClient.post<Organizacion>('/organizaciones/me/logo', form)).data;
+  },
+  getLogo: async () => (await apiClient.get<Blob>('/organizaciones/me/logo', { responseType: 'blob' })).data,
+  deleteLogo: async () => (await apiClient.delete<Organizacion>('/organizaciones/me/logo')).data,
   getMembers: async () => (await apiClient.get<OrganizacionMiembroView[]>('/organizaciones/me/miembros')).data,
   addMember: async (data: { email: string; rol: RolOrganizacion; rolOperativo?: Rol }) => (await apiClient.post('/organizaciones/me/miembros', data)).data,
   revokeMember: async (id: string) => (await apiClient.post(`/organizaciones/me/miembros/${id}/revocar`)).data,

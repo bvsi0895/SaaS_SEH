@@ -46,4 +46,20 @@ describe('PDFMensualGenerator', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1000);
   });
+
+  it('distribuye múltiples evidencias normalizadas entre páginas A4', async () => {
+    const webp = await sharp(onePixelPng).webp({ quality: 82 }).toBuffer();
+    const data = baseData();
+    data.fotos = Array.from({ length: 8 }, (_, index) => ({
+      buffer: index % 2 ? webp : onePixelPng,
+      nombre: 'evidencia fotográfica',
+      titulo: `Hallazgo ${index + 1}`,
+      sector: 'Producción',
+      establecimiento: 'Planta Norte',
+      fecha: new Date('2026-11-19T12:00:00Z'),
+    }));
+    const pdf = await new PDFMensualGenerator().generate(data);
+    const pages = (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
+    expect(pages).toBeGreaterThan(1);
+  });
 });

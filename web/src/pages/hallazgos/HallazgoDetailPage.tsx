@@ -206,6 +206,8 @@ export default function HallazgoDetailPage() {
     return <Typography>Hallazgo no encontrado</Typography>;
   }
 
+  const canModifyHallazgo = !isTechnician || hallazgo.inspeccion?.asignadoA?.id === user?.id;
+
   return (
     <Box>
       <PageHeader
@@ -220,6 +222,12 @@ export default function HallazgoDetailPage() {
           icon: 'back',
         }}
       />
+
+      {isTechnician && !canModifyHallazgo && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Este hallazgo pertenece a una inspección asignada a otro inspector. Podés consultarlo, pero no modificarlo ni adjuntar evidencias.
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         {/* Info del Hallazgo */}
@@ -308,7 +316,7 @@ export default function HallazgoDetailPage() {
                     variant="outlined"
                     size="small"
                     startIcon={<PhotoLibraryIcon />}
-                    disabled={uploadingPhotos}
+                    disabled={uploadingPhotos || !canModifyHallazgo}
                   >
                     Seleccionar fotografías
                     <input
@@ -357,7 +365,7 @@ export default function HallazgoDetailPage() {
                 }}
               >
                 <Typography variant="h6">Acciones Correctivas</Typography>
-                {!isTechnician && <Button
+                {!isTechnician && canModifyHallazgo && <Button
                   variant="contained"
                   size="small"
                   startIcon={<AddIcon />}

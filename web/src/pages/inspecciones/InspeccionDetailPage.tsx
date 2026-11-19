@@ -199,8 +199,8 @@ export default function InspeccionDetailPage() {
       setSelectedItemStatus(null);
       setObservacion('');
     },
-    onError: () => {
-      showError('Error al registrar el item');
+    onError: (error) => {
+      showError(`No se pudo registrar la respuesta: ${getBackendErrorMessage(error, 'La operación no está autorizada o la inspección ya no está disponible')}`);
     },
   });
 
@@ -391,6 +391,10 @@ export default function InspeccionDetailPage() {
   };
 
   const handleNoCumple = (itemId: string) => {
+    if (inspeccion?.asignadoAId !== user?.id) {
+      showError('Esta inspección está asignada a otro inspector. Podés consultarla, pero no modificar sus respuestas');
+      return;
+    }
     registrarItemMutation.mutate(
       { itemId, cumplimiento: 'NO_CUMPLE' },
       { onSuccess: () => openHallazgoForItem(itemId) },
@@ -446,6 +450,10 @@ export default function InspeccionDetailPage() {
   };
 
   const handleCumplimiento = (itemId: string, cumplimiento: CumplimientoItem) => {
+    if (inspeccion?.asignadoAId !== user?.id) {
+      showError('Esta inspección está asignada a otro inspector. Podés consultarla, pero no modificar sus respuestas');
+      return;
+    }
     if (cumplimiento === 'NO_CUMPLE') {
       handleNoCumple(itemId);
     } else if (cumplimiento === 'OBSERVACION') {
@@ -581,6 +589,7 @@ export default function InspeccionDetailPage() {
   const isPending = inspeccion.estado === 'PENDIENTE';
   const canStart = isPending && inspeccion.asignadoAId === user?.id;
   const assigned = inspeccion.asignadoA || inspeccion.usuario;
+  const canModifyInspection = isEditable && inspeccion.asignadoAId === user?.id;
   const creator = inspeccion.creadoPor;
 
   return (
@@ -609,6 +618,11 @@ export default function InspeccionDetailPage() {
               <Divider sx={{ mb: 2 }} />
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {isEditable && !canModifyInspection && (
+                  <Alert severity="info">
+                    Esta inspección está asignada a otro inspector. Podés consultarla, pero no modificar sus respuestas.
+                  </Alert>
+                )}
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Estado
@@ -739,7 +753,7 @@ export default function InspeccionDetailPage() {
                 Reasignar inspección
               </Button>}
 
-              {isEditable && (
+              {canModifyInspection && (
                 <>
                   <Button
                     variant="outlined"
@@ -838,6 +852,7 @@ export default function InspeccionDetailPage() {
                           value={item.cumplimiento}
                           exclusive
                           size="small"
+                          disabled={!canModifyInspection || registrarItemMutation.isPending}
                           onChange={(_, value) => {
                             if (value) handleCumplimiento(item.id, value);
                           }}
@@ -919,7 +934,7 @@ export default function InspeccionDetailPage() {
           >
             Cancelar
           </Button>
-          <Button variant="contained" onClick={handleSaveObservacion}>
+          <Button variant="contained" onClick={handleSaveObservacion} disabled={!canModifyInspection || registrarItemMutation.isPending}>
             Guardar
           </Button>
         </DialogActions>

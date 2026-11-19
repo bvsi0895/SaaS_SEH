@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +25,38 @@ export class AdministracionController {
   @Patch('me')
   updateOrganization(@CurrentUser('organizacionId') orgId: string, @CurrentUser('id') userId: string, @Body() dto: UpdateOrganizacionDto) {
     return this.service.updateOrganization(orgId, userId, dto);
+  }
+
+  @Post('me/logo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        const allowedMime = new Set(['image/png', 'image/jpeg']);
+        const allowedExtension = /\.(png|jpe?g)$/i.test(file.originalname);
+        callback(null, allowedMime.has(file.mimetype) && allowedExtension);
+      },
+    }),
+  )
+  uploadLogo(
+    @CurrentUser('organizacionId') orgId: string,
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file?: { buffer: Buffer; originalname: string; mimetype: string },
+  ) {
+    if (!file) throw new BadRequestException('Se requiere un logo PNG, JPG o JPEG de hasta 2 MiB');
+    return this.service.uploadLogo(orgId, userId, file);
+  }
+
+  @Get('me/logo')
+  async getLogo(@CurrentUser('organizacionId') orgId: string, @CurrentUser('id') userId: string, @Res() res: Response) {
+    const logo = await this.service.getLogo(orgId, userId);
+    res.type(logo.contentType).send(logo.buffer);
+  }
+
+  @Delete('me/logo')
+  deleteLogo(@CurrentUser('organizacionId') orgId: string, @CurrentUser('id') userId: string) {
+    return this.service.deleteLogo(orgId, userId);
   }
 
   @Get('me/miembros')

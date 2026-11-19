@@ -1,4 +1,5 @@
 import * as PDFDocument from 'pdfkit';
+const sharp = require('sharp') as any;
 
 export interface ReporteMensualData {
   organizacion: { nombre: string; logoUrl?: string | null; emailContacto?: string | null; telefono?: string | null; direccion?: string | null };
@@ -14,9 +15,9 @@ export interface ReporteMensualData {
     tecnico: string;
     hallazgos: number;
   }>;
-  hallazgos: Array<{ titulo: string; nivel: string; establecimiento?: string | null; fecha: Date }>;
+  hallazgos: Array<{ titulo: string; nivel: string; establecimiento?: string | null; sector?: string | null; fecha: Date }>;
   acciones: Array<{ descripcion: string; estado: string; fechaCompromiso: Date; establecimiento?: string | null }>;
-  fotos: Array<{ buffer: Buffer; nombre: string }>;
+  fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }>;
   incidenciasFotografias: number;
   logo?: Buffer | null;
   incidenciaLogo?: string;
@@ -24,14 +25,16 @@ export interface ReporteMensualData {
 
 export class PDFMensualGenerator {
   async generate(data: ReporteMensualData): Promise<Buffer> {
+    const normalizedPhotos = await this.preparePhotos(data.fotos);
+    const preparedData = { ...data, fotos: normalizedPhotos.fotos, incidenciasFotografias: data.incidenciasFotografias + normalizedPhotos.incidencias };
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',
         margin: 48,
         bufferPages: true,
         info: {
-          Title: `Informe mensual - ${data.empresa.nombre}`,
-          Author: data.organizacion.nombre,
+          Title: `Informe mensual - ${preparedData.empresa.nombre}`,
+          Author: preparedData.organizacion.nombre,
           Subject: 'Informe mensual de Seguridad e Higiene',
         },
       });
@@ -40,24 +43,24 @@ export class PDFMensualGenerator {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      this.header(doc, data);
+      this.header(doc, preparedData);
       this.section(doc, 'RESUMEN EJECUTIVO');
       doc.fontSize(10).fillColor('#222').text(
-        `Durante el período informado se realizaron ${data.inspecciones.length} inspección(es), ` +
-        `se registraron ${data.hallazgos.length} hallazgo(s) y ${data.acciones.length} acción(es) correctiva(s). ` +
-        `Se incrustaron ${data.fotos.length} fotografía(s) como evidencia.`,
+        `Durante el período informado se realizaron ${preparedData.inspecciones.length} inspección(es), ` +
+        `se registraron ${preparedData.hallazgos.length} hallazgo(s) y ${preparedData.acciones.length} acción(es) correctiva(s). ` +
+        `Se incrustaron ${preparedData.fotos.length} fotografía(s) como evidencia.`,
         { lineGap: 3 },
       );
-      if (data.incidenciasFotografias > 0) {
-        doc.moveDown(0.4).fillColor('#9a6700').text(`Advertencia: ${data.incidenciasFotografias} evidencia(s) no pudieron incrustarse y fueron omitidas.`);
+      if (preparedData.incidenciasFotografias > 0) {
+        doc.moveDown(0.4).fillColor('#9a6700').text(`Advertencia: ${preparedData.incidenciasFotografias} evidencia(s) no pudieron recuperarse o procesarse y fueron omitidas.`);
       }
       doc.moveDown(0.8);
 
       this.section(doc, 'INSPECCIONES REALIZADAS');
-      if (data.inspecciones.length === 0) {
+      if (preparedData.inspecciones.length === 0) {
         doc.fontSize(10).fillColor('#555').text('No se registraron inspecciones en el período seleccionado.');
       } else {
-        data.inspecciones.forEach((item, index) => {
+        preparedData.inspecciones.forEach((item, index) => {
           this.ensureSpace(doc, 52);
           doc.fontSize(9).fillColor('#222').font('Helvetica-Bold')
             .text(`${index + 1}. ${this.date(item.fecha)} — ${item.checklist}`)
@@ -71,10 +74,10 @@ export class PDFMensualGenerator {
       this.section(doc, 'HALLAZGOS POR RIESGO');
       const riskCounts = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'].map((risk) => [
         risk,
-        data.hallazgos.filter((item) => item.nivel === risk).length,
+        preparedData.hallazgos.filter((item) => item.nivel === risk).length,
       ]);
       doc.fontSize(10).fillColor('#222').text(riskCounts.map(([risk, count]) => `${risk}: ${count}`).join('   '));
-      data.hallazgos.forEach((item, index) => {
+      preparedData.hallazgos.forEach((item, index) => {
         this.ensureSpace(doc, 38);
         doc.fontSize(9).text(`${index + 1}. ${item.titulo} — ${item.nivel} — ${item.establecimiento || 'Sin establecimiento'} — ${this.date(item.fecha)}`);
       });
@@ -82,40 +85,53 @@ export class PDFMensualGenerator {
       this.section(doc, 'ACCIONES CORRECTIVAS');
       const states = ['PENDIENTE', 'EN_PROGRESO', 'RESUELTA', 'VENCIDA'].map((state) => [
         state,
-        data.acciones.filter((item) => item.estado === state).length,
+        preparedData.acciones.filter((item) => item.estado === state).length,
       ]);
       doc.fontSize(10).text(states.map(([state, count]) => `${state}: ${count}`).join('   '));
-      data.acciones.forEach((item, index) => {
+      preparedData.acciones.forEach((item, index) => {
         this.ensureSpace(doc, 38);
         doc.fontSize(9).text(`${index + 1}. ${item.descripcion} — ${item.estado} — vencimiento ${this.date(item.fechaCompromiso)} — ${item.establecimiento || 'Sin establecimiento'}`);
       });
 
       this.section(doc, 'EVIDENCIAS FOTOGRÁFICAS');
-      if (data.fotos.length === 0) {
+      if (preparedData.fotos.length === 0) {
         doc.fontSize(10).fillColor('#555').text('No hay fotografías disponibles para este período.');
       } else {
-        data.fotos.forEach((photo, index) => {
-          this.ensureSpace(doc, 150);
+        preparedData.fotos.forEach((photo, index) => {
+          this.ensureSpace(doc, 205);
           const top = doc.y;
-          doc.fontSize(9).fillColor('#222').text(`${index + 1}. ${photo.nombre}`);
-          try {
-            doc.image(photo.buffer, 55, doc.y + 4, { fit: [150, 105], align: 'center', valign: 'center' });
-            doc.y = top + 122;
-          } catch {
-            doc.fillColor('#9a6700').text('Imagen inválida: se omitió la miniatura.');
-            doc.y = top + 32;
-          }
+          const context = [photo.titulo, photo.sector ? `Sector: ${photo.sector}` : null, photo.establecimiento ? `Establecimiento: ${photo.establecimiento}` : null, photo.fecha ? this.date(photo.fecha) : null]
+            .filter(Boolean).join(' | ');
+          doc.fontSize(9).fillColor('#222').font('Helvetica-Bold').text(`${index + 1}. ${context || 'Evidencia fotográfica'}`);
+          doc.font('Helvetica').fontSize(8).fillColor('#555').text('Evidencia fotográfica incorporada');
+          doc.image(photo.buffer, 55, top + 34, { fit: [497, 145], align: 'center', valign: 'center' });
+          doc.y = top + 190;
         });
       }
 
       this.section(doc, 'RESPONSABLE TÉCNICO');
       doc.fontSize(10).text(`${data.responsable.nombre} ${data.responsable.apellido} — ${data.responsable.email}`);
       doc.moveDown(1);
-      if (data.incidenciaLogo) doc.fontSize(8).fillColor('#9a6700').text(`Advertencia de identidad: ${data.incidenciaLogo}`, { align: 'center' });
-      doc.fontSize(8).fillColor('#666').text(`Generado el ${this.date(new Date())} por ${data.organizacion.nombre}`, { align: 'center' });
+      if (preparedData.incidenciaLogo) doc.fontSize(8).fillColor('#9a6700').text(`Advertencia de identidad: ${preparedData.incidenciaLogo}`, { align: 'center' });
+      doc.fontSize(8).fillColor('#666').text(`Generado el ${this.date(new Date())} por ${preparedData.organizacion.nombre}`, { align: 'center' });
       this.addPageNumbers(doc);
       doc.end();
     });
+  }
+
+  private async preparePhotos(photos: ReporteMensualData['fotos']) {
+    const normalized: ReporteMensualData['fotos'] = [];
+    let incidencias = 0;
+    for (const photo of photos) {
+      try {
+        const buffer = await sharp(photo.buffer, { limitInputPixels: 40_000_000, failOn: 'warning' })
+          .rotate().png().toBuffer();
+        normalized.push({ ...photo, buffer });
+      } catch {
+        incidencias += 1;
+      }
+    }
+    return { fotos: normalized, incidencias };
   }
 
   private header(doc: PDFKit.PDFDocument, data: ReporteMensualData) {
@@ -161,6 +177,9 @@ export class PDFMensualGenerator {
   }
 
   private date(value: Date): string {
-    return new Date(value).toLocaleDateString('es-AR');
+    const date = new Date(value);
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${date.getUTCFullYear()}`;
   }
 }

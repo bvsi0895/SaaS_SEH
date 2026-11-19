@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { basename, join, resolve } from 'path';
+// Sharp valida el contenido real y normaliza el logo a PNG antes de persistirlo.
+const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AddMiembroDto,
@@ -64,6 +68,75 @@ export class AdministracionService {
       where: { id: organizacionId },
       include: { _count: { select: { miembros: true, empresas: true } } },
     });
+  }
+
+  private getLogoDir() {
+    return join(process.cwd(), process.env.UPLOAD_DIR || './uploads', 'logos');
+  }
+
+  private async getOrganizationLogo(organizacionId: string, usuarioId: string) {
+    await this.assertAdmin(organizacionId, usuarioId);
+    return this.prisma.organizacion.findUniqueOrThrow({ where: { id: organizacionId }, select: { logoUrl: true } });
+  }
+
+  async uploadLogo(organizacionId: string, usuarioId: string, file: { buffer: Buffer; originalname: string; mimetype: string }) {
+    await this.assertAdmin(organizacionId, usuarioId);
+    let normalized: Buffer;
+    try {
+      const metadata = await sharp(file.buffer, { limitInputPixels: 20_000_000, failOn: 'warning' }).metadata();
+      if (!metadata.width || !metadata.height || metadata.width * metadata.height > 20_000_000) throw new Error('invalid dimensions');
+      normalized = await sharp(file.buffer, { limitInputPixels: 20_000_000, failOn: 'warning' }).rotate().png().toBuffer();
+    } catch {
+      throw new BadRequestException('El logo está corrupto o no es un PNG, JPG o JPEG válido');
+    }
+
+    const current = await this.prisma.organizacion.findUniqueOrThrow({ where: { id: organizacionId }, select: { logoUrl: true } });
+    const filename = `${organizacionId}-${randomUUID()}.png`;
+    const relativePath = join('uploads', 'logos', filename).replace(/\\/g, '/');
+    const directory = this.getLogoDir();
+    await mkdir(directory, { recursive: true });
+    const destination = join(directory, filename);
+    await writeFile(destination, normalized, { flag: 'wx' });
+    try {
+      const organization = await this.prisma.organizacion.update({ where: { id: organizacionId }, data: { logoUrl: relativePath } });
+      await this.removeStoredLogo(current.logoUrl, relativePath);
+      return organization;
+    } catch (error) {
+      await unlink(destination).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async getLogo(organizacionId: string, usuarioId: string) {
+    const organization = await this.getOrganizationLogo(organizacionId, usuarioId);
+    if (!organization.logoUrl || /^https?:\/\//i.test(organization.logoUrl) || /^data:/i.test(organization.logoUrl)) {
+      throw new NotFoundException('La organización no tiene un logo almacenado en el servidor');
+    }
+    const uploadRoot = resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
+    const candidate = resolve(process.cwd(), organization.logoUrl.replace(/^[/\\]+/, ''));
+    if (!candidate.startsWith(`${uploadRoot}${require('path').sep}`) || !basename(candidate).toLowerCase().endsWith('.png')) {
+      throw new NotFoundException('El logo almacenado no está disponible');
+    }
+    try {
+      return { buffer: await readFile(candidate), contentType: 'image/png' };
+    } catch {
+      throw new NotFoundException('El logo almacenado no está disponible');
+    }
+  }
+
+  async deleteLogo(organizacionId: string, usuarioId: string) {
+    const current = await this.getOrganizationLogo(organizacionId, usuarioId);
+    const organization = await this.prisma.organizacion.update({ where: { id: organizacionId }, data: { logoUrl: null } });
+    await this.removeStoredLogo(current.logoUrl, null);
+    return organization;
+  }
+
+  private async removeStoredLogo(logoUrl: string | null | undefined, keep: string | null) {
+    if (!logoUrl || logoUrl === keep || /^https?:\/\//i.test(logoUrl) || /^data:/i.test(logoUrl)) return;
+    const uploadRoot = resolve(process.cwd(), process.env.UPLOAD_DIR || './uploads');
+    const candidate = resolve(process.cwd(), logoUrl.replace(/^[/\\]+/, ''));
+    if (!candidate.startsWith(`${uploadRoot}${require('path').sep}`)) return;
+    await unlink(candidate).catch(() => undefined);
   }
 
   async updateOrganization(organizacionId: string, usuarioId: string, dto: UpdateOrganizacionDto) {
