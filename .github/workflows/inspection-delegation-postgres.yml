@@ -5,10 +5,10 @@ on:
     branches:
       - feature/demo-online
     paths:
-      - 'backend/**'
-      - 'web/**'
-      - 'tests/contracts/**'
-      - '.github/workflows/inspection-delegation-postgres.yml'
+      - "backend/**"
+      - "web/**"
+      - "tests/contracts/**"
+      - ".github/workflows/inspection-delegation-postgres.yml"
   workflow_dispatch:
 
 permissions:
@@ -67,6 +67,8 @@ jobs:
         run: pnpm --filter seh-backend exec ts-node --transpile-only integration/inspection-delegation-postgres.integration.ts
       - name: Run PostgreSQL technician authorization integration
         run: pnpm --filter seh-backend exec ts-node --transpile-only integration/technician-permissions-postgres.integration.ts
+      - name: Run PostgreSQL dashboard integration
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/dashboard-postgres.integration.ts
 
   migration-preservation:
     runs-on: ubuntu-latest
@@ -121,4 +123,3 @@ jobs:
         run: |
           pnpm --filter seh-backend exec prisma migrate deploy
           pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-inspection-delegation-migration.ts
-

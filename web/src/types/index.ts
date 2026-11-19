@@ -1,8 +1,18 @@
 // Enums
 export type Rol = 'ADMIN_EMPRESA' | 'SUPERVISOR' | 'TECNICO';
-export type TipoChecklist = 'GENERAL' | 'EPP' | 'ORDEN_LIMPIEZA' | 'RIESGO_QUIMICO' | 'MAQUINARIA' | 'ERGONOMIA' | 'INCENDIO' | 'OTRO';
-export type EstadoInspeccion = 'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA';
-export type CumplimientoItem = 'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA' | 'OBSERVACION';
+export type TipoChecklist =
+  | 'GENERAL'
+  | 'EPP'
+  | 'ORDEN_LIMPIEZA'
+  | 'RIESGO_QUIMICO'
+  | 'MAQUINARIA'
+  | 'ERGONOMIA'
+  | 'INCENDIO'
+  | 'OTRO';
+export type EstadoInspeccion =
+  'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA';
+export type CumplimientoItem =
+  'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA' | 'OBSERVACION';
 export type NivelRiesgo = 'BAJO' | 'MEDIO' | 'ALTO' | 'CRITICO';
 export type EstadoAccion = 'PENDIENTE' | 'EN_PROGRESO' | 'RESUELTA' | 'VENCIDA';
 
@@ -31,7 +41,8 @@ export interface ContextoAutorizado {
   empresaNombre?: string;
 }
 
-export type RolOrganizacion = 'OWNER' | 'ADMIN_ORGANIZACION' | 'AUDITOR_ORGANIZACION';
+export type RolOrganizacion =
+  'OWNER' | 'ADMIN_ORGANIZACION' | 'AUDITOR_ORGANIZACION';
 export type EstadoRelacionEmpresa = 'ACTIVA' | 'SUSPENDIDA' | 'REVOCADA';
 
 export interface Organizacion {
@@ -71,8 +82,21 @@ export interface OrganizacionMiembroView {
   usuarioId: string;
   rol: RolOrganizacion;
   activa: boolean;
-  usuario: Pick<Usuario, 'id' | 'email' | 'nombre' | 'apellido' | 'rol' | 'activo'>;
-  accesosEmpresa: Array<{ id: string; rol: Rol; activo: boolean; empresaId: string; organizacionEmpresa: { id: string; estado: EstadoRelacionEmpresa; empresa: { nombre: string } } }>;
+  usuario: Pick<
+    Usuario,
+    'id' | 'email' | 'nombre' | 'apellido' | 'rol' | 'activo'
+  >;
+  accesosEmpresa: Array<{
+    id: string;
+    rol: Rol;
+    activo: boolean;
+    empresaId: string;
+    organizacionEmpresa: {
+      id: string;
+      estado: EstadoRelacionEmpresa;
+      empresa: { nombre: string };
+    };
+  }>;
 }
 
 export interface Empresa {
@@ -201,11 +225,18 @@ export interface AuthResponse {
 export interface DashboardKPIs {
   inspeccionesEsteMes: number;
   inspeccionesMesAnterior: number;
+  inspeccionesCompletadasEsteMes: number;
+  variacionMensual: number | null;
+  hallazgosTotal: number;
   hallazgosAbiertos: number;
   hallazgosCriticos: number;
+  hallazgosAltos: number;
+  accionesTotal: number;
   accionesPendientes: number;
+  accionesEnProgreso: number;
+  accionesResueltas: number;
   accionesVencidas: number;
-  tasaCumplimiento: number;
+  tasaCumplimiento: number | null;
 }
 
 export interface DashboardTrend {
@@ -242,4 +273,3 @@ export interface ApiError {
   statusCode: number;
   error?: string;
 }
-
