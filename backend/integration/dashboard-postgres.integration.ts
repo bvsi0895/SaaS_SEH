@@ -59,6 +59,7 @@ const ids = {
   a5: '00000000-0000-0000-0000-000000001736',
   aPrev: '00000000-0000-0000-0000-000000001737',
   a6: '00000000-0000-0000-0000-000000001742',
+  a7: '00000000-0000-0000-0000-000000001747',
   item1: '00000000-0000-0000-0000-000000001738',
   item2: '00000000-0000-0000-0000-000000001739',
   item3: '00000000-0000-0000-0000-000000001740',
@@ -76,7 +77,7 @@ const pastDue = new Date(currentDate.getTime() - 3 * 86400000);
 const futureDue = new Date(currentDate.getTime() + 30 * 86400000);
 
 async function cleanup() {
-  const actionIds = [ids.a2, ids.a3, ids.a4, ids.a5, ids.aPrev, ids.a6];
+  const actionIds = [ids.a2, ids.a3, ids.a4, ids.a5, ids.aPrev, ids.a6, ids.a7];
   const findingIds = [
     ids.h1,
     ids.h2,
@@ -589,6 +590,17 @@ async function main() {
           responsableId: ids.supervisor,
         },
         {
+          id: ids.a7,
+          descripcion: 'Pendiente del hallazgo mixto',
+          fechaCompromiso: futureDue,
+          estado: EstadoAccion.PENDIENTE,
+          empresaId: ids.empresa,
+          organizacionEmpresaId: ids.relacion,
+          hallazgoId: ids.h3,
+          creadorId: ids.admin,
+          responsableId: ids.supervisor,
+        },
+        {
           id: ids.a4,
           descripcion: 'En progreso vencida',
           fechaCompromiso: pastDue,
@@ -637,16 +649,40 @@ async function main() {
       ],
     });
 
+    const mixedFinding = await prisma.hallazgo.findUnique({
+      where: { id: ids.h3 },
+      include: { accionesCorrectivas: { select: { estado: true } } },
+    });
+    assert.deepEqual(
+      mixedFinding?.accionesCorrectivas.map((action) => action.estado).sort(),
+      [EstadoAccion.PENDIENTE, EstadoAccion.RESUELTA].sort(),
+    );
+    const actionlessFinding = await prisma.hallazgo.findUnique({
+      where: { id: ids.h1 },
+      include: { accionesCorrectivas: true },
+    });
+    assert.equal(actionlessFinding?.accionesCorrectivas.length, 0);
+    const resolvedFinding = await prisma.hallazgo.findUnique({
+      where: { id: ids.h5 },
+      include: { accionesCorrectivas: true },
+    });
+    assert.equal(
+      resolvedFinding?.accionesCorrectivas.every(
+        (action) => action.estado === EstadoAccion.RESUELTA,
+      ),
+      true,
+    );
+
     const adminKpis = await dashboard.getKPIs(ids.empresa, ids.relacion);
     assert.equal(adminKpis.inspeccionesEsteMes, 4);
     assert.equal(adminKpis.inspeccionesMesAnterior, 1);
     assert.equal(adminKpis.inspeccionesCompletadasEsteMes, 2);
     assert.equal(adminKpis.hallazgosTotal, 7);
-    assert.equal(adminKpis.hallazgosAbiertos, 4);
+    assert.equal(adminKpis.hallazgosAbiertos, 5);
     assert.equal(adminKpis.hallazgosCriticos, 1);
     assert.equal(adminKpis.hallazgosAltos, 2);
-    assert.equal(adminKpis.accionesTotal, 6);
-    assert.equal(adminKpis.accionesPendientes, 1);
+    assert.equal(adminKpis.accionesTotal, 7);
+    assert.equal(adminKpis.accionesPendientes, 2);
     assert.equal(adminKpis.accionesEnProgreso, 1);
     assert.equal(adminKpis.accionesResueltas, 3);
     assert.equal(adminKpis.accionesVencidas, 3);
@@ -664,7 +700,7 @@ async function main() {
     assert.equal(technicianKpis.inspeccionesMesAnterior, 1);
     assert.equal(technicianKpis.inspeccionesCompletadasEsteMes, 1);
     assert.equal(technicianKpis.hallazgosTotal, 5);
-    assert.equal(technicianKpis.hallazgosAbiertos, 3);
+    assert.equal(technicianKpis.hallazgosAbiertos, 4);
     assert.equal(technicianKpis.accionesTotal, 3);
     assert.equal(technicianKpis.accionesPendientes, 1);
     assert.equal(technicianKpis.accionesEnProgreso, 1);
@@ -696,7 +732,7 @@ async function main() {
     assert.equal(
       (await dashboard.getActividadReciente(ids.empresa, 20, ids.relacion))
         .acciones.length,
-      6,
+      7,
     );
     await assert.rejects(
       () =>

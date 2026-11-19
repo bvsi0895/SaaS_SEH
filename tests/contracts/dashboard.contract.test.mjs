@@ -19,9 +19,10 @@ test('dashboard backend exposes scoped technician metrics and an explicit metric
     /getKPIs\([\s\S]*?empresaId,[\s\S]*?accesoEmpresaId,[\s\S]*?usuarioId,[\s\S]*?rol,/,
   );
   assert.match(service, /fechaHoraInicio: \{ not: null \}/);
+  assert.match(service, /accionesCorrectivas:\s*\{\s*none: \{\}/);
   assert.match(
     service,
-    /accionesCorrectivas:\s*\{\s*none:\s*\{\s*estado: EstadoAccion\.RESUELTA/,
+    /accionesCorrectivas:\s*\{\s*some:\s*\{\s*estado:\s*\{\s*not: EstadoAccion\.RESUELTA/,
   );
   assert.match(service, /cumplimiento !== CumplimientoItem\.NO_APLICA/);
   assert.match(

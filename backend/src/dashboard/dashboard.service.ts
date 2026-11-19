@@ -164,7 +164,14 @@ export class DashboardService {
       this.prisma.hallazgo.count({
         where: {
           ...findingWhere,
-          accionesCorrectivas: { none: { estado: EstadoAccion.RESUELTA } },
+          OR: [
+            { accionesCorrectivas: { none: {} } },
+            {
+              accionesCorrectivas: {
+                some: { estado: { not: EstadoAccion.RESUELTA } },
+              },
+            },
+          ],
         },
       }),
       this.prisma.hallazgo.groupBy({
