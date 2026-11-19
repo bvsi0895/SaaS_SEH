@@ -1,209 +1,349 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoInspeccion, EstadoAccion, NivelRiesgo } from '@prisma/client';
+import {
+  CumplimientoItem,
+  EstadoAccion,
+  EstadoInspeccion,
+  Rol,
+} from '@prisma/client';
+
+type DashboardPeriod = 'semana' | 'mes' | 'trimestre';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  private async establishmentFilter(empresaId: string, establecimientoId?: string, accesoEmpresaId?: string) {
-    if (!establecimientoId) return {};
-    const establishment = await this.prisma.establecimiento.findFirst({ where: { id: establecimientoId, empresaId } });
-    if (!establishment) throw new NotFoundException('Establecimiento no encontrado');
-    if (accesoEmpresaId) {
-      const scoped = await this.prisma.accesoEstablecimiento.count({ where: { accesoEmpresaId } });
-      if (scoped > 0) {
-        const allowed = await this.prisma.accesoEstablecimiento.count({ where: { accesoEmpresaId, establecimientoId } });
-        if (!allowed) throw new NotFoundException('Establecimiento no encontrado');
-      }
+  private async establishmentFilter(
+    empresaId: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+  ) {
+    if (establecimientoId) {
+      const establishment = await this.prisma.establecimiento.findFirst({
+        where: { id: establecimientoId, empresaId },
+        select: { id: true },
+      });
+      if (!establishment)
+        throw new NotFoundException('Establecimiento no encontrado');
     }
-    return { establecimientoId };
+
+    const scoped = accesoEmpresaId
+      ? await this.prisma.accesoEstablecimiento.findMany({
+          where: { accesoEmpresaId, establecimiento: { empresaId } },
+          select: { establecimientoId: true },
+        })
+      : [];
+    const allowedIds = scoped.map((item) => item.establecimientoId);
+
+    if (
+      establecimientoId &&
+      allowedIds.length > 0 &&
+      !allowedIds.includes(establecimientoId)
+    ) {
+      throw new NotFoundException('Establecimiento no encontrado');
+    }
+    if (establecimientoId) return { establecimientoId };
+    // An access without establishment rows retains the legacy all-establishments scope.
+    return allowedIds.length > 0
+      ? { establecimientoId: { in: allowedIds } }
+      : {};
+  }
+
+  private async buildScope(
+    empresaId: string,
+    organizacionEmpresaId?: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+  ) {
+    const establishment = await this.establishmentFilter(
+      empresaId,
+      establecimientoId,
+      accesoEmpresaId,
+    );
+    const baseInspectionWhere = {
+      empresaId,
+      ...(organizacionEmpresaId && { organizacionEmpresaId }),
+      ...establishment,
+    };
+    const inspectionWhere =
+      rol === Rol.TECNICO && usuarioId
+        ? { ...baseInspectionWhere, asignadoAId: usuarioId }
+        : baseInspectionWhere;
+
+    return {
+      baseInspectionWhere,
+      inspectionWhere,
+      findingWhere: { inspeccion: inspectionWhere },
+      // Technicians see findings from assigned inspections and actions assigned
+      // to them even when those actions belong to another inspection.
+      actionWhere: {
+        empresaId,
+        ...(organizacionEmpresaId && { organizacionEmpresaId }),
+        ...(rol === Rol.TECNICO && usuarioId && { responsableId: usuarioId }),
+        hallazgo: { inspeccion: baseInspectionWhere },
+      },
+    };
+  }
+
+  private getMonthBounds(now = new Date()) {
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    return {
+      currentStart: new Date(Date.UTC(year, month, 1)),
+      nextStart: new Date(Date.UTC(year, month + 1, 1)),
+      previousStart: new Date(Date.UTC(year, month - 1, 1)),
+    };
   }
 
   /**
-   * Obtener resumen general del dashboard
+   * Definitions: started inspections have fechaHoraInicio; pending inspections
+   * are excluded. A finding is open when it has no corrective action or at
+   * least one action that is not RESUELTA. Compliance is CUMPLE divided by all
+   * evaluable items; NO_APLICA is excluded, while pending/NO_CUMPLE/OBSERVACION
+   * remain in the denominator as not fulfilled.
    */
-  async getResumen(empresaId: string, filtros?: { fechaDesde?: Date; fechaHasta?: Date }, organizacionEmpresaId?: string, establecimientoId?: string, accesoEmpresaId?: string) {
-    const establishment = await this.establishmentFilter(empresaId, establecimientoId, accesoEmpresaId);
-    const whereDate = {
-      ...(filtros?.fechaDesde && { fechaHoraInicio: { gte: filtros.fechaDesde } }),
-      ...(filtros?.fechaHasta && { fechaHoraInicio: { lte: filtros.fechaHasta } }),
-    };
-
+  async getResumen(
+    empresaId: string,
+    filtros?: { fechaDesde?: Date; fechaHasta?: Date },
+    organizacionEmpresaId?: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+  ) {
+    const scope = await this.buildScope(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
+    const whereDate =
+      filtros?.fechaDesde || filtros?.fechaHasta
+        ? {
+            fechaHoraInicio: {
+              ...(filtros.fechaDesde && { gte: filtros.fechaDesde }),
+              ...(filtros.fechaHasta && { lte: filtros.fechaHasta }),
+            },
+          }
+        : {};
+    const inspectionWhere = { ...scope.inspectionWhere, ...whereDate };
+    const findingWhere = { inspeccion: inspectionWhere };
     const [
       totalInspecciones,
+      inspeccionesIniciadas,
       inspeccionesCompletadas,
       inspeccionesEnProgreso,
-      totalHallazgos,
+      inspeccionesPendientes,
+      hallazgos,
+      hallazgosAbiertos,
       hallazgosPorNivel,
-      totalAcciones,
+      hallazgosSinAccion,
+      acciones,
       accionesPorEstado,
       accionesVencidas,
+      items,
     ] = await Promise.all([
-      // Total inspecciones
+      this.prisma.inspeccion.count({ where: inspectionWhere }),
       this.prisma.inspeccion.count({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, ...whereDate },
+        where: { ...inspectionWhere, fechaHoraInicio: { not: null } },
       }),
-      // Inspecciones completadas
       this.prisma.inspeccion.count({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, estado: EstadoInspeccion.COMPLETADA, ...whereDate },
+        where: { ...inspectionWhere, estado: EstadoInspeccion.COMPLETADA },
       }),
-      // Inspecciones en progreso
       this.prisma.inspeccion.count({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, estado: EstadoInspeccion.EN_PROGRESO },
+        where: { ...inspectionWhere, estado: EstadoInspeccion.EN_PROGRESO },
       }),
-      // Total hallazgos
+      this.prisma.inspeccion.count({
+        where: { ...inspectionWhere, estado: EstadoInspeccion.PENDIENTE },
+      }),
+      this.prisma.hallazgo.count({ where: findingWhere }),
       this.prisma.hallazgo.count({
-        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, ...whereDate } },
+        where: {
+          ...findingWhere,
+          accionesCorrectivas: { none: { estado: EstadoAccion.RESUELTA } },
+        },
       }),
-      // Hallazgos por nivel
       this.prisma.hallazgo.groupBy({
         by: ['nivelRiesgo'],
         _count: true,
-        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, ...whereDate } },
+        where: findingWhere,
       }),
-      // Total acciones
-      this.prisma.accionCorrectiva.count({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), hallazgo: { inspeccion: { ...establishment } } },
+      this.prisma.hallazgo.count({
+        where: { ...findingWhere, accionesCorrectivas: { none: {} } },
       }),
-      // Acciones por estado
+      this.prisma.accionCorrectiva.count({ where: scope.actionWhere }),
       this.prisma.accionCorrectiva.groupBy({
         by: ['estado'],
         _count: true,
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), hallazgo: { inspeccion: { ...establishment } } },
+        where: scope.actionWhere,
       }),
-      // Acciones vencidas
       this.prisma.accionCorrectiva.count({
         where: {
-          empresaId,
-          ...(organizacionEmpresaId && { organizacionEmpresaId }),
-          hallazgo: { inspeccion: { ...establishment } },
-          fechaCompromiso: { lt: new Date() },
-          estado: { in: [EstadoAccion.PENDIENTE, EstadoAccion.EN_PROGRESO] },
+          ...scope.actionWhere,
+          OR: [
+            { estado: EstadoAccion.VENCIDA },
+            {
+              fechaCompromiso: { lt: new Date() },
+              estado: {
+                in: [EstadoAccion.PENDIENTE, EstadoAccion.EN_PROGRESO],
+              },
+            },
+          ],
         },
+      }),
+      this.prisma.inspeccionItem.findMany({
+        where: { inspeccion: inspectionWhere },
+        select: { cumplimiento: true },
       }),
     ]);
 
-    // Calcular porcentaje de cumplimiento
-    const porcentajeCumplimiento = totalInspecciones > 0
-      ? Math.round((inspeccionesCompletadas / totalInspecciones) * 100)
-      : 0;
+    const evaluableItems = items.filter(
+      (item) => item.cumplimiento !== CumplimientoItem.NO_APLICA,
+    ).length;
+    const cumplidos = items.filter(
+      (item) => item.cumplimiento === CumplimientoItem.CUMPLE,
+    ).length;
+    const porcentajeCumplimiento =
+      evaluableItems > 0
+        ? Math.round((cumplidos / evaluableItems) * 100)
+        : null;
 
     return {
       inspecciones: {
         total: totalInspecciones,
+        iniciadas: inspeccionesIniciadas,
         completadas: inspeccionesCompletadas,
         enProgreso: inspeccionesEnProgreso,
+        pendientes: inspeccionesPendientes,
         porcentajeCumplimiento,
       },
       hallazgos: {
-        total: totalHallazgos,
+        total: hallazgos,
+        abiertos: hallazgosAbiertos,
+        sinAccion: hallazgosSinAccion,
         porNivel: this.formatGroupBy(hallazgosPorNivel, 'nivelRiesgo'),
       },
       accionesCorrectivas: {
-        total: totalAcciones,
+        total: acciones,
         porEstado: this.formatGroupBy(accionesPorEstado, 'estado'),
         vencidas: accionesVencidas,
       },
     };
   }
 
-  /**
-   * Obtener tendencias de inspecciones por período
-   */
   async getTendencias(
     empresaId: string,
-    periodo: 'semana' | 'mes' | 'trimestre' = 'mes',
+    periodo: DashboardPeriod = 'mes',
     organizacionEmpresaId?: string,
     establecimientoId?: string,
     accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
   ) {
-    const establishment = await this.establishmentFilter(empresaId, establecimientoId, accesoEmpresaId);
+    const scope = await this.buildScope(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
     const fechaInicio = this.getFechaInicio(periodo);
-
-    const inspecciones = await this.prisma.inspeccion.findMany({
-      where: {
-        empresaId,
-        ...(organizacionEmpresaId && { organizacionEmpresaId }),
-        ...establishment,
-        fechaHoraInicio: { gte: fechaInicio },
-      },
-      select: {
-        fechaHoraInicio: true,
-        estado: true,
-      },
-      orderBy: { fechaHoraInicio: 'asc' },
-    });
-
-    const hallazgos = await this.prisma.hallazgo.findMany({
-      where: {
-        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment },
-        createdAt: { gte: fechaInicio },
-      },
-      select: {
-        createdAt: true,
-        nivelRiesgo: true,
-      },
-    });
-
-    // Agrupar por día/semana según período
+    const now = new Date();
+    const [inspecciones, hallazgos] = await Promise.all([
+      this.prisma.inspeccion.findMany({
+        where: {
+          ...scope.inspectionWhere,
+          fechaHoraInicio: { gte: fechaInicio, lte: now },
+        },
+        select: { fechaHoraInicio: true },
+        orderBy: { fechaHoraInicio: 'asc' },
+      }),
+      this.prisma.hallazgo.findMany({
+        where: {
+          ...scope.findingWhere,
+          createdAt: { gte: fechaInicio, lte: now },
+        },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
     return {
       inspecciones: this.agruparPorFecha(inspecciones, 'fechaHoraInicio'),
       hallazgos: this.agruparPorFecha(hallazgos, 'createdAt'),
     };
   }
 
-  /**
-   * Obtener top sectores con más hallazgos
-   */
-  async getTopSectores(empresaId: string, limit: number = 5, organizacionEmpresaId?: string, establecimientoId?: string, accesoEmpresaId?: string) {
-    const establishment = await this.establishmentFilter(empresaId, establecimientoId, accesoEmpresaId);
-    const result = await this.prisma.inspeccion.groupBy({
-      by: ['sector'],
-      _count: {
-        id: true,
-      },
-      where: {
-        empresaId,
-        ...(organizacionEmpresaId && { organizacionEmpresaId }),
-        ...establishment,
-        hallazgos: { some: {} },
-      },
-      orderBy: {
-        _count: {
-          id: 'desc',
-        },
-      },
-      take: limit,
-    });
-
-    // Obtener conteo de hallazgos por sector
-    const sectoresConHallazgos = await Promise.all(
-      result.map(async (item) => {
-        const hallazgos = await this.prisma.hallazgo.count({
-          where: {
-            inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment, sector: item.sector },
-          },
-        });
-        return {
-          sector: item.sector,
-          inspecciones: item._count.id,
-          hallazgos,
-        };
-      }),
+  async getTopSectores(
+    empresaId: string,
+    limit = 5,
+    organizacionEmpresaId?: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+  ) {
+    const scope = await this.buildScope(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
     );
-
-    return sectoresConHallazgos;
+    const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 20);
+    const sectors = await this.prisma.inspeccion.groupBy({
+      by: ['sector'],
+      where: { ...scope.inspectionWhere, hallazgos: { some: {} } },
+      _count: { id: true },
+    });
+    const result = await Promise.all(
+      sectors.map(async (item) => ({
+        sector: item.sector,
+        inspecciones: item._count.id,
+        hallazgos: await this.prisma.hallazgo.count({
+          where: {
+            ...scope.findingWhere,
+            inspeccion: { ...scope.inspectionWhere, sector: item.sector },
+          },
+        }),
+      })),
+    );
+    return result
+      .sort(
+        (a, b) =>
+          b.hallazgos - a.hallazgos ||
+          b.inspecciones - a.inspecciones ||
+          a.sector.localeCompare(b.sector),
+      )
+      .slice(0, safeLimit);
   }
 
-  /**
-   * Obtener resumen de actividad reciente
-   */
-  async getActividadReciente(empresaId: string, limit: number = 10, organizacionEmpresaId?: string, establecimientoId?: string, accesoEmpresaId?: string) {
-    const establishment = await this.establishmentFilter(empresaId, establecimientoId, accesoEmpresaId);
+  async getActividadReciente(
+    empresaId: string,
+    limit = 10,
+    organizacionEmpresaId?: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+  ) {
+    const scope = await this.buildScope(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
+    const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
     const [inspecciones, hallazgos, acciones] = await Promise.all([
       this.prisma.inspeccion.findMany({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment },
+        where: scope.inspectionWhere,
         select: {
           id: true,
           sector: true,
@@ -213,11 +353,11 @@ export class DashboardService {
           usuario: { select: { nombre: true, apellido: true } },
           checklist: { select: { nombre: true } },
         },
-        orderBy: { fechaHoraInicio: 'desc' },
-        take: limit,
+        orderBy: { createdAt: 'desc' },
+        take: safeLimit,
       }),
       this.prisma.hallazgo.findMany({
-        where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment } },
+        where: scope.findingWhere,
         select: {
           id: true,
           titulo: true,
@@ -226,140 +366,138 @@ export class DashboardService {
           inspeccion: { select: { sector: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: limit,
+        take: safeLimit,
       }),
       this.prisma.accionCorrectiva.findMany({
-        where: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), hallazgo: { inspeccion: { ...establishment } } },
+        where: scope.actionWhere,
         select: {
           id: true,
           descripcion: true,
           estado: true,
+          createdAt: true,
           fechaCompromiso: true,
           hallazgo: { select: { titulo: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: limit,
+        take: safeLimit,
       }),
     ]);
-
-    return {
-      inspecciones,
-      hallazgos,
-      acciones,
-    };
+    return { inspecciones, hallazgos, acciones };
   }
 
-  /**
-   * Obtener KPIs principales
-   */
-  async getKPIs(empresaId: string, organizacionEmpresaId?: string, establecimientoId?: string, accesoEmpresaId?: string) {
-    const establishment = await this.establishmentFilter(empresaId, establecimientoId, accesoEmpresaId);
-    const now = new Date();
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
-    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-    // Inspecciones este mes vs mes anterior
-    const [inspeccionesMes, inspeccionesMesAnterior] = await Promise.all([
-      this.prisma.inspeccion.count({
-        where: {
-          empresaId,
-          ...(organizacionEmpresaId && { organizacionEmpresaId }),
-          ...establishment,
-          fechaHoraInicio: { gte: inicioMes },
-          estado: EstadoInspeccion.COMPLETADA,
-        },
-      }),
-      this.prisma.inspeccion.count({
-        where: {
-          empresaId,
-          ...(organizacionEmpresaId && { organizacionEmpresaId }),
-          ...establishment,
-          fechaHoraInicio: { gte: inicioMesAnterior, lt: inicioMes },
-          estado: EstadoInspeccion.COMPLETADA,
-        },
-      }),
-    ]);
-
-    // Tiempo promedio de resolución de acciones
-    const accionesResueltas = await this.prisma.accionCorrectiva.findMany({
-      where: {
+  async getKPIs(
+    empresaId: string,
+    organizacionEmpresaId?: string,
+    establecimientoId?: string,
+    accesoEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+  ) {
+    const scope = await this.buildScope(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
+    const { currentStart, nextStart, previousStart } = this.getMonthBounds();
+    const [
+      resumen,
+      inspeccionesEsteMes,
+      inspeccionesMesAnterior,
+      completadasEsteMes,
+    ] = await Promise.all([
+      this.getResumen(
         empresaId,
-        ...(organizacionEmpresaId && { organizacionEmpresaId }),
-        hallazgo: { inspeccion: { ...establishment } },
-        estado: EstadoAccion.RESUELTA,
-        fechaCierre: { not: null },
-      },
-      select: {
-        createdAt: true,
-        fechaCierre: true,
-      },
-    });
-
-    const tiempoPromedioResolucion = accionesResueltas.length > 0
-      ? Math.round(
-          accionesResueltas.reduce((sum, a) => {
-            const dias = Math.ceil(
-              (a.fechaCierre!.getTime() - a.createdAt.getTime()) / (1000 * 60 * 60 * 24),
-            );
-            return sum + dias;
-          }, 0) / accionesResueltas.length,
-        )
-      : 0;
-
-    // Índice de criticidad (hallazgos críticos + altos / total)
-    const [hallazgosCriticos, hallazgosTotal] = await Promise.all([
-      this.prisma.hallazgo.count({
+        undefined,
+        organizacionEmpresaId,
+        establecimientoId,
+        accesoEmpresaId,
+        usuarioId,
+        rol,
+      ),
+      this.prisma.inspeccion.count({
         where: {
-          inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment },
-          nivelRiesgo: { in: [NivelRiesgo.CRITICO, NivelRiesgo.ALTO] },
+          ...scope.inspectionWhere,
+          fechaHoraInicio: { gte: currentStart, lt: nextStart },
         },
       }),
-      this.prisma.hallazgo.count({
-          where: { inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishment } },
+      this.prisma.inspeccion.count({
+        where: {
+          ...scope.inspectionWhere,
+          fechaHoraInicio: { gte: previousStart, lt: currentStart },
+        },
+      }),
+      this.prisma.inspeccion.count({
+        where: {
+          ...scope.inspectionWhere,
+          estado: EstadoInspeccion.COMPLETADA,
+          fechaHoraInicio: { gte: currentStart, lt: nextStart },
+        },
       }),
     ]);
-
-    const indiceCriticidad = hallazgosTotal > 0
-      ? Math.round((hallazgosCriticos / hallazgosTotal) * 100)
-      : 0;
-
+    const variacionMensual =
+      inspeccionesMesAnterior === 0
+        ? inspeccionesEsteMes === 0
+          ? 0
+          : null
+        : Math.round(
+            ((inspeccionesEsteMes - inspeccionesMesAnterior) /
+              inspeccionesMesAnterior) *
+              100,
+          );
+    const porNivel = resumen.hallazgos.porNivel;
+    const porEstado = resumen.accionesCorrectivas.porEstado;
     return {
-      inspeccionesMes,
-      variacionMensual: inspeccionesMesAnterior > 0
-        ? Math.round(((inspeccionesMes - inspeccionesMesAnterior) / inspeccionesMesAnterior) * 100)
-        : 100,
-      tiempoPromedioResolucion,
-      indiceCriticidad,
+      inspeccionesEsteMes,
+      inspeccionesMesAnterior,
+      inspeccionesCompletadasEsteMes: completadasEsteMes,
+      variacionMensual,
+      hallazgosTotal: resumen.hallazgos.total,
+      hallazgosAbiertos: resumen.hallazgos.abiertos,
+      hallazgosCriticos: porNivel.CRITICO || 0,
+      hallazgosAltos: porNivel.ALTO || 0,
+      accionesTotal: resumen.accionesCorrectivas.total,
+      accionesPendientes: porEstado.PENDIENTE || 0,
+      accionesEnProgreso: porEstado.EN_PROGRESO || 0,
+      accionesResueltas: porEstado.RESUELTA || 0,
+      accionesVencidas: resumen.accionesCorrectivas.vencidas,
+      tasaCumplimiento: resumen.inspecciones.porcentajeCumplimiento,
     };
   }
 
-  // Helpers
   private formatGroupBy(data: any[], key: string) {
-    return data.reduce((acc, item) => {
-      acc[item[key]] = item._count;
-      return acc;
-    }, {} as Record<string, number>);
+    return data.reduce(
+      (acc, item) => {
+        acc[item[key]] = item._count;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
   }
 
-  private getFechaInicio(periodo: 'semana' | 'mes' | 'trimestre'): Date {
+  private getFechaInicio(periodo: DashboardPeriod): Date {
     const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
     switch (periodo) {
       case 'semana':
         return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      case 'mes':
-        return new Date(now.getFullYear(), now.getMonth(), 1);
       case 'trimestre':
-        return new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        return new Date(Date.UTC(year, month - 2, 1));
+      case 'mes':
+        return new Date(Date.UTC(year, month, 1));
     }
   }
 
   private agruparPorFecha(data: any[], campo: string) {
     const grupos: Record<string, number> = {};
     data.forEach((item) => {
-      const fecha = new Date(item[campo]).toISOString().split('T')[0];
+      if (!item[campo]) return;
+      const fecha = new Date(item[campo]).toISOString().slice(0, 10);
       grupos[fecha] = (grupos[fecha] || 0) + 1;
     });
     return grupos;
   }
 }
-

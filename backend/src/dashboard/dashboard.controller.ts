@@ -21,7 +21,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('resumen')
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Obtener resumen general del dashboard' })
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })
@@ -34,17 +34,31 @@ export class DashboardController {
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
     @Query('establecimientoId') establecimientoId?: string,
+    @CurrentUser('id') usuarioId?: string,
+    @CurrentUser('rol') rol?: Rol,
   ) {
-    return this.dashboardService.getResumen(empresaId, {
-      fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
-      fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    }, organizacionEmpresaId, establecimientoId, accesoEmpresaId);
+    return this.dashboardService.getResumen(
+      empresaId,
+      {
+        fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
+        fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
+      },
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
   }
 
   @Get('tendencias')
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Obtener tendencias por período' })
-  @ApiQuery({ name: 'periodo', enum: ['semana', 'mes', 'trimestre'], required: false })
+  @ApiQuery({
+    name: 'periodo',
+    enum: ['semana', 'mes', 'trimestre'],
+    required: false,
+  })
   @ApiQuery({ name: 'establecimientoId', required: false })
   @ApiResponse({ status: 200, description: 'Tendencias' })
   async getTendencias(
@@ -53,12 +67,22 @@ export class DashboardController {
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('periodo') periodo?: 'semana' | 'mes' | 'trimestre',
     @Query('establecimientoId') establecimientoId?: string,
+    @CurrentUser('id') usuarioId?: string,
+    @CurrentUser('rol') rol?: Rol,
   ) {
-    return this.dashboardService.getTendencias(empresaId, periodo, organizacionEmpresaId, establecimientoId, accesoEmpresaId);
+    return this.dashboardService.getTendencias(
+      empresaId,
+      periodo,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
   }
 
   @Get('top-sectores')
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Obtener top sectores con más hallazgos' })
   @ApiQuery({ name: 'limit', type: Number, required: false })
   @ApiQuery({ name: 'establecimientoId', required: false })
@@ -69,12 +93,22 @@ export class DashboardController {
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('limit') limit?: number,
     @Query('establecimientoId') establecimientoId?: string,
+    @CurrentUser('id') usuarioId?: string,
+    @CurrentUser('rol') rol?: Rol,
   ) {
-    return this.dashboardService.getTopSectores(empresaId, limit || 5, organizacionEmpresaId, establecimientoId, accesoEmpresaId);
+    return this.dashboardService.getTopSectores(
+      empresaId,
+      limit || 5,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
   }
 
   @Get('actividad-reciente')
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Obtener actividad reciente' })
   @ApiQuery({ name: 'limit', type: Number, required: false })
   @ApiQuery({ name: 'establecimientoId', required: false })
@@ -85,12 +119,22 @@ export class DashboardController {
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('limit') limit?: number,
     @Query('establecimientoId') establecimientoId?: string,
+    @CurrentUser('id') usuarioId?: string,
+    @CurrentUser('rol') rol?: Rol,
   ) {
-    return this.dashboardService.getActividadReciente(empresaId, limit || 10, organizacionEmpresaId, establecimientoId, accesoEmpresaId);
+    return this.dashboardService.getActividadReciente(
+      empresaId,
+      limit || 10,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
   }
 
   @Get('kpis')
-  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR)
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
   @ApiOperation({ summary: 'Obtener KPIs principales' })
   @ApiResponse({ status: 200, description: 'KPIs' })
   @ApiQuery({ name: 'establecimientoId', required: false })
@@ -99,7 +143,16 @@ export class DashboardController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('establecimientoId') establecimientoId?: string,
+    @CurrentUser('id') usuarioId?: string,
+    @CurrentUser('rol') rol?: Rol,
   ) {
-    return this.dashboardService.getKPIs(empresaId, organizacionEmpresaId, establecimientoId, accesoEmpresaId);
+    return this.dashboardService.getKPIs(
+      empresaId,
+      organizacionEmpresaId,
+      establecimientoId,
+      accesoEmpresaId,
+      usuarioId,
+      rol,
+    );
   }
 }

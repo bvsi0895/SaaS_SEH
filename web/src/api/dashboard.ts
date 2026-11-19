@@ -1,40 +1,31 @@
 import apiClient from './client';
-import type { DashboardKPIs, DashboardTrend, TopSector, ActividadReciente } from '../types';
+import type {
+  DashboardKPIs,
+  DashboardTrend,
+  TopSector,
+  ActividadReciente,
+} from '../types';
 
-export interface DashboardFilters { establecimientoId?: string; }
+export interface DashboardFilters {
+  establecimientoId?: string;
+}
 
 export const dashboardApi = {
   getKPIs: async (filters?: DashboardFilters): Promise<DashboardKPIs> => {
-    const [kpisResponse, resumenResponse] = await Promise.all([
-      apiClient.get<{ inspeccionesMes: number; variacionMensual: number }>('/dashboard/kpis', { params: filters }),
-      apiClient.get<{
-        inspecciones: { porcentajeCumplimiento: number };
-        hallazgos: { total: number; porNivel: Record<string, number> };
-        accionesCorrectivas: { porEstado: Record<string, number>; vencidas: number };
-      }>('/dashboard/resumen', { params: filters }),
-    ]);
-    const resumen = resumenResponse.data;
-    const accionesPendientes =
-      (resumen.accionesCorrectivas.porEstado.PENDIENTE || 0) +
-      (resumen.accionesCorrectivas.porEstado.EN_PROGRESO || 0);
-    return {
-      inspeccionesEsteMes: kpisResponse.data.inspeccionesMes,
-      inspeccionesMesAnterior: kpisResponse.data.variacionMensual === 100 ? 0 : 1,
-      hallazgosAbiertos: resumen.hallazgos.total,
-      hallazgosCriticos:
-        (resumen.hallazgos.porNivel.CRITICO || 0) +
-        (resumen.hallazgos.porNivel.ALTO || 0),
-      accionesPendientes,
-      accionesVencidas: resumen.accionesCorrectivas.vencidas,
-      tasaCumplimiento: resumen.inspecciones.porcentajeCumplimiento,
-    };
+    const response = await apiClient.get<DashboardKPIs>('/dashboard/kpis', {
+      params: filters,
+    });
+    return response.data;
   },
 
-  getTendencias: async (meses?: number, filters?: DashboardFilters): Promise<DashboardTrend[]> => {
+  getTendencias: async (
+    periodo: 'semana' | 'mes' | 'trimestre' = 'mes',
+    filters?: DashboardFilters,
+  ): Promise<DashboardTrend[]> => {
     const response = await apiClient.get<{
       inspecciones: Record<string, number>;
       hallazgos: Record<string, number>;
-    }>('/dashboard/tendencias', { params: { meses, ...filters } });
+    }>('/dashboard/tendencias', { params: { periodo, ...filters } });
     const fechas = new Set([
       ...Object.keys(response.data.inspecciones),
       ...Object.keys(response.data.hallazgos),
@@ -46,14 +37,23 @@ export const dashboardApi = {
     }));
   },
 
-  getTopSectores: async (limit?: number, filters?: DashboardFilters): Promise<TopSector[]> => {
-    const response = await apiClient.get<TopSector[]>('/dashboard/top-sectores', {
-      params: { limit, ...filters },
-    });
+  getTopSectores: async (
+    limit?: number,
+    filters?: DashboardFilters,
+  ): Promise<TopSector[]> => {
+    const response = await apiClient.get<TopSector[]>(
+      '/dashboard/top-sectores',
+      {
+        params: { limit, ...filters },
+      },
+    );
     return response.data;
   },
 
-  getActividadReciente: async (limit?: number, filters?: DashboardFilters): Promise<ActividadReciente[]> => {
+  getActividadReciente: async (
+    limit?: number,
+    filters?: DashboardFilters,
+  ): Promise<ActividadReciente[]> => {
     const response = await apiClient.get<{
       inspecciones: Array<{
         id: string;
@@ -72,6 +72,7 @@ export const dashboardApi = {
       acciones: Array<{
         id: string;
         descripcion: string;
+        createdAt: string;
         fechaCompromiso: string;
         hallazgo: { titulo: string };
       }>;
@@ -99,10 +100,9 @@ export const dashboardApi = {
         id: item.id,
         tipo: 'accion' as const,
         descripcion: `Acción correctiva: ${item.descripcion}`,
-        fecha: item.fechaCompromiso,
+        fecha: item.createdAt,
         usuario: 'Sistema',
       })),
     ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   },
 };
-
