@@ -105,6 +105,17 @@ function getPhotoUploadErrorMessage(error: unknown): string {
 
 type HallazgoRequiredField = 'titulo' | 'descripcion' | 'ubicacionTexto';
 
+export function buildHallazgoUpdateData(
+  draft: Partial<CreateHallazgoDto>,
+): UpdateHallazgoDto {
+  return {
+    ...(draft.titulo !== undefined && { titulo: draft.titulo }),
+    ...(draft.descripcion !== undefined && { descripcion: draft.descripcion }),
+    ...(draft.nivelRiesgo !== undefined && { nivelRiesgo: draft.nivelRiesgo }),
+    ...(draft.ubicacionTexto !== undefined && { ubicacionTexto: draft.ubicacionTexto }),
+  };
+}
+
 export default function InspeccionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -127,6 +138,7 @@ export default function InspeccionDetailPage() {
   const [hallazgoPhoto, setHallazgoPhoto] = useState<File | null>(null);
   const [hallazgoPhotoError, setHallazgoPhotoError] = useState<string | null>(null);
   const [hallazgoPhotoUploadError, setHallazgoPhotoUploadError] = useState<string | null>(null);
+  const [hallazgoSaveError, setHallazgoSaveError] = useState<string | null>(null);
   const [hallazgoFieldErrors, setHallazgoFieldErrors] = useState<Partial<Record<HallazgoRequiredField, string>>>({});
   const [accionDescripcion, setAccionDescripcion] = useState('');
   const [accionFechaCompromiso, setAccionFechaCompromiso] = useState(new Date().toISOString().slice(0, 10));
@@ -219,8 +231,10 @@ export default function InspeccionDetailPage() {
       }
       guardarAccionCorrectiva(hallazgo.id, 'Hallazgo creado exitosamente');
     },
-    onError: () => {
-      showError('Error al crear el hallazgo');
+    onError: (error) => {
+      const message = getBackendErrorMessage(error, 'No se pudo crear el hallazgo');
+      setHallazgoSaveError(message);
+      showError(`No se pudo crear el hallazgo: ${message}`);
     },
   });
 
@@ -240,8 +254,10 @@ export default function InspeccionDetailPage() {
       }
       guardarAccionCorrectiva(hallazgo.id, 'Hallazgo actualizado exitosamente');
     },
-    onError: () => {
-      showError('Error al actualizar el hallazgo');
+    onError: (error) => {
+      const message = getBackendErrorMessage(error, 'No se pudo actualizar el hallazgo');
+      setHallazgoSaveError(message);
+      showError(`No se pudo actualizar el hallazgo: ${message}`);
     },
   });
 
@@ -327,6 +343,7 @@ export default function InspeccionDetailPage() {
     setHallazgoPhoto(null);
     setHallazgoPhotoError(null);
     setHallazgoPhotoUploadError(null);
+    setHallazgoSaveError(null);
     setHallazgoFieldErrors({});
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
@@ -352,6 +369,7 @@ export default function InspeccionDetailPage() {
     setAccionError(null);
     setHallazgoPhotoError(null);
     setHallazgoPhotoUploadError(null);
+    setHallazgoSaveError(null);
     setHallazgoFieldErrors({});
     setNuevoHallazgo(existing
       ? {
@@ -385,6 +403,7 @@ export default function InspeccionDetailPage() {
     setHallazgoPhoto(null);
     setHallazgoPhotoError(null);
     setHallazgoPhotoUploadError(null);
+    setHallazgoSaveError(null);
     setHallazgoFieldErrors({});
     setAccionDescripcion('');
     setAccionFechaCompromiso(new Date().toISOString().slice(0, 10));
@@ -471,6 +490,7 @@ export default function InspeccionDetailPage() {
 
   const handleCrearHallazgo = () => {
     setAccionError(null);
+    setHallazgoSaveError(null);
     if (!validateHallazgoFields()) return;
 
     if (!isTechnician && accionDescripcion.trim()) {
@@ -488,11 +508,20 @@ export default function InspeccionDetailPage() {
       }
     }
 
-    const data = nuevoHallazgo as CreateHallazgoDto;
+    const data = buildHallazgoUpdateData(nuevoHallazgo);
     if (editingHallazgoId) {
       actualizarHallazgoMutation.mutate({ id: editingHallazgoId, data });
     } else {
-      crearHallazgoMutation.mutate({ ...data, inspeccionId: id! });
+      crearHallazgoMutation.mutate({
+        titulo: nuevoHallazgo.titulo!.trim(),
+        descripcion: nuevoHallazgo.descripcion!.trim(),
+        nivelRiesgo: nuevoHallazgo.nivelRiesgo!,
+        ubicacionTexto: nuevoHallazgo.ubicacionTexto!.trim(),
+        inspeccionId: id!,
+        ...(hallazgoOriginItemId || nuevoHallazgo.inspeccionItemId
+          ? { inspeccionItemId: hallazgoOriginItemId || nuevoHallazgo.inspeccionItemId }
+          : {}),
+      });
     }
   };
 
@@ -964,6 +993,13 @@ export default function InspeccionDetailPage() {
         <DialogTitle>{editingHallazgoId ? 'Editar Hallazgo' : 'Registrar Hallazgo'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {hallazgoSaveError && (
+              <Grid item xs={12}>
+                <Alert severity="error" role="alert">
+                  {hallazgoSaveError}
+                </Alert>
+              </Grid>
+            )}
             <Grid item xs={12}>
               <TextField
                 fullWidth
