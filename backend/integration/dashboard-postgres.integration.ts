@@ -683,7 +683,7 @@ async function main() {
       completadas: 3,
       enProgreso: 2,
       pendientes: 1,
-      porcentajeCumplimiento: 40,
+      porcentajeCumplimiento: 45,
     });
     const top = await dashboard.getTopSectores(ids.empresa, 5, ids.relacion);
     assert.equal(top[0].sector, 'Producción');
