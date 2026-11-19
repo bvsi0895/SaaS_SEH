@@ -6,6 +6,7 @@ import { EstadoInspeccion, Rol } from '@prisma/client';
 import { readFile } from 'fs/promises';
 import { basename, extname, relative, resolve } from 'path';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
+import { MAX_ORGANIZATION_LOGO_BYTES } from '../administracion/logo.constants';
 const sharp = require('sharp') as any;
 
 @Injectable()
@@ -25,7 +26,8 @@ export class ReportesService {
 
   private async loadConfiguredLogo(logoUrl?: string | null): Promise<{ buffer?: Buffer; incident?: string }> {
     if (!logoUrl) return {};
-    const maxLogoBytes = 1_500_000;
+    // Debe coincidir con el límite de FileInterceptor y del almacenamiento normalizado.
+    const maxLogoBytes = MAX_ORGANIZATION_LOGO_BYTES;
     try {
       let buffer: Buffer;
       if (logoUrl.startsWith('data:image/')) {

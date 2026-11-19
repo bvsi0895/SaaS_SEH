@@ -46,6 +46,22 @@ test('monthly PDF normalizes evidence images and counts only processed photos', 
   assert.doesNotMatch(generator, /Imagen inválida: se omitió la miniatura/);
 });
 
+test('logo upload and PDF consumption share the 2 MiB limit and use the persistent upload volume', async () => {
+  const [constant, controller, service, compose, integration] = await Promise.all([
+    read('backend/src/administracion/logo.constants.ts'),
+    read('backend/src/administracion/administracion.controller.ts'),
+    read('backend/src/reportes/reportes.service.ts'),
+    read('docker-compose.yml'),
+    read('backend/integration/organization-logo-report-postgres.integration.ts'),
+  ]);
+  assert.match(constant, /2 \* 1024 \* 1024/);
+  assert.match(controller, /MAX_ORGANIZATION_LOGO_BYTES/);
+  assert.match(service, /MAX_ORGANIZATION_LOGO_BYTES/);
+  assert.match(compose, /seh_uploads:\s*\/app\/uploads/);
+  assert.match(integration, /uploadLogo[\s\S]*getLogo[\s\S]*generarReporteMensualPDF/);
+  assert.match(integration, /reemplazo\/delete isolation|stat\(/);
+});
+
 test('inspections keep null planned dates as a dash and avoid timezone conversion', async () => {
   const page = await read('web/src/pages/inspecciones/InspeccionesPage.tsx');
   assert.match(page, /if \(!value\) return '-'/);

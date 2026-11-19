@@ -6,6 +6,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdministracionService } from './administracion.service';
+import { MAX_ORGANIZATION_LOGO_BYTES } from './logo.constants';
 import {
   AddMiembroDto, AssignAccessDto, CreateEmpresaClienteDto, CreateEstablecimientoDto,
   LinkEmpresaDto, UpdateEmpresaRelationDto, UpdateEstablecimientoDto, UpdateMiembroDto,
@@ -31,7 +32,7 @@ export class AdministracionController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 2 * 1024 * 1024 },
+      limits: { fileSize: MAX_ORGANIZATION_LOGO_BYTES },
       fileFilter: (_request, file, callback) => {
         const allowedMime = new Set(['image/png', 'image/jpeg']);
         const allowedExtension = /\.(png|jpe?g)$/i.test(file.originalname);

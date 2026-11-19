@@ -12,6 +12,7 @@ import { basename, join, resolve } from 'path';
 // Sharp valida el contenido real y normaliza el logo a PNG antes de persistirlo.
 const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
+import { MAX_ORGANIZATION_LOGO_BYTES } from './logo.constants';
 import {
   AddMiembroDto,
   AssignAccessDto,
@@ -86,6 +87,7 @@ export class AdministracionService {
       const metadata = await sharp(file.buffer, { limitInputPixels: 20_000_000, failOn: 'warning' }).metadata();
       if (!metadata.width || !metadata.height || metadata.width * metadata.height > 20_000_000) throw new Error('invalid dimensions');
       normalized = await sharp(file.buffer, { limitInputPixels: 20_000_000, failOn: 'warning' }).rotate().png().toBuffer();
+      if (normalized.length > MAX_ORGANIZATION_LOGO_BYTES) throw new Error('normalized logo exceeds size limit');
     } catch {
       throw new BadRequestException('El logo está corrupto o no es un PNG, JPG o JPEG válido');
     }
