@@ -20,6 +20,8 @@ export default function AdministracionPage() {
   const [companyId, setCompanyId] = useState('');
   const [selectedAccess, setSelectedAccess] = useState<AccessRow | null>(null);
   const [orgForm, setOrgForm] = useState({ nombre: '', emailContacto: '', telefono: '', direccion: '', logoUrl: '' });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState({ nombre: '', cuit: '', email: '', telefono: '', direccion: '' });
   const [editCompanyForm, setEditCompanyForm] = useState({ nombre: '', cuit: '', email: '', telefono: '', direccion: '' });
   const [linkEmpresaId, setLinkEmpresaId] = useState('');
@@ -36,7 +38,12 @@ export default function AdministracionPage() {
   const assignments = useQuery({ queryKey: ['admin-assignments', selected?.id], queryFn: () => administracionApi.getAssignments(selected!.id), enabled: !!selected?.id });
 
   useEffect(() => {
-    if (org.data) setOrgForm({ nombre: org.data.nombre, emailContacto: org.data.emailContacto || '', telefono: org.data.telefono || '', direccion: org.data.direccion || '', logoUrl: org.data.logoUrl || '' });
+    if (org.data) {
+      setOrgForm({ nombre: org.data.nombre, emailContacto: org.data.emailContacto || '', telefono: org.data.telefono || '', direccion: org.data.direccion || '', logoUrl: org.data.logoUrl || '' });
+      if (org.data.logoUrl && (/^https?:\/\//i.test(org.data.logoUrl) || /^data:image\//i.test(org.data.logoUrl))) setLogoPreview(org.data.logoUrl);
+      else if (org.data.logoUrl) administracionApi.getLogo().then((blob) => setLogoPreview(URL.createObjectURL(blob))).catch(() => setLogoPreview(null));
+      else setLogoPreview(null);
+    }
   }, [org.data]);
   useEffect(() => {
     if (selected) setEditCompanyForm({ nombre: selected.empresa.nombre, cuit: selected.empresa.cuit || '', email: selected.empresa.email || '', telefono: selected.empresa.telefono || '', direccion: selected.empresa.direccion || '' });
@@ -53,7 +60,46 @@ export default function AdministracionPage() {
   const success = (message: string) => { showSuccess(message); invalidate(); };
   const error = () => showError('No se pudo completar la operación');
 
-  const saveOrg = useMutation({ mutationFn: () => administracionApi.updateOrganization(orgForm), onSuccess: () => success('Organización actualizada'), onError: error });
+  const saveOrg = useMutation({
+    mutationFn: () => administracionApi.updateOrganization({
+      ...orgForm,
+      // Las rutas internas las administra el endpoint de archivos; el campo manual
+      // sigue disponible únicamente para logos legados configurados por URL.
+      ...(orgForm.logoUrl.startsWith('uploads/') ? { logoUrl: undefined } : {}),
+    }),
+    onSuccess: () => success('Organización actualizada'),
+    onError: error,
+  });
+  const uploadLogo = useMutation({
+    mutationFn: (file: File) => administracionApi.uploadLogo(file),
+    onSuccess: (organization) => {
+      setOrgForm((current) => ({ ...current, logoUrl: organization.logoUrl || '' }));
+      void administracionApi.getLogo().then((blob) => setLogoPreview(URL.createObjectURL(blob)));
+      setLogoError(null);
+      success('Logo guardado');
+    },
+    onError: (reason: any) => setLogoError(reason?.response?.data?.message || 'No se pudo guardar el logo'),
+  });
+  const deleteLogo = useMutation({
+    mutationFn: administracionApi.deleteLogo,
+    onSuccess: () => { setLogoPreview(null); setOrgForm((current) => ({ ...current, logoUrl: '' })); success('Logo eliminado'); },
+    onError: () => setLogoError('No se pudo eliminar el logo'),
+  });
+
+  const handleLogoSelection = (file: File | undefined) => {
+    setLogoError(null);
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type) || !/\.(png|jpe?g)$/i.test(file.name)) {
+      setLogoError('Formato no compatible. Elegí un archivo PNG, JPG o JPEG.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('El logo supera el límite de 2 MiB.');
+      return;
+    }
+    setLogoPreview(URL.createObjectURL(file));
+    uploadLogo.mutate(file);
+  };
   const createCompany = useMutation({ mutationFn: () => administracionApi.createCompany(companyForm), onSuccess: () => success('Empresa cliente creada'), onError: error });
   const updateCompany = useMutation({ mutationFn: () => administracionApi.updateCompany(selected!.id, editCompanyForm), onSuccess: () => success('Datos de empresa actualizados'), onError: error });
   const linkCompany = useMutation({ mutationFn: () => administracionApi.linkCompany(linkEmpresaId), onSuccess: () => { setLinkEmpresaId(''); success('Empresa vinculada'); }, onError: error });
@@ -72,7 +118,7 @@ export default function AdministracionPage() {
     <PageHeader title="Administración de consultora" subtitle="Organización, empresas-clientes, establecimientos y técnicos" />
     <Card sx={{ mb: 3 }}><Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto" sx={{ '& .MuiTab-root': { scrollMarginTop: '80px' } }}><Tab label="Organización" /><Tab label="Empresas-clientes" /><Tab label="Establecimientos" /><Tab label="Técnicos y accesos" /></Tabs></Card>
 
-    {tab === 0 && <Card><CardContent><Typography variant="h6" sx={{ mb: 2 }}>Datos comerciales</Typography><Grid container spacing={2}>{[['nombre','Nombre'],['emailContacto','Email de contacto'],['telefono','Teléfono'],['direccion','Dirección'],['logoUrl','URL del logo']].map(([key, label]) => <Grid item xs={12} md={6} key={key}><TextField {...field} label={label} value={orgForm[key as keyof typeof orgForm]} onChange={(e) => setOrgForm({ ...orgForm, [key]: e.target.value })} /></Grid>)}</Grid><Button sx={{ mt: 2 }} variant="contained" onClick={() => saveOrg.mutate()}>Guardar organización</Button></CardContent></Card>}
+    {tab === 0 && <Card><CardContent><Typography variant="h6" sx={{ mb: 2 }}>Datos comerciales</Typography><Grid container spacing={2}>{[['nombre','Nombre'],['emailContacto','Email de contacto'],['telefono','Teléfono'],['direccion','Dirección'],['logoUrl','URL del logo legado']].map(([key, label]) => <Grid item xs={12} md={6} key={key}><TextField {...field} label={label} value={orgForm[key as keyof typeof orgForm]} onChange={(e) => setOrgForm({ ...orgForm, [key]: e.target.value })} /></Grid>)}</Grid><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2, alignItems: { sm: 'center' } }}><Button component="label" variant="outlined" disabled={uploadLogo.isPending}>Subir logo PNG/JPG/JPEG<input hidden type="file" accept="image/png,image/jpeg" onChange={(e) => { handleLogoSelection(e.target.files?.[0]); e.currentTarget.value = ''; }} /></Button>{logoPreview && <Box component="img" src={logoPreview} alt="Vista previa del logo" sx={{ maxWidth: 180, maxHeight: 80, objectFit: 'contain' }} />}{orgForm.logoUrl && <Button color="error" onClick={() => deleteLogo.mutate()} disabled={deleteLogo.isPending}>Eliminar logo guardado</Button>}</Stack><Typography variant="caption" color="text.secondary">PNG, JPG o JPEG. Máximo 2 MiB. El archivo se valida y almacena en el servidor.</Typography>{logoError && <Typography color="error" variant="body2">{logoError}</Typography>}<Button sx={{ mt: 2 }} variant="contained" onClick={() => saveOrg.mutate()}>Guardar organización</Button></CardContent></Card>}
 
     {tab === 1 && <Card><CardContent><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1} sx={{ mb: 2 }}><Typography variant="h6">Empresas vinculadas</Typography><Button variant="contained" onClick={() => createCompany.mutate()}>Crear empresa</Button></Stack><Grid container spacing={2}>{[['nombre','Nombre'],['cuit','CUIT'],['email','Email'],['telefono','Teléfono'],['direccion','Dirección']].map(([key, label]) => <Grid item xs={12} md={6} key={key}><TextField {...field} label={label} value={companyForm[key as keyof typeof companyForm]} onChange={(e) => setCompanyForm({ ...companyForm, [key]: e.target.value })} /></Grid>)}</Grid><Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ mt: 2 }}><TextField {...field} label="ID de empresa existente" value={linkEmpresaId} onChange={(e) => setLinkEmpresaId(e.target.value)} /><Button variant="outlined" disabled={!linkEmpresaId} onClick={() => linkCompany.mutate()}>Vincular existente</Button></Stack><Divider sx={{ my: 2 }} />{selected && <><Typography variant="subtitle1">Editar empresa seleccionada</Typography><Grid container spacing={2} sx={{ mt: 0.5 }}>{[['nombre','Nombre'],['cuit','CUIT'],['email','Email'],['telefono','Teléfono'],['direccion','Dirección']].map(([key, label]) => <Grid item xs={12} md={6} key={key}><TextField {...field} label={label} value={editCompanyForm[key as keyof typeof editCompanyForm]} onChange={(e) => setEditCompanyForm({ ...editCompanyForm, [key]: e.target.value })} /></Grid>)}</Grid><Button sx={{ mt: 1 }} variant="outlined" onClick={() => updateCompany.mutate()}>Guardar datos comerciales</Button></>}<Divider sx={{ my: 2 }} />{companies.data?.map((item) => <Stack key={item.id} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1} sx={{ py: 1 }}><Box><Typography>{item.empresa.nombre}</Typography><Typography variant="caption" color="text.secondary">{item.empresa.cuit || 'Sin CUIT'} · {item.empresa._count?.establecimientos || 0} establecimientos</Typography></Box><Chip label={item.estado} color={item.estado === 'ACTIVA' ? 'success' : 'default'} onClick={() => administracionApi.updateCompanyRelation(item.id, item.estado === 'ACTIVA' ? 'SUSPENDIDA' : 'ACTIVA').then(invalidate).catch(() => showError('No se pudo cambiar el estado'))} /></Stack>)}</CardContent></Card>}
 

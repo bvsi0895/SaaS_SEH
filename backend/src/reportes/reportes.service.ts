@@ -6,6 +6,8 @@ import { EstadoInspeccion, Rol } from '@prisma/client';
 import { readFile } from 'fs/promises';
 import { basename, extname, relative, resolve } from 'path';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
+import { MAX_ORGANIZATION_LOGO_BYTES } from '../administracion/logo.constants';
+const sharp = require('sharp') as any;
 
 @Injectable()
 export class ReportesService {
@@ -24,7 +26,8 @@ export class ReportesService {
 
   private async loadConfiguredLogo(logoUrl?: string | null): Promise<{ buffer?: Buffer; incident?: string }> {
     if (!logoUrl) return {};
-    const maxLogoBytes = 1_500_000;
+    // Debe coincidir con el límite de FileInterceptor y del almacenamiento normalizado.
+    const maxLogoBytes = MAX_ORGANIZATION_LOGO_BYTES;
     try {
       let buffer: Buffer;
       if (logoUrl.startsWith('data:image/')) {
@@ -46,18 +49,18 @@ export class ReportesService {
       if (buffer.length === 0 || buffer.length > maxLogoBytes || !this.isSupportedImage(buffer)) {
         return { incident: 'el logo no es una imagen válida o supera el tamaño permitido' };
       }
-      return { buffer };
+      return { buffer: await sharp(buffer, { limitInputPixels: 20_000_000, failOn: 'warning' }).rotate().png().toBuffer() };
     } catch {
       return { incident: 'el logo configurado no está disponible localmente' };
     }
   }
 
   private async loadReportPhotos(
-    inspections: Array<{ hallazgos: Array<{ id: string; fotosUrls: string | null }> }>,
+    inspections: Array<{ sector: string; establecimiento?: { nombre: string } | null; hallazgos: Array<{ id: string; titulo: string; createdAt: Date; fotosUrls: string | null }> }>,
     empresaId: string,
     organizacionEmpresaId: string,
   ): Promise<{ fotos: Array<{ buffer: Buffer; nombre: string }>; incidencias: number }> {
-    const fotos: Array<{ buffer: Buffer; nombre: string }> = [];
+    const fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }> = [];
     let incidencias = 0;
     let totalBytes = 0;
     const maxPhotos = 12;
@@ -77,7 +80,14 @@ export class ReportesService {
               incidencias += 1;
               continue;
             }
-            fotos.push({ buffer, nombre: filename });
+            fotos.push({
+              buffer,
+              nombre: 'evidencia fotográfica',
+              titulo: hallazgo.titulo,
+              sector: inspection.sector,
+              establecimiento: inspection.establecimiento?.nombre,
+              fecha: hallazgo.createdAt,
+            });
             totalBytes += buffer.length;
           } catch {
             incidencias += 1;
@@ -284,6 +294,7 @@ export class ReportesService {
       titulo: hallazgo.titulo,
       nivel: hallazgo.nivelRiesgo,
       establecimiento: inspection.establecimiento?.nombre,
+      sector: inspection.sector,
       fecha: hallazgo.createdAt,
     })));
     const photoResult = await this.loadReportPhotos(inspections, params.empresaId, params.organizacionEmpresaId);
