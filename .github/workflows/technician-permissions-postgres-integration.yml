@@ -54,3 +54,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://seh_permissions_test:seh_permissions_test_password@localhost:5432/seh_permissions_test?schema=public
           NODE_ENV: test
+      - name: Run checklist finding integration test
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/hallazgos-checklist-postgres.integration.ts
+        env:
+          DATABASE_URL: postgresql://seh_permissions_test:seh_permissions_test_password@localhost:5432/seh_permissions_test?schema=public
+          NODE_ENV: test
