@@ -45,17 +45,20 @@ export class HallazgosController {
   @ApiQuery({ name: 'conAccionesCorrectivas', type: Boolean, required: false })
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })
+  @ApiQuery({ name: 'establecimientoId', required: false })
   @ApiResponse({ status: 200, description: 'Lista de hallazgos' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('nivelRiesgo') nivelRiesgo?: NivelRiesgo,
     @Query('inspeccionId') inspeccionId?: string,
     @Query('conAccionesCorrectivas') conAccionesCorrectivas?: boolean,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
+    @Query('establecimientoId') establecimientoId?: string,
   ) {
     return this.hallazgosService.findAll(empresaId, {
       nivelRiesgo,
@@ -63,7 +66,8 @@ export class HallazgosController {
       conAccionesCorrectivas,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    }, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+      establecimientoId,
+    }, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 
   @Get('estadisticas')
@@ -96,8 +100,9 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.hallazgosService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    return this.hallazgosService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 
   @Post()
@@ -110,8 +115,9 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.hallazgosService.create(createHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    return this.hallazgosService.create(createHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 
   @Post(':id/fotos')
@@ -133,12 +139,13 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @UploadedFile() file?: { buffer: Buffer; originalname: string },
   ) {
     if (!file) {
       throw new BadRequestException('Se requiere una imagen JPG, PNG o WEBP');
     }
-    return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 
   @Get(':id/fotos/:filename')
@@ -150,9 +157,10 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Res() res: Response,
   ) {
-    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    const photo = await this.hallazgosService.getPhoto(id, filename, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
     res.type(filename).send(photo);
   }
 
@@ -167,8 +175,9 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.hallazgosService.update(id, updateHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    return this.hallazgosService.update(id, updateHallazgoDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 
   @Delete(':id')
@@ -181,7 +190,8 @@ export class HallazgosController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.hallazgosService.remove(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined);
+    return this.hallazgosService.remove(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
   }
 }

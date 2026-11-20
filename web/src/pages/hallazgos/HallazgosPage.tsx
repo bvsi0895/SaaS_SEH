@@ -21,6 +21,7 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { Hallazgo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 
 const getPhotoCount = (fotosUrls?: string) => {
   if (!fotosUrls) return 0;
@@ -37,15 +38,17 @@ export default function HallazgosPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [nivelRiesgoFilter, setNivelRiesgoFilter] = useState<string>('');
+  const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['hallazgos', activeContextId, user?.id, user?.rol, page, pageSize, nivelRiesgoFilter],
+    queryKey: ['hallazgos', activeContextId, user?.id, user?.rol, page, pageSize, nivelRiesgoFilter, establecimientoId],
     queryFn: () =>
       hallazgosApi.getAll({
         page: page + 1,
         limit: pageSize,
         nivelRiesgo: nivelRiesgoFilter || undefined,
+        establecimientoId: establecimientoId || undefined,
       }),
   });
 
@@ -151,6 +154,9 @@ export default function HallazgosPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <EstablishmentSelector value={establecimientoId} onChange={(value) => { setEstablecimientoId(value); setPage(0); }} />
+            </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth

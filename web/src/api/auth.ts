@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { LoginCredentials, RegisterData, AuthResponse, Usuario, ContextoAutorizado } from '../types';
+import type { LoginCredentials, RegisterData, AuthResponse, Usuario, ContextoAutorizado, Establecimiento } from '../types';
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
@@ -23,6 +23,11 @@ export const authApi = {
 
   getContexts: async (): Promise<ContextoAutorizado[]> => {
     const response = await apiClient.get<ContextoAutorizado[]>('/auth/contextos');
+    return response.data;
+  },
+
+  getEstablishments: async (): Promise<Establecimiento[]> => {
+    const response = await apiClient.get<Establecimiento[]>('/auth/establecimientos');
     return response.data;
   },
 

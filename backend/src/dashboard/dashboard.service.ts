@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenancyService } from '../tenancy/tenancy.service';
 import {
   CumplimientoItem,
   EstadoAccion,
@@ -11,13 +12,19 @@ type DashboardPeriod = 'semana' | 'mes' | 'trimestre';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService) {}
 
   private async establishmentFilter(
     empresaId: string,
     establecimientoId?: string,
     accesoEmpresaId?: string,
   ) {
+    if (this.tenancy && accesoEmpresaId) {
+      const scope = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId);
+      if (establecimientoId && scope !== undefined && !scope.includes(establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
+      if (establecimientoId) return { establecimientoId };
+      return scope === undefined ? {} : { establecimientoId: { in: scope } };
+    }
     if (establecimientoId) {
       const establishment = await this.prisma.establecimiento.findFirst({
         where: { id: establecimientoId, empresaId },
@@ -43,7 +50,7 @@ export class DashboardService {
       throw new NotFoundException('Establecimiento no encontrado');
     }
     if (establecimientoId) return { establecimientoId };
-    // An access without establishment rows retains the legacy all-establishments scope.
+    // Legacy fallback is kept only for direct unit callers without tenancy context.
     return allowedIds.length > 0
       ? { establecimientoId: { in: allowedIds } }
       : {};

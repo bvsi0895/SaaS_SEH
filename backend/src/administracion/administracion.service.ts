@@ -299,6 +299,7 @@ export class AdministracionService {
     return this.prisma.accesoEmpresa.findMany({
       where: { organizacionEmpresaId: relationId },
       select: { id: true, rol: true, activo: true, organizacionMiembroId: true,
+        establecimientos: { select: { establecimientoId: true } },
         organizacionMiembro: { select: { usuario: { select: { id: true, email: true, nombre: true, apellido: true } }, rol: true, activa: true } } },
       orderBy: { organizacionMiembro: { usuario: { nombre: 'asc' } } },
     });
@@ -307,12 +308,25 @@ export class AdministracionService {
   async assignAccess(organizacionId: string, usuarioId: string, relationId: string, dto: AssignAccessDto) {
     await this.assertAdmin(organizacionId, usuarioId);
     const relation = await this.getRelation(organizacionId, relationId);
-    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true } });
+    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true }, select: { id: true, usuario: { select: { rol: true } } } });
     if (!member) throw new NotFoundException('Membresía no encontrada');
-    return this.prisma.accesoEmpresa.upsert({
-      where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId: member.id } },
-      create: { id: randomUUID(), organizacionEmpresaId: relation.id, organizacionMiembroId: member.id, organizacionId, empresaId: relation.empresaId, rol: dto.rol, activo: true },
-      update: { rol: dto.rol, activo: true },
+    if (dto.rol === Rol.TECNICO && member.usuario.rol !== Rol.TECNICO) throw new BadRequestException('La asignación TECNICO requiere un usuario técnico');
+    const establishmentIds = Array.from(new Set(dto.establecimientoIds || []));
+    if (dto.rol === Rol.TECNICO && establishmentIds.length > 0) {
+      const establishments = await this.prisma.establecimiento.findMany({ where: { id: { in: establishmentIds }, empresaId: relation.empresaId, activo: true }, select: { id: true } });
+      if (establishments.length !== establishmentIds.length) throw new ForbiddenException('Uno o más establecimientos no pertenecen a la empresa autorizada');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const access = await tx.accesoEmpresa.upsert({
+        where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId: member.id } },
+        create: { id: randomUUID(), organizacionEmpresaId: relation.id, organizacionMiembroId: member.id, organizacionId, empresaId: relation.empresaId, rol: dto.rol, activo: true },
+        update: { rol: dto.rol, activo: true },
+      });
+      await tx.accesoEstablecimiento.deleteMany({ where: { accesoEmpresaId: access.id } });
+      if (dto.rol === Rol.TECNICO && establishmentIds.length > 0) {
+        await tx.accesoEstablecimiento.createMany({ data: establishmentIds.map((establecimientoId) => ({ accesoEmpresaId: access.id, establecimientoId, empresaId: relation.empresaId })) });
+      }
+      return tx.accesoEmpresa.findUniqueOrThrow({ where: { id: access.id }, include: { establecimientos: { select: { establecimientoId: true } } } });
     });
   }
 

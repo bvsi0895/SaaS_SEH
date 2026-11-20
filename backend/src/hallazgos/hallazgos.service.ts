@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { join, basename } from 'path';
@@ -11,12 +12,13 @@ const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHallazgoDto, UpdateHallazgoDto } from './dto';
 import { NivelRiesgo, EstadoInspeccion } from '@prisma/client';
+import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
 export class HallazgosService {
   private static activeImageOptimizations = 0;
 
-  constructor(private prisma: PrismaService) {
+  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService) {
     const configuredConcurrency = Number(process.env.SHARP_CONCURRENCY || 1);
     const concurrency = Number.isFinite(configuredConcurrency) && configuredConcurrency >= 1
       ? Math.floor(configuredConcurrency)
@@ -86,8 +88,8 @@ export class HallazgosService {
     }
   }
 
-  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string, usuarioId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+  async addPhoto(id: string, empresaId: string, file: { buffer: Buffer; originalname: string }, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
     // Los técnicos solo pueden incorporar evidencias a hallazgos de sus propias
     // inspecciones y mientras la inspección siga abierta. Los administradores
     // conservan el comportamiento administrativo existente.
@@ -119,8 +121,8 @@ export class HallazgosService {
     }
   }
 
-  async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string, usuarioId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+  async getPhoto(id: string, filename: string, empresaId: string, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
     const photos = hallazgo.fotosUrls ? JSON.parse(hallazgo.fotosUrls) as string[] : [];
     if (!photos.some((photo) => basename(photo) === filename)) {
       throw new NotFoundException('Foto no encontrada');
@@ -144,13 +146,18 @@ export class HallazgosService {
       conAccionesCorrectivas?: boolean;
       fechaDesde?: Date;
       fechaHasta?: Date;
+      establecimientoId?: string;
     },
     organizacionEmpresaId?: string,
     usuarioId?: string,
+    accesoEmpresaId?: string,
   ) {
+    const allowed = this.tenancy && accesoEmpresaId ? await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId) : undefined;
+    if (filters?.establecimientoId && allowed !== undefined && !allowed.includes(filters.establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
+    const establishmentFilter = filters?.establecimientoId ? { establecimientoId: filters.establecimientoId } : allowed !== undefined ? { establecimientoId: { in: allowed } } : {};
     return this.prisma.hallazgo.findMany({
       where: {
-        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) },
+        inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishmentFilter },
         ...(filters?.nivelRiesgo && { nivelRiesgo: filters.nivelRiesgo }),
         ...(filters?.inspeccionId && { inspeccionId: filters.inspeccionId }),
         ...(filters?.conAccionesCorrectivas !== undefined && {
@@ -195,7 +202,7 @@ export class HallazgosService {
   /**
    * Obtener hallazgo por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
     const hallazgo = await this.prisma.hallazgo.findUnique({
       where: { id },
       include: {
@@ -207,6 +214,7 @@ export class HallazgosService {
             estado: true,
             empresaId: true,
             organizacionEmpresaId: true,
+            establecimientoId: true,
             checklist: { select: { id: true, nombre: true } },
             asignadoA: { select: { id: true, nombre: true, apellido: true } },
             usuario: { select: { id: true, nombre: true, apellido: true } },
@@ -238,6 +246,10 @@ export class HallazgosService {
     ) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
+    if (usuarioId && this.tenancy && accesoEmpresaId) {
+      const allowed = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId || hallazgo.inspeccion.empresaId, organizacionEmpresaId);
+      if (!hallazgo.inspeccion.establecimientoId || (allowed !== undefined && !allowed.includes(hallazgo.inspeccion.establecimientoId))) throw new NotFoundException('Hallazgo no encontrado');
+    }
 
     return hallazgo;
   }
@@ -245,7 +257,7 @@ export class HallazgosService {
   /**
    * Crear nuevo hallazgo
    */
-  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
+  async create(createHallazgoDto: CreateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
     // Verificar que la inspección existe
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: createHallazgoDto.inspeccionId },
@@ -263,6 +275,10 @@ export class HallazgosService {
     }
     if (usuarioId && inspeccion.asignadoAId !== usuarioId) {
       throw new NotFoundException('Inspección no encontrada');
+    }
+    if (usuarioId && this.tenancy && accesoEmpresaId) {
+      const allowed = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId || inspeccion.empresaId, organizacionEmpresaId);
+      if (!inspeccion.establecimientoId || (allowed !== undefined && !allowed.includes(inspeccion.establecimientoId))) throw new NotFoundException('Inspección no encontrada');
     }
 
     // Solo crear hallazgos en inspecciones en progreso
@@ -291,7 +307,7 @@ export class HallazgosService {
           nivelRiesgo: createHallazgoDto.nivelRiesgo,
           ubicacionTexto: createHallazgoDto.ubicacionTexto,
           fotosUrls: createHallazgoDto.fotosUrls,
-        }, empresaId, organizacionEmpresaId, usuarioId);
+        }, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
       }
     }
 
@@ -318,8 +334,8 @@ export class HallazgosService {
   /**
    * Actualizar hallazgo
    */
-  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+  async update(id: string, updateHallazgoDto: UpdateHallazgoDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
 
     if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
@@ -346,8 +362,8 @@ export class HallazgosService {
   /**
    * Eliminar hallazgo
    */
-  async remove(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string) {
-    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId);
+  async remove(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, accesoEmpresaId?: string) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
 
     if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');

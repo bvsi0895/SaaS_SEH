@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { EstadoRelacionEmpresa } from '@prisma/client';
+import { EstadoRelacionEmpresa, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface TenantContext {
@@ -69,19 +69,37 @@ export class TenancyService {
   }
 
   async listEstablishmentsForAccess(accesoEmpresaId: string, empresaId: string) {
-    const scoped = await this.prisma.accesoEstablecimiento.findMany({
-      where: { accesoEmpresaId, establecimiento: { empresaId } },
-      select: { establecimientoId: true },
-    });
+    const scope = await this.getEstablishmentScope(accesoEmpresaId, empresaId);
     return this.prisma.establecimiento.findMany({
       where: {
         empresaId,
-        ...(scoped.length > 0 ? { id: { in: scoped.map((item) => item.establecimientoId) } } : {}),
+        ...(scope !== undefined ? { id: { in: scope } } : {}),
         activo: true,
       },
       select: { id: true, nombre: true, codigo: true, direccion: true },
       orderBy: { nombre: 'asc' },
     });
+  }
+
+  /**
+   * Returns undefined for administrative access (all establishments), and an
+   * explicit list for technicians. An empty list is intentional: a technician
+   * without assignments must not inherit access to the whole company.
+   */
+  async getEstablishmentScope(accesoEmpresaId: string, empresaId: string, organizacionEmpresaId?: string): Promise<string[] | undefined> {
+    const access = await this.prisma.accesoEmpresa.findFirst({
+      where: {
+        id: accesoEmpresaId,
+        empresaId,
+        ...(organizacionEmpresaId ? { organizacionEmpresaId } : {}),
+        activo: true,
+        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+      },
+      select: { rol: true, establecimientos: { select: { establecimientoId: true, establecimiento: { select: { empresaId: true, activo: true } } } } },
+    });
+    if (!access) throw new ForbiddenException('No existe un acceso activo al contexto solicitado');
+    if (access.rol !== Rol.TECNICO) return undefined;
+    return access.establecimientos.filter((item) => item.establecimiento.empresaId === empresaId && item.establecimiento.activo).map((item) => item.establecimientoId);
   }
 
   assertResource(organizacionEmpresaId: string | null | undefined, context: TenantContext): void {

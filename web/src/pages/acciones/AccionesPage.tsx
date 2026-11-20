@@ -21,23 +21,26 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import type { AccionCorrectiva } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 
 export default function AccionesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState<string>('');
+  const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
   const isOverdueFilter = estadoFilter === 'VENCIDAS';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['acciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter],
+    queryKey: ['acciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter, establecimientoId],
     queryFn: async () => {
       if (isTechnician) {
         const rows = await accionesApi.getMisAcciones({
           estado: isOverdueFilter ? undefined : estadoFilter as any || undefined,
           vencidas: isOverdueFilter,
+          establecimientoId: establecimientoId || undefined,
         });
         return { data: rows, total: rows.length, isPaginated: false };
       }
@@ -46,6 +49,7 @@ export default function AccionesPage() {
         limit: pageSize,
         estado: isOverdueFilter ? undefined : estadoFilter as any || undefined,
         vencidas: isOverdueFilter,
+        establecimientoId: establecimientoId || undefined,
       });
     },
   });
@@ -143,6 +147,9 @@ export default function AccionesPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <EstablishmentSelector value={establecimientoId} onChange={(value) => { setEstablecimientoId(value); setPage(0); }} />
+            </Grid>
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth

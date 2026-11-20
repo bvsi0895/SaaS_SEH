@@ -4,6 +4,7 @@ import type { Inspeccion, InspeccionItem } from '../types';
 export interface CreateInspeccionDto {
   checklistId: string;
   sector: string;
+  establecimientoId: string;
   descripcion?: string;
   asignadoAId?: string;
   fechaProgramada?: string;
@@ -26,6 +27,7 @@ export const inspeccionesApi = {
     estado?: string;
     checklistId?: string;
     asignadoAId?: string;
+    establecimientoId?: string;
   }): Promise<{ data: Inspeccion[]; total: number; isPaginated: boolean }> => {
     const response = await apiClient.get<Inspeccion[] | { data: Inspeccion[]; total: number }>(
       '/inspecciones',

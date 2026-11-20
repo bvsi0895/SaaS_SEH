@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PDFInspeccionGenerator } from './generators/pdf-inspeccion.generator';
 import { PDFMensualGenerator } from './generators/pdf-mensual.generator';
@@ -7,6 +7,7 @@ import { readFile } from 'fs/promises';
 import { basename, extname, relative, resolve } from 'path';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
 import { MAX_ORGANIZATION_LOGO_BYTES } from '../administracion/logo.constants';
+import { TenancyService } from '../tenancy/tenancy.service';
 const sharp = require('sharp') as any;
 
 @Injectable()
@@ -14,7 +15,7 @@ export class ReportesService {
   private pdfGenerator = new PDFInspeccionGenerator();
   private monthlyPdfGenerator = new PDFMensualGenerator();
 
-  constructor(private prisma: PrismaService, private hallazgosService: HallazgosService) {}
+  constructor(private prisma: PrismaService, private hallazgosService: HallazgosService, @Optional() private tenancy?: TenancyService) {}
 
   private isSupportedImage(buffer: Buffer): boolean {
     return (
@@ -109,17 +110,13 @@ export class ReportesService {
       : null;
     if (establecimientoId && !establishment) throw new NotFoundException('Establecimiento no encontrado');
 
-    const scoped = await this.prisma.accesoEstablecimiento.findMany({
-      where: { accesoEmpresaId, establecimiento: { empresaId } },
-      select: { establecimientoId: true },
-    });
-    const allowedIds = scoped.map((item) => item.establecimientoId);
-    if (establecimientoId && allowedIds.length > 0 && !allowedIds.includes(establecimientoId)) {
+    const allowedIds = this.tenancy
+      ? await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId)
+      : undefined;
+    if (establecimientoId && allowedIds !== undefined && !allowedIds.includes(establecimientoId)) {
       throw new NotFoundException('Establecimiento no encontrado');
     }
-    // Un acceso sin restricciones por establecimiento conserva el comportamiento legacy:
-    // puede operar sobre todos los establecimientos de su empresa contextual.
-    return allowedIds.length > 0 ? allowedIds : undefined;
+    return allowedIds;
   }
 
   /**

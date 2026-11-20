@@ -33,7 +33,7 @@ async function main() {
   const ids = {
     orgA: randomUUID(), orgB: randomUUID(), linkA: randomUUID(), linkB: randomUUID(),
     memberA: randomUUID(), memberB: randomUUID(), userA: randomUUID(), userB: randomUUID(),
-    accessA: randomUUID(), accessB: randomUUID(), checklistA: randomUUID(), checklistB: randomUUID(),
+    accessA: randomUUID(), accessB: randomUUID(), establishmentA: randomUUID(), establishmentB: randomUUID(), checklistA: randomUUID(), checklistB: randomUUID(),
   };
   const emailA = `e2e-a-${ids.userA}@seh.local`;
   const emailB = `e2e-b-${ids.userB}@seh.local`;
@@ -51,6 +51,10 @@ async function main() {
         { id: ids.linkA, organizacionId: ids.orgA, empresaId: empresa.id },
         { id: ids.linkB, organizacionId: ids.orgB, empresaId: empresa.id },
       ] });
+      await tx.establecimiento.createMany({ data: [
+        { id: ids.establishmentA, empresaId: empresa.id, nombre: 'E2E Establishment A' },
+        { id: ids.establishmentB, empresaId: empresa.id, nombre: 'E2E Establishment B' },
+      ] });
       await tx.usuario.createMany({ data: [
         { id: ids.userA, email: emailA, password: passwordHash, nombre: 'E2E', apellido: 'Consultora A', rol: Rol.TECNICO, empresaId: empresa.id },
         { id: ids.userB, email: emailB, password: passwordHash, nombre: 'E2E', apellido: 'Consultora B', rol: Rol.TECNICO, empresaId: empresa.id },
@@ -62,6 +66,10 @@ async function main() {
       await tx.accesoEmpresa.createMany({ data: [
         { id: ids.accessA, organizacionEmpresaId: ids.linkA, organizacionMiembroId: ids.memberA, organizacionId: ids.orgA, empresaId: empresa.id, rol: Rol.TECNICO },
         { id: ids.accessB, organizacionEmpresaId: ids.linkB, organizacionMiembroId: ids.memberB, organizacionId: ids.orgB, empresaId: empresa.id, rol: Rol.TECNICO },
+      ] });
+      await tx.accesoEstablecimiento.createMany({ data: [
+        { accesoEmpresaId: ids.accessA, establecimientoId: ids.establishmentA, empresaId: empresa.id },
+        { accesoEmpresaId: ids.accessB, establecimientoId: ids.establishmentB, empresaId: empresa.id },
       ] });
       await tx.checklist.create({
         data: { id: ids.checklistA, nombre: 'E2E Checklist A', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: ids.linkA, items: { create: [{ descripcion: 'Item A', orden: 1 }] } },
@@ -88,8 +96,8 @@ async function main() {
       throw new Error('Se detectó cruce de checklists');
     }
 
-    const inspectionA = await json('/inspecciones', { method: 'POST', headers: { ...headersA, 'Content-Type': 'application/json' }, body: JSON.stringify({ checklistId: ids.checklistA, sector: 'E2E A' }) }, 201);
-    const inspectionB = await json('/inspecciones', { method: 'POST', headers: { ...headersB, 'Content-Type': 'application/json' }, body: JSON.stringify({ checklistId: ids.checklistB, sector: 'E2E B' }) }, 201);
+    const inspectionA = await json('/inspecciones', { method: 'POST', headers: { ...headersA, 'Content-Type': 'application/json' }, body: JSON.stringify({ checklistId: ids.checklistA, establecimientoId: ids.establishmentA, sector: 'E2E A' }) }, 201);
+    const inspectionB = await json('/inspecciones', { method: 'POST', headers: { ...headersB, 'Content-Type': 'application/json' }, body: JSON.stringify({ checklistId: ids.checklistB, establecimientoId: ids.establishmentB, sector: 'E2E B' }) }, 201);
     inspectionIds.push(inspectionA.id, inspectionB.id);
 
     const crossContext = await request(`/inspecciones/${inspectionB.id}`, { headers: headersA }, 404);
@@ -117,6 +125,7 @@ async function main() {
     await prisma.$transaction([
       prisma.inspeccion.deleteMany({ where: { id: { in: inspectionIds } } }),
       prisma.checklist.deleteMany({ where: { id: { in: checklistIds } } }),
+      prisma.establecimiento.deleteMany({ where: { id: { in: [ids.establishmentA, ids.establishmentB] } } }),
       prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accessA, ids.accessB] } } }),
       prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.memberA, ids.memberB] } } }),
       prisma.organizacionEmpresa.deleteMany({ where: { id: { in: [ids.linkA, ids.linkB] } } }),

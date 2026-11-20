@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -13,13 +14,15 @@ import {
   ReasignarInspeccionDto,
 } from './dto';
 import { EstadoInspeccion, CumplimientoItem, Rol, EstadoRelacionEmpresa } from '@prisma/client';
+import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
 export class InspeccionesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService) {}
 
   private readonly listInclude = {
     checklist: { select: { id: true, nombre: true, tipo: true } },
+    establecimiento: { select: { id: true, nombre: true, codigo: true } },
     creadoPor: { select: { id: true, nombre: true, apellido: true, email: true } },
     asignadoA: { select: { id: true, nombre: true, apellido: true, email: true, rol: true } },
     usuario: { select: { id: true, nombre: true, apellido: true, email: true } },
@@ -28,6 +31,7 @@ export class InspeccionesService {
 
   private readonly detailInclude = {
     checklist: { include: { items: { orderBy: { orden: 'asc' as const } } } },
+    establecimiento: { select: { id: true, nombre: true, codigo: true } },
     creadoPor: { select: { id: true, nombre: true, apellido: true, email: true } },
     asignadoA: { select: { id: true, nombre: true, apellido: true, email: true, rol: true } },
     usuario: { select: { id: true, nombre: true, apellido: true, email: true } },
@@ -56,7 +60,7 @@ export class InspeccionesService {
     return role === Rol.TECNICO;
   }
 
-  private async assertAuthorizedAssignee(usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
+  private async assertAuthorizedAssignee(usuarioId: string, empresaId: string, organizacionEmpresaId?: string, establecimientoId?: string) {
     const usuario = await this.prisma.usuario.findFirst({
       where: {
         id: usuarioId,
@@ -73,6 +77,7 @@ export class InspeccionesService {
                   organizacionEmpresaId,
                   activo: true,
                   organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                  ...(establecimientoId && { establecimientos: { some: { establecimientoId } } }),
                 },
               },
             },
@@ -82,6 +87,22 @@ export class InspeccionesService {
       select: { id: true },
     });
     if (!usuario) throw new ForbiddenException('El responsable no está autorizado para esta empresa y organización');
+  }
+
+  private async establishmentFilter(empresaId: string, organizacionEmpresaId: string | undefined, establecimientoId: string | undefined, accesoEmpresaId?: string) {
+    if (!this.tenancy || !accesoEmpresaId) return establecimientoId ? { establecimientoId } : {};
+    const scope = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId);
+    if (establecimientoId && scope !== undefined && !scope.includes(establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
+    if (establecimientoId) return { establecimientoId };
+    return scope === undefined ? {} : { establecimientoId: { in: scope } };
+  }
+
+  private async assertEstablishmentAccess(establecimientoId: string, empresaId: string, organizacionEmpresaId: string | undefined, accesoEmpresaId: string | undefined) {
+    if (!this.tenancy || !accesoEmpresaId) return;
+    const establishment = await this.prisma.establecimiento.findFirst({ where: { id: establecimientoId, empresaId, activo: true } });
+    if (!establishment) throw new NotFoundException('Establecimiento no encontrado');
+    const scope = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId);
+    if (scope !== undefined && !scope.includes(establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
   }
 
   private assertCanAccess(inspeccion: any, usuarioId?: string, currentUserRole?: Rol) {
@@ -101,12 +122,15 @@ export class InspeccionesService {
       sector?: string;
       fechaDesde?: Date;
       fechaHasta?: Date;
+      establecimientoId?: string;
     },
     organizacionEmpresaId?: string,
     currentUserRole?: Rol,
     currentUserId?: string,
+    accesoEmpresaId?: string,
   ) {
     const assignedId = this.isTechnician(currentUserRole) ? currentUserId : filters?.asignadoAId || filters?.usuarioId;
+    const establishmentFilter = await this.establishmentFilter(empresaId, organizacionEmpresaId, filters?.establecimientoId, accesoEmpresaId);
     return this.prisma.inspeccion.findMany({
       where: {
         empresaId,
@@ -118,22 +142,26 @@ export class InspeccionesService {
         ...(filters?.sector && { sector: { contains: filters.sector, mode: 'insensitive' } }),
         ...(filters?.fechaDesde && { fechaHoraInicio: { gte: filters.fechaDesde } }),
         ...(filters?.fechaHasta && { fechaHoraInicio: { lte: filters.fechaHasta } }),
+        ...establishmentFilter,
       },
       include: this.listInclude,
       orderBy: [{ fechaProgramada: 'asc' }, { fechaHoraInicio: 'desc' }],
     });
   }
 
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
     const inspeccion = await this.prisma.inspeccion.findUnique({ where: { id }, include: this.detailInclude });
     if (!inspeccion) throw new NotFoundException('Inspección no encontrada');
     if (empresaId && inspeccion.empresaId !== empresaId) throw new NotFoundException('Inspección no encontrada');
     if (organizacionEmpresaId && inspeccion.organizacionEmpresaId !== organizacionEmpresaId) throw new NotFoundException('Inspección no encontrada');
     this.assertCanAccess(inspeccion, usuarioId, currentUserRole);
+    if (currentUserRole === Rol.TECNICO && empresaId && inspeccion.establecimientoId) await this.assertEstablishmentAccess(inspeccion.establecimientoId, empresaId, organizacionEmpresaId, accesoEmpresaId);
+    if (currentUserRole === Rol.TECNICO && !inspeccion.establecimientoId) throw new NotFoundException('Inspección no encontrada');
     return inspeccion;
   }
 
-  async create(dto: CreateInspeccionDto, usuarioId: string, empresaId: string, organizacionEmpresaId?: string, currentUserRole: Rol = Rol.TECNICO) {
+  async create(dto: CreateInspeccionDto, usuarioId: string, empresaId: string, organizacionEmpresaId?: string, currentUserRole: Rol = Rol.TECNICO, accesoEmpresaId?: string) {
+    await this.assertEstablishmentAccess(dto.establecimientoId, empresaId, organizacionEmpresaId, accesoEmpresaId);
     const checklist = await this.prisma.checklist.findUnique({ where: { id: dto.checklistId }, include: { items: { orderBy: { orden: 'asc' } } } });
     if (!checklist) throw new NotFoundException('Checklist no encontrado');
     if (!checklist.activo) throw new BadRequestException('El checklist está desactivado');
@@ -143,7 +171,7 @@ export class InspeccionesService {
 
     const asignadoAId = dto.asignadoAId || usuarioId;
     if (this.isTechnician(currentUserRole) && asignadoAId !== usuarioId) throw new ForbiddenException('Un técnico solo puede crear inspecciones propias');
-    if (asignadoAId !== usuarioId) await this.assertAuthorizedAssignee(asignadoAId, empresaId, organizacionEmpresaId);
+    if (asignadoAId !== usuarioId) await this.assertAuthorizedAssignee(asignadoAId, empresaId, organizacionEmpresaId, dto.establecimientoId);
 
     const estado = asignadoAId === usuarioId ? EstadoInspeccion.EN_PROGRESO : EstadoInspeccion.PENDIENTE;
     return this.prisma.inspeccion.create({
@@ -155,6 +183,7 @@ export class InspeccionesService {
         empresaId,
         organizacionEmpresaId,
         sector: dto.sector,
+        establecimientoId: dto.establecimientoId,
         descripcion: dto.descripcion,
         fechaProgramada: dto.fechaProgramada ? new Date(dto.fechaProgramada) : undefined,
         fechaHoraInicio: estado === EstadoInspeccion.EN_PROGRESO ? new Date() : null,
@@ -168,17 +197,17 @@ export class InspeccionesService {
     });
   }
 
-  async iniciar(id: string, empresaId: string, organizacionEmpresaId: string, usuarioId: string, currentUserRole: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async iniciar(id: string, empresaId: string, organizacionEmpresaId: string, usuarioId: string, currentUserRole: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.PENDIENTE) throw new BadRequestException('Solo se pueden iniciar inspecciones pendientes');
     return this.prisma.inspeccion.update({ where: { id }, data: { estado: EstadoInspeccion.EN_PROGRESO, fechaHoraInicio: new Date(), fechaHoraFin: null }, include: this.listInclude });
   }
 
-  async reasignar(id: string, dto: ReasignarInspeccionDto, empresaId: string, organizacionEmpresaId: string, efectuadoPorId: string, currentUserRole: Rol) {
+  async reasignar(id: string, dto: ReasignarInspeccionDto, empresaId: string, organizacionEmpresaId: string, efectuadoPorId: string, currentUserRole: Rol, accesoEmpresaId?: string) {
     if (currentUserRole !== Rol.ADMIN_EMPRESA && currentUserRole !== Rol.SUPERVISOR) throw new ForbiddenException('Solo administradores y supervisores pueden reasignar inspecciones');
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId);
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, undefined, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.PENDIENTE) throw new BadRequestException('Solo se pueden reasignar inspecciones pendientes');
-    await this.assertAuthorizedAssignee(dto.asignadoAId, empresaId, organizacionEmpresaId);
+    await this.assertAuthorizedAssignee(dto.asignadoAId, empresaId, organizacionEmpresaId, inspeccion.establecimientoId || undefined);
     if (dto.asignadoAId === inspeccion.asignadoAId) throw new BadRequestException('La inspección ya está asignada a ese técnico');
     return this.prisma.$transaction(async (tx) => {
       await tx.inspeccionReasignacion.create({ data: { inspeccionId: id, desdeUsuarioId: inspeccion.asignadoAId, haciaUsuarioId: dto.asignadoAId, efectuadaPorId: efectuadoPorId } });
@@ -186,41 +215,41 @@ export class InspeccionesService {
     });
   }
 
-  async registrarItem(id: string, dto: RegistrarItemDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async registrarItem(id: string, dto: RegistrarItemDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('La inspección no está en progreso');
     if (!inspeccion.items.some((item) => item.id === dto.inspeccionItemId)) throw new NotFoundException('Item no encontrado en esta inspección');
     return this.prisma.inspeccionItem.update({ where: { id: dto.inspeccionItemId }, data: { cumplimiento: dto.cumplimiento, observacion: dto.observacion }, include: { checklistItem: true } });
   }
 
-  async registrarMultiplesItems(id: string, items: RegistrarItemDto[], empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async registrarMultiplesItems(id: string, items: RegistrarItemDto[], empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('La inspección no está en progreso');
     if (items.some((item) => !inspeccion.items.some((existing) => existing.id === item.inspeccionItemId))) throw new NotFoundException('Uno de los items no pertenece a esta inspección');
     await this.prisma.$transaction(items.map((item) => this.prisma.inspeccionItem.update({ where: { id: item.inspeccionItemId }, data: { cumplimiento: item.cumplimiento, observacion: item.observacion } })));
-    return this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+    return this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
   }
 
-  async update(id: string, dto: UpdateInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async update(id: string, dto: UpdateInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('No se puede editar una inspección que no está en progreso');
     return this.prisma.inspeccion.update({ where: { id }, data: dto, include: this.listInclude });
   }
 
-  async finalizar(id: string, dto: FinalizarInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async finalizar(id: string, dto: FinalizarInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('Solo se pueden finalizar inspecciones en progreso');
     return this.prisma.inspeccion.update({ where: { id }, data: { estado: EstadoInspeccion.COMPLETADA, fechaHoraFin: new Date(), observaciones: dto.observaciones }, include: this.detailInclude });
   }
 
-  async cancelar(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async cancelar(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.PENDIENTE && inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('Solo se pueden cancelar inspecciones pendientes o en progreso');
     return this.prisma.inspeccion.update({ where: { id }, data: { estado: EstadoInspeccion.CANCELADA, fechaHoraFin: new Date() }, include: this.listInclude });
   }
 
-  async getResumen(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol) {
-    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole);
+  async getResumen(id: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {
+    const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     const itemsCumplen = inspeccion.items.filter((i) => i.cumplimiento === CumplimientoItem.CUMPLE).length;
     const itemsNoCumplen = inspeccion.items.filter((i) => i.cumplimiento === CumplimientoItem.NO_CUMPLE).length;
     const itemsNoAplica = inspeccion.items.filter((i) => i.cumplimiento === CumplimientoItem.NO_APLICA).length;
@@ -249,8 +278,9 @@ export class InspeccionesService {
     };
   }
 
-  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoInspeccion }, organizacionEmpresaId?: string) {
-    return this.prisma.inspeccion.findMany({ where: { asignadoAId: usuarioId, empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...(filters?.estado && { estado: filters.estado }) }, include: this.listInclude, orderBy: [{ fechaProgramada: 'asc' }, { fechaHoraInicio: 'desc' }] });
+  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoInspeccion; establecimientoId?: string }, organizacionEmpresaId?: string, accesoEmpresaId?: string) {
+    const establishmentFilter = await this.establishmentFilter(empresaId, organizacionEmpresaId, filters?.establecimientoId, accesoEmpresaId);
+    return this.prisma.inspeccion.findMany({ where: { asignadoAId: usuarioId, empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...(filters?.estado && { estado: filters.estado }), ...establishmentFilter }, include: this.listInclude, orderBy: [{ fechaProgramada: 'asc' }, { fechaHoraInicio: 'desc' }] });
   }
 }
 

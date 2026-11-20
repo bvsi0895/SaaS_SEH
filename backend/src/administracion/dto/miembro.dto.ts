@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { Rol, RolOrganizacion } from '@prisma/client';
 
 export class AddMiembroDto {
@@ -10,4 +10,5 @@ export class UpdateMiembroDto { @IsOptional() @IsEnum(RolOrganizacion) rol?: Rol
 export class AssignAccessDto {
   @IsUUID() organizacionMiembroId!: string;
   @IsEnum(Rol) rol!: Rol;
+  @IsOptional() @IsArray() @IsUUID('4', { each: true }) establecimientoIds?: string[];
 }

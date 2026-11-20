@@ -7,10 +7,6 @@ import {
   Card,
   CardContent,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Paper,
   Skeleton,
   Typography,
@@ -44,6 +40,7 @@ import { dashboardApi } from '../../api/dashboard';
 import { reportesApi } from '../../api/reportes';
 import PageHeader from '../../components/common/PageHeader';
 import { useAuth } from '../../contexts/AuthContext';
+import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
 interface KPICardProps {
@@ -128,19 +125,7 @@ export default function DashboardPage() {
   const { showError } = useSnackbar();
   const [establecimientoId, setEstablecimientoId] = useState('');
   const [generandoInforme, setGenerandoInforme] = useState(false);
-  const isTechnician = user?.rol === 'TECNICO';
   const filters = establecimientoId ? { establecimientoId } : undefined;
-  const establecimientosQuery = useQuery({
-    queryKey: [
-      'reportes',
-      'establecimientos',
-      activeContextId,
-      user?.id,
-      user?.rol,
-    ],
-    queryFn: reportesApi.getEstablecimientos,
-    enabled: !isTechnician,
-  });
   const kpisQuery = useQuery({
     queryKey: [
       'dashboard',
@@ -249,31 +234,8 @@ export default function DashboardPage() {
             flexWrap: 'wrap',
           }}
         >
-          {!isTechnician && (
-            <FormControl
-              size="small"
-              sx={{ minWidth: 240 }}
-              error={establecimientosQuery.isError}
-            >
-              <InputLabel id="dashboard-establecimiento-label">
-                Establecimiento
-              </InputLabel>
-              <Select
-                labelId="dashboard-establecimiento-label"
-                value={establecimientoId}
-                label="Establecimiento"
-                onChange={(event) => setEstablecimientoId(event.target.value)}
-              >
-                <MenuItem value="">Todos los autorizados</MenuItem>
-                {(establecimientosQuery.data ?? []).map((item) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    {item.nombre}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-          {!isTechnician && (
+          <EstablishmentSelector value={establecimientoId} onChange={setEstablecimientoId} />
+          {user?.rol !== 'TECNICO' && (
             <Button
               variant="contained"
               onClick={descargarInforme}
@@ -281,11 +243,6 @@ export default function DashboardPage() {
             >
               {generandoInforme ? 'Generando…' : 'Descargar informe mensual'}
             </Button>
-          )}
-          {establecimientosQuery.isError && (
-            <Typography color="error" variant="body2">
-              No se pudieron cargar los establecimientos autorizados.
-            </Typography>
           )}
         </Box>
       </Paper>

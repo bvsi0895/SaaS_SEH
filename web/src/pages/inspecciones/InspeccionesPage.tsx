@@ -11,6 +11,7 @@ import StatusChip from '../../components/common/StatusChip';
 import type { Inspeccion } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 
 const personName = (person?: { nombre: string; apellido: string }) => person ? `${person.nombre} ${person.apellido}` : '-';
 const dateValue = (value?: string) => {
@@ -27,6 +28,7 @@ export default function InspeccionesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [estadoFilter, setEstadoFilter] = useState('');
   const [responsableFilter, setResponsableFilter] = useState('');
+  const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
 
@@ -36,8 +38,8 @@ export default function InspeccionesPage() {
     enabled: !isTechnician,
   });
   const { data, isLoading } = useQuery({
-    queryKey: ['inspecciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter, responsableFilter],
-    queryFn: () => inspeccionesApi.getAll({ page: page + 1, limit: pageSize, estado: estadoFilter || undefined, asignadoAId: responsableFilter || undefined }),
+    queryKey: ['inspecciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter, responsableFilter, establecimientoId],
+    queryFn: () => inspeccionesApi.getAll({ page: page + 1, limit: pageSize, estado: estadoFilter || undefined, asignadoAId: responsableFilter || undefined, establecimientoId: establecimientoId || undefined }),
   });
   const iniciarMutation = useMutation({
     mutationFn: inspeccionesApi.iniciar,
@@ -58,6 +60,7 @@ export default function InspeccionesPage() {
   };
 
   const columns: GridColDef[] = [
+    { field: 'establecimiento', headerName: 'Establecimiento', flex: 1, minWidth: 180, valueGetter: (params) => params.row.establecimiento?.nombre || 'Sin establecimiento (histórica)' },
     { field: 'sector', headerName: 'Sector', flex: 1, minWidth: 150 },
     { field: 'checklist', headerName: 'Checklist', flex: 1, minWidth: 150, valueGetter: (params) => params.row.checklist?.nombre || '-' },
     { field: 'creadoPor', headerName: 'Creada por', flex: 1, minWidth: 150, valueGetter: (params) => personName(params.row.creadoPor || params.row.usuario) },
@@ -74,9 +77,10 @@ export default function InspeccionesPage() {
   return <Box>
     <PageHeader title="Inspecciones" subtitle={isTechnician ? 'Inspecciones asignadas a ti' : 'Inspecciones del contexto autorizado'} action={{ label: 'Nueva inspección', onClick: () => navigate('/inspecciones/nueva'), icon: 'add' }} />
     <Card sx={{ mb: 3 }}><CardContent><Grid container spacing={2} alignItems="center">
+      <Grid item xs={12} md={4}><EstablishmentSelector value={establecimientoId} onChange={(value) => { setEstablecimientoId(value); setPage(0); }} /></Grid>
       <Grid item xs={12} md={4}><TextField fullWidth select label="Estado" value={estadoFilter} onChange={(e) => { setEstadoFilter(e.target.value); setPage(0); }}><MenuItem value="">Todos</MenuItem><MenuItem value="PENDIENTE">Pendiente</MenuItem><MenuItem value="EN_PROGRESO">En progreso</MenuItem><MenuItem value="COMPLETADA">Completada</MenuItem><MenuItem value="CANCELADA">Cancelada</MenuItem></TextField></Grid>
       {!isTechnician && <Grid item xs={12} md={4}><TextField fullWidth select label="Responsable" value={responsableFilter} onChange={(e) => { setResponsableFilter(e.target.value); setPage(0); }}><MenuItem value="">Todos</MenuItem>{tecnicos.map((tecnico) => <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>)}</TextField></Grid>}
-      <Grid item xs={12} md={4}><Button onClick={() => { setEstadoFilter(''); setResponsableFilter(''); setPage(0); }}>Limpiar filtros</Button></Grid>
+      <Grid item xs={12} md={4}><Button onClick={() => { setEstadoFilter(''); setResponsableFilter(''); setEstablecimientoId(''); setPage(0); }}>Limpiar filtros</Button></Grid>
     </Grid></CardContent></Card>
     <Card><DataGrid rows={data?.data || []} columns={columns} rowCount={data?.total || 0} loading={isLoading} paginationMode={data && !data.isPaginated ? 'client' : 'server'} paginationModel={{ page, pageSize }} onPaginationModelChange={(model) => { setPage(model.page); setPageSize(model.pageSize); }} pageSizeOptions={[10, 25, 50]} disableRowSelectionOnClick autoHeight sx={{ border: 'none', '& .MuiDataGrid-cell:focus': { outline: 'none' } }} /></Card>
   </Box>;

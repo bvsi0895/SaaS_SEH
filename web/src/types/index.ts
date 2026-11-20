@@ -155,6 +155,8 @@ export interface Inspeccion {
   creadoPorId: string;
   asignadoAId: string;
   checklistId: string;
+  establecimientoId: string | null;
+  establecimiento?: Pick<Establecimiento, 'id' | 'nombre' | 'codigo'> | null;
   fechaProgramada?: string;
   creadoPor?: Usuario;
   asignadoA?: Usuario;
