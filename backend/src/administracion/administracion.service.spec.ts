@@ -92,7 +92,6 @@ describe('AdministracionService logo storage', () => {
     await expect(service.deleteLogo('org-1', 'member-1')).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.organizacion.update).not.toHaveBeenCalled();
   });
-
   it('does not allow a member without organization admin role to write a logo', async () => {
     prisma.organizacionMiembro.findFirst.mockResolvedValue(null);
     await expect(service.uploadLogo('org-other', 'member-2', {
@@ -103,4 +102,3 @@ describe('AdministracionService logo storage', () => {
     expect(prisma.organizacion.update).not.toHaveBeenCalled();
   });
 });
-
