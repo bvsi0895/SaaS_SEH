@@ -25,6 +25,7 @@ import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { getQueryScope, invalidateActionQueries, queryKeys } from '../../queryKeys';
 
 export default function AccionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,24 +34,22 @@ export default function AccionDetailPage() {
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const [iniciarDialogOpen, setIniciarDialogOpen] = useState(false);
   const [resolverDialogOpen, setResolverDialogOpen] = useState(false);
 
   const { data: accion, isLoading } = useQuery({
-    queryKey: ['accion', id, activeContextId, user?.id, user?.rol],
+    queryKey: queryKeys.action(id || '', queryScope),
     queryFn: () => accionesApi.getById(id!),
     enabled: !!id,
   });
 
   const iniciarMutation = useMutation({
     mutationFn: () => accionesApi.iniciar(id!),
-    onSuccess: () => {
+    onSuccess: async (updatedAction) => {
       showSuccess('Accion iniciada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['accion', id] });
-      queryClient.invalidateQueries({ queryKey: ['acciones'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      if (accion?.hallazgoId) queryClient.invalidateQueries({ queryKey: ['hallazgo', accion.hallazgoId] });
+      await invalidateActionQueries(queryClient, queryScope, updatedAction.id, updatedAction.hallazgoId);
       setIniciarDialogOpen(false);
     },
     onError: () => {
@@ -60,12 +59,9 @@ export default function AccionDetailPage() {
 
   const resolverMutation = useMutation({
     mutationFn: () => accionesApi.resolver(id!),
-    onSuccess: () => {
+    onSuccess: async (updatedAction) => {
       showSuccess('Accion resuelta exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['accion', id] });
-      queryClient.invalidateQueries({ queryKey: ['acciones'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      if (accion?.hallazgoId) queryClient.invalidateQueries({ queryKey: ['hallazgo', accion.hallazgoId] });
+      await invalidateActionQueries(queryClient, queryScope, updatedAction.id, updatedAction.hallazgoId);
       setResolverDialogOpen(false);
     },
     onError: () => {

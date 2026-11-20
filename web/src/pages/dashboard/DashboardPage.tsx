@@ -37,6 +37,7 @@ import {
   Bar,
 } from 'recharts';
 import { dashboardApi } from '../../api/dashboard';
+import { queryKeys } from '../../queryKeys';
 import { reportesApi } from '../../api/reportes';
 import PageHeader from '../../components/common/PageHeader';
 import { useAuth } from '../../contexts/AuthContext';
@@ -126,48 +127,21 @@ export default function DashboardPage() {
   const [establecimientoId, setEstablecimientoId] = useState('');
   const [generandoInforme, setGenerandoInforme] = useState(false);
   const filters = establecimientoId ? { establecimientoId } : undefined;
+  const dashboardScope = { contextId: activeContextId, userId: user?.id, role: user?.rol };
   const kpisQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'kpis',
-      activeContextId,
-      user?.id,
-      user?.rol,
-      establecimientoId,
-    ],
+    queryKey: [...queryKeys.dashboard(dashboardScope), 'kpis', establecimientoId],
     queryFn: () => dashboardApi.getKPIs(filters),
   });
   const tendenciasQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'tendencias',
-      activeContextId,
-      user?.id,
-      user?.rol,
-      establecimientoId,
-    ],
+    queryKey: [...queryKeys.dashboard(dashboardScope), 'tendencias', establecimientoId],
     queryFn: () => dashboardApi.getTendencias('mes', filters),
   });
   const topSectoresQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'topSectores',
-      activeContextId,
-      user?.id,
-      user?.rol,
-      establecimientoId,
-    ],
+    queryKey: [...queryKeys.dashboard(dashboardScope), 'topSectores', establecimientoId],
     queryFn: () => dashboardApi.getTopSectores(5, filters),
   });
   const actividadQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'actividad',
-      activeContextId,
-      user?.id,
-      user?.rol,
-      establecimientoId,
-    ],
+    queryKey: [...queryKeys.dashboard(dashboardScope), 'actividad', establecimientoId],
     queryFn: () => dashboardApi.getActividadReciente(10, filters),
   });
   const {

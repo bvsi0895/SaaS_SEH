@@ -12,6 +12,7 @@ import type { Inspeccion } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import EstablishmentSelector from '../../components/common/EstablishmentSelector';
+import { getQueryScope, invalidateInspectionQueries, queryKeys } from '../../queryKeys';
 
 const personName = (person?: { nombre: string; apellido: string }) => person ? `${person.nombre} ${person.apellido}` : '-';
 const dateValue = (value?: string) => {
@@ -31,6 +32,7 @@ export default function InspeccionesPage() {
   const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const { data: tecnicos = [] } = useQuery({
     queryKey: ['usuarios', 'tecnicos', activeContextId, user?.id, user?.rol],
@@ -38,15 +40,14 @@ export default function InspeccionesPage() {
     enabled: !isTechnician,
   });
   const { data, isLoading } = useQuery({
-    queryKey: ['inspecciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter, responsableFilter, establecimientoId],
+    queryKey: [...queryKeys.inspections(queryScope), page, pageSize, estadoFilter, responsableFilter, establecimientoId],
     queryFn: () => inspeccionesApi.getAll({ page: page + 1, limit: pageSize, estado: estadoFilter || undefined, asignadoAId: responsableFilter || undefined, establecimientoId: establecimientoId || undefined }),
   });
   const iniciarMutation = useMutation({
     mutationFn: inspeccionesApi.iniciar,
-    onSuccess: (inspection) => {
+    onSuccess: async (inspection) => {
       showSuccess('Inspección iniciada');
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', inspection.id] });
+      await invalidateInspectionQueries(queryClient, queryScope, inspection.id);
     },
     onError: () => showError('No se pudo iniciar la inspección'),
   });

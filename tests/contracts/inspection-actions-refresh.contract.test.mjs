@@ -16,19 +16,25 @@ test('hallazgos expose inspector and multiple action responsible users', async (
   assert.match(page, /Array\.from\(new Set\(responsables\)\)/);
 });
 
-test('mutations invalidate related lists without dropping context-aware query keys', async () => {
-  const [newInspection, inspectionDetail, findingDetail, actionDetail] = await Promise.all([
+test('mutations invalidate related scoped queries, including dashboard metrics', async () => {
+  const [newInspection, inspectionDetail, findingDetail, actionDetail, queryKeys] = await Promise.all([
     read('web/src/pages/inspecciones/NuevaInspeccionPage.tsx'),
     read('web/src/pages/inspecciones/InspeccionDetailPage.tsx'),
     read('web/src/pages/hallazgos/HallazgoDetailPage.tsx'),
     read('web/src/pages/acciones/AccionDetailPage.tsx'),
+    read('web/src/queryKeys.ts'),
   ]);
-  assert.match(newInspection, /queryClient\.invalidateQueries\(\{ queryKey: \['inspecciones'\] \}\)/);
-  assert.match(inspectionDetail, /queryClient\.invalidateQueries\(\{ queryKey: \['hallazgos'\] \}\)/);
-  assert.match(inspectionDetail, /queryClient\.invalidateQueries\(\{ queryKey: \['acciones'\] \}\)/);
-  assert.match(findingDetail, /queryClient\.invalidateQueries\(\{ queryKey: \['hallazgos'\] \}\)/);
-  assert.match(actionDetail, /queryClient\.invalidateQueries\(\{ queryKey: \['hallazgos'\] \}\)/);
-  assert.match(actionDetail, /queryKey: \['accion', id, activeContextId, user\?\.id, user\?\.rol\]/);
+  assert.match(newInspection, /invalidateInspectionQueries\(queryClient, queryScope, inspeccion\.id\)/);
+  assert.match(inspectionDetail, /invalidateInspectionQueries\(queryClient, queryScope/);
+  assert.match(inspectionDetail, /invalidateFindingQueries\(queryClient, queryScope/);
+  assert.match(inspectionDetail, /invalidateActionQueries\(queryClient, queryScope/);
+  assert.match(findingDetail, /invalidateFindingQueries\(queryClient, queryScope/);
+  assert.match(findingDetail, /invalidateActionQueries\(queryClient, queryScope/);
+  assert.match(actionDetail, /invalidateActionQueries\(queryClient, queryScope/);
+  assert.match(queryKeys, /dashboard: \(scope: QueryScope\)/);
+  assert.match(queryKeys, /scope\.contextId/);
+  assert.match(queryKeys, /scope\.userId/);
+  assert.match(queryKeys, /scope\.role/);
 });
 
 test('inspection finding form assigns authorized responsible users and supports safe retries', async () => {

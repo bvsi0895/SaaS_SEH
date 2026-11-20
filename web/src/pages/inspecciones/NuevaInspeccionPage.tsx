@@ -10,6 +10,7 @@ import PageHeader from '../../components/common/PageHeader';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useAuth } from '../../contexts/AuthContext';
 import EstablishmentSelector from '../../components/common/EstablishmentSelector';
+import { getQueryScope, invalidateInspectionQueries } from '../../queryKeys';
 
 export default function NuevaInspeccionPage() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function NuevaInspeccionPage() {
   const queryClient = useQueryClient();
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
   const [error, setError] = useState<string | null>(null);
   const [establecimientoId, setEstablecimientoId] = useState('');
 
@@ -33,10 +35,9 @@ export default function NuevaInspeccionPage() {
 
   const createMutation = useMutation({
     mutationFn: inspeccionesApi.create,
-    onSuccess: (inspeccion) => {
+    onSuccess: async (inspeccion) => {
       showSuccess(inspeccion.estado === 'PENDIENTE' ? 'Inspección creada y asignada' : 'Inspección iniciada');
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', inspeccion.id] });
+      await invalidateInspectionQueries(queryClient, queryScope, inspeccion.id);
       navigate(`/inspecciones/${inspeccion.id}`);
     },
     onError: (err: any) => {
