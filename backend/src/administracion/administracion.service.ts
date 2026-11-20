@@ -49,7 +49,6 @@ export class AdministracionService {
     if (!member) throw new ForbiddenException('No tiene acceso a esta organización');
     return member;
   }
-
   private async getRelation(organizacionId: string, organizacionEmpresaId: string, requireActive = true) {
     const relation = await this.prisma.organizacionEmpresa.findFirst({
       where: { id: organizacionEmpresaId, organizacionId, ...(requireActive && { estado: EstadoRelacionEmpresa.ACTIVA }) },
@@ -326,4 +325,3 @@ export class AdministracionService {
     return { message: 'Acceso revocado' };
   }
 }
-
