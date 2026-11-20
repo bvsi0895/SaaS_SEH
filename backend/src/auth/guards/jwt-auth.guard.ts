@@ -18,6 +18,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     super();
   }
 
+  private async attachTenantContext(request: { user: { id: string; empresaId: string } }, organizationCompanyId?: string) {
+    const resolvedContext = await this.tenancy.resolveForUser(
+      request.user.id,
+      request.user.empresaId,
+      organizationCompanyId,
+    );
+    if (!resolvedContext.accesoEmpresaId) {
+      throw new UnauthorizedException('No existe un acceso activo al contexto solicitado');
+    }
+    request.user = { ...request.user, ...resolvedContext };
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Verificar si el endpoint es público
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -35,14 +47,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const organizationCompanyId = Array.isArray(requestedContext)
       ? requestedContext[0]
       : requestedContext;
-    request.user = {
-      ...request.user,
-      ...(await this.tenancy.resolveForUser(
-        request.user.id,
-        request.user.empresaId,
-        organizationCompanyId,
-      )),
-    };
+    await this.attachTenantContext(request, organizationCompanyId);
     return allowed;
   }
 

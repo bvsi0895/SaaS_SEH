@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Rol } from '@prisma/client';
 import { readFile, unlink, writeFile } from 'fs/promises';
 import { AdministracionService } from './administracion.service';
 
@@ -100,5 +101,35 @@ describe('AdministracionService logo storage', () => {
       mimetype: 'image/png',
     })).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.organizacion.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdministracionService establishment assignment safety', () => {
+  it('does not overwrite an existing administrative access with a technician assignment', async () => {
+    const tx = {
+      accesoEmpresa: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'access-admin', rol: Rol.ADMIN_EMPRESA }),
+        upsert: jest.fn(),
+      },
+      accesoEstablecimiento: { deleteMany: jest.fn(), createMany: jest.fn() },
+    };
+    const prisma = {
+      organizacionMiembro: {
+        findFirst: jest.fn()
+          .mockResolvedValueOnce({ id: 'admin-member', rol: 'OWNER' })
+          .mockResolvedValueOnce({ id: 'tech-member', usuario: { rol: Rol.TECNICO } }),
+      },
+      organizacionEmpresa: { findFirst: jest.fn().mockResolvedValue({ id: 'relation-1', empresaId: 'company-1' }) },
+      establecimiento: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx)),
+    };
+    const service = new AdministracionService(prisma as never);
+
+    await expect(service.assignAccess('org-1', 'admin-1', 'relation-1', {
+      organizacionMiembroId: 'tech-member',
+      rol: Rol.TECNICO,
+      establecimientoIds: [],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tx.accesoEmpresa.upsert).not.toHaveBeenCalled();
   });
 });

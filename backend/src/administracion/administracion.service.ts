@@ -317,6 +317,13 @@ export class AdministracionService {
       if (establishments.length !== establishmentIds.length) throw new ForbiddenException('Uno o más establecimientos no pertenecen a la empresa autorizada');
     }
     return this.prisma.$transaction(async (tx) => {
+      const existingAccess = await tx.accesoEmpresa.findUnique({
+        where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId: member.id } },
+        select: { id: true, rol: true },
+      });
+      if (dto.rol === Rol.TECNICO && existingAccess && existingAccess.rol !== Rol.TECNICO) {
+        throw new ForbiddenException('No se puede sobrescribir un acceso administrativo como técnico');
+      }
       const access = await tx.accesoEmpresa.upsert({
         where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId: member.id } },
         create: { id: randomUUID(), organizacionEmpresaId: relation.id, organizacionMiembroId: member.id, organizacionId, empresaId: relation.empresaId, rol: dto.rol, activo: true },
