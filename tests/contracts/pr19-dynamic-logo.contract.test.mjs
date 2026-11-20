@@ -12,6 +12,7 @@ test('PR #19 loads the logo through the authenticated organization endpoint', ()
   assert.match(logo, /administracionApi\.getLogo\(\)/);
   assert.match(logo, /URL\.createObjectURL\(blob\)/);
   assert.match(logo, /URL\.revokeObjectURL\(objectUrl\)/);
+  assert.match(logo, /onError=\{handleImageError\}/);
 });
 
 test('PR #19 keeps SEH for missing logos and failed loads', () => {
