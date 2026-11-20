@@ -30,6 +30,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { hallazgosApi } from '../../api/hallazgos';
 import { accionesApi, CreateAccionDto } from '../../api/acciones';
+import { getQueryScope, invalidateActionQueries, invalidateFindingQueries, queryKeys } from '../../queryKeys';
 import { usuariosApi } from '../../api/usuarios';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
@@ -62,6 +63,7 @@ export default function HallazgoDetailPage() {
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const [accionDialogOpen, setAccionDialogOpen] = useState(false);
   const [nuevaAccion, setNuevaAccion] = useState<Partial<CreateAccionDto>>({
@@ -78,7 +80,7 @@ export default function HallazgoDetailPage() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   const { data: hallazgo, isLoading } = useQuery({
-    queryKey: ['hallazgo', id, activeContextId, user?.id, user?.rol],
+    queryKey: queryKeys.finding(id || '', queryScope),
     queryFn: () => hallazgosApi.getById(id!),
     enabled: !!id,
   });
@@ -155,15 +157,13 @@ export default function HallazgoDetailPage() {
           setUploadProgress((current) => ({ ...current, [file.name]: progress }));
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
-      await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      await invalidateFindingQueries(queryClient, queryScope, id);
       setSelectedFiles([]);
       setUploadProgress({});
       setUploadSuccess(`${selectedFiles.length} fotografía(s) cargada(s) correctamente`);
     } catch {
       setUploadError('No se pudieron cargar todas las fotografías. Las ya confirmadas se conservaron.');
-      await queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
-      await queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      await invalidateFindingQueries(queryClient, queryScope, id);
     } finally {
       setUploadingPhotos(false);
     }
@@ -171,11 +171,9 @@ export default function HallazgoDetailPage() {
 
   const crearAccionMutation = useMutation({
     mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
-    onSuccess: () => {
+    onSuccess: async (accion) => {
       showSuccess('Accion correctiva creada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['hallazgo', id] });
-      queryClient.invalidateQueries({ queryKey: ['acciones'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      await invalidateActionQueries(queryClient, queryScope, accion.id, id);
       setAccionDialogOpen(false);
       setNuevaAccion({ fechaCompromiso: new Date().toISOString() });
     },

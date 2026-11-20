@@ -22,6 +22,7 @@ import StatusChip from '../../components/common/StatusChip';
 import type { Hallazgo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import EstablishmentSelector from '../../components/common/EstablishmentSelector';
+import { getQueryScope, queryKeys } from '../../queryKeys';
 
 const getPhotoCount = (fotosUrls?: string) => {
   if (!fotosUrls) return 0;
@@ -40,9 +41,10 @@ export default function HallazgosPage() {
   const [nivelRiesgoFilter, setNivelRiesgoFilter] = useState<string>('');
   const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['hallazgos', activeContextId, user?.id, user?.rol, page, pageSize, nivelRiesgoFilter, establecimientoId],
+    queryKey: [...queryKeys.findings(queryScope), page, pageSize, nivelRiesgoFilter, establecimientoId],
     queryFn: () =>
       hallazgosApi.getAll({
         page: page + 1,

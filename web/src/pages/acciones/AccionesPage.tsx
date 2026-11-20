@@ -22,6 +22,7 @@ import StatusChip from '../../components/common/StatusChip';
 import type { AccionCorrectiva } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import EstablishmentSelector from '../../components/common/EstablishmentSelector';
+import { getQueryScope, queryKeys } from '../../queryKeys';
 
 export default function AccionesPage() {
   const navigate = useNavigate();
@@ -30,11 +31,12 @@ export default function AccionesPage() {
   const [estadoFilter, setEstadoFilter] = useState<string>('');
   const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
   const isTechnician = user?.rol === 'TECNICO';
   const isOverdueFilter = estadoFilter === 'VENCIDAS';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['acciones', activeContextId, user?.id, user?.rol, page, pageSize, estadoFilter, establecimientoId],
+    queryKey: [...queryKeys.actions(queryScope), page, pageSize, estadoFilter, establecimientoId],
     queryFn: async () => {
       if (isTechnician) {
         const rows = await accionesApi.getMisAcciones({

@@ -46,6 +46,13 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import type { CumplimientoItem, NivelRiesgo } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuariosApi } from '../../api/usuarios';
+import {
+  getQueryScope,
+  invalidateActionQueries,
+  invalidateFindingQueries,
+  invalidateInspectionQueries,
+  queryKeys,
+} from '../../queryKeys';
 
 const MAX_HALLAZGO_PHOTO_SIZE = 5 * 1024 * 1024;
 const HALLAZGO_PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp';
@@ -123,6 +130,7 @@ export default function InspeccionDetailPage() {
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
+  const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [selectedItemStatus, setSelectedItemStatus] = useState<CumplimientoItem | null>(null);
@@ -150,21 +158,18 @@ export default function InspeccionDetailPage() {
 
   const iniciarMutation = useMutation({
     mutationFn: () => inspeccionesApi.iniciar(id!),
-    onSuccess: (inspection) => {
+    onSuccess: async (inspection) => {
       showSuccess('Inspección iniciada');
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', inspection.id] });
+      await invalidateInspectionQueries(queryClient, queryScope, inspection.id);
     },
     onError: () => showError('No se pudo iniciar la inspección'),
   });
 
   const reasignarMutation = useMutation({
     mutationFn: () => inspeccionesApi.reasignar(id!, reasignarUsuarioId),
-    onSuccess: () => {
+    onSuccess: async () => {
       showSuccess('Inspección reasignada');
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      await invalidateInspectionQueries(queryClient, queryScope, id);
       setReasignarDialogOpen(false);
       setReasignarUsuarioId('');
     },
@@ -172,7 +177,7 @@ export default function InspeccionDetailPage() {
   });
 
   const { data: inspeccion, isLoading } = useQuery({
-    queryKey: ['inspeccion', id, activeContextId, user?.id, user?.rol],
+    queryKey: queryKeys.inspection(id || '', queryScope),
     queryFn: () => inspeccionesApi.getById(id!),
     enabled: !!id,
   });
@@ -193,8 +198,8 @@ export default function InspeccionDetailPage() {
       cumplimiento: CumplimientoItem;
       observacion?: string;
     }) => inspeccionesApi.registrarItem(id!, itemId, { cumplimiento, observacion }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+    onSuccess: async () => {
+      await invalidateInspectionQueries(queryClient, queryScope, id);
       setSelectedItem(null);
       setSelectedItemStatus(null);
       setObservacion('');
@@ -206,9 +211,9 @@ export default function InspeccionDetailPage() {
 
   const finalizarMutation = useMutation({
     mutationFn: () => inspeccionesApi.finalizar(id!, { observaciones: observacionesFinal }),
-    onSuccess: () => {
+    onSuccess: async () => {
       showSuccess('Inspeccion finalizada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
+      await invalidateInspectionQueries(queryClient, queryScope, id);
       setFinalizarDialogOpen(false);
     },
     onError: () => {
@@ -216,11 +221,22 @@ export default function InspeccionDetailPage() {
     },
   });
 
+  const cancelarMutation = useMutation({
+    mutationFn: () => inspeccionesApi.cancelar(id!),
+    onSuccess: async (inspection) => {
+      showSuccess('Inspección cancelada');
+      await invalidateInspectionQueries(queryClient, queryScope, inspection.id);
+    },
+    onError: () => {
+      showError('No se pudo cancelar la inspección');
+    },
+  });
+
   const crearHallazgoMutation = useMutation({
     mutationFn: (data: CreateHallazgoDto) => hallazgosApi.create(data),
-    onSuccess: (hallazgo) => {
+    onSuccess: async (hallazgo) => {
       setEditingHallazgoId(hallazgo.id);
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+      await invalidateFindingQueries(queryClient, queryScope, hallazgo.id, id);
       if (hallazgoPhoto) {
         subirFotoMutation.mutate({
           id: hallazgo.id,
@@ -241,9 +257,8 @@ export default function InspeccionDetailPage() {
   const actualizarHallazgoMutation = useMutation({
     mutationFn: ({ id: hallazgoId, data }: { id: string; data: UpdateHallazgoDto }) =>
       hallazgosApi.update(hallazgoId, data),
-    onSuccess: (hallazgo) => {
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgo', hallazgo.id] });
+    onSuccess: async (hallazgo) => {
+      await invalidateFindingQueries(queryClient, queryScope, hallazgo.id, id);
       if (hallazgoPhoto) {
         subirFotoMutation.mutate({
           id: hallazgo.id,
@@ -264,9 +279,8 @@ export default function InspeccionDetailPage() {
   const subirFotoMutation = useMutation({
     mutationFn: ({ id: hallazgoId, file }: { id: string; file: File; successMessage: string }) =>
       hallazgosApi.uploadPhoto(hallazgoId, file),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.id] });
+    onSuccess: async (_, variables) => {
+      await invalidateFindingQueries(queryClient, queryScope, variables.id, id);
       setHallazgoPhoto(null);
       guardarAccionCorrectiva(variables.id, variables.successMessage);
       setHallazgoPhotoUploadError(null);
@@ -280,11 +294,9 @@ export default function InspeccionDetailPage() {
 
   const crearAccionMutation = useMutation({
     mutationFn: (data: CreateAccionDto) => accionesApi.create(data),
-    onSuccess: (_accion, variables) => {
+    onSuccess: async (_accion, variables) => {
       showSuccess('Hallazgo y acción correctiva guardados exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['acciones'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
+      await invalidateActionQueries(queryClient, queryScope, _accion.id, variables.hallazgoId, id);
       finalizarCreacionHallazgo();
     },
     onError: (error) => {
@@ -298,11 +310,9 @@ export default function InspeccionDetailPage() {
   const actualizarAccionMutation = useMutation({
     mutationFn: ({ id: accionId, data }: { id: string; data: UpdateAccionDto; hallazgoId: string }) =>
       accionesApi.update(accionId, data),
-    onSuccess: (_accion, variables) => {
+    onSuccess: async (_accion, variables) => {
       showSuccess('Hallazgo y acción correctiva actualizados exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['acciones'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
-      queryClient.invalidateQueries({ queryKey: ['hallazgo', variables.hallazgoId] });
+      await invalidateActionQueries(queryClient, queryScope, _accion.id, variables.hallazgoId, id);
       finalizarCreacionHallazgo();
     },
     onError: (error) => {
@@ -337,8 +347,6 @@ export default function InspeccionDetailPage() {
   };
 
   const finalizarCreacionHallazgo = () => {
-    queryClient.invalidateQueries({ queryKey: ['inspeccion', id] });
-    queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
     setHallazgoDialogOpen(false);
     setHallazgoPhoto(null);
     setHallazgoPhotoError(null);
@@ -590,6 +598,8 @@ export default function InspeccionDetailPage() {
   const canStart = isPending && inspeccion.asignadoAId === user?.id;
   const assigned = inspeccion.asignadoA || inspeccion.usuario;
   const canModifyInspection = isEditable && inspeccion.asignadoAId === user?.id;
+  const canCancelInspection = (isPending || isEditable)
+    && (!isTechnician || inspeccion.asignadoAId === user?.id);
   const creator = inspeccion.creadoPor;
 
   return (
@@ -742,6 +752,19 @@ export default function InspeccionDetailPage() {
                 disabled={iniciarMutation.isPending}
               >
                 {iniciarMutation.isPending ? 'Iniciando...' : 'Iniciar inspección'}
+              </Button>}
+
+              {canCancelInspection && <Button
+                variant="outlined"
+                color="error"
+                fullWidth
+                sx={{ mt: 1 }}
+                onClick={() => {
+                  if (window.confirm('¿Querés cancelar esta inspección?')) cancelarMutation.mutate();
+                }}
+                disabled={cancelarMutation.isPending}
+              >
+                {cancelarMutation.isPending ? 'Cancelando...' : 'Cancelar inspección'}
               </Button>}
 
               {!isTechnician && isPending && <Button

@@ -31,7 +31,7 @@ test('inspection finding keeps editing, corrective action and retry flows', asyn
   assert.match(source, /responsableId: accionResponsableId/);
   assert.match(source, /guardarAccionCorrectiva\(hallazgo\.id/);
   assert.match(source, /El hallazgo ya fue guardado, pero no se pudo crear la acción correctiva/);
-  assert.match(source, /queryClient\.invalidateQueries\(\{ queryKey: \['acciones'\] \}\)/);
+  assert.match(source, /invalidateActionQueries\(queryClient, queryScope/);
   assert.match(source, /subirFotoMutation\.isPending/);
 });
 

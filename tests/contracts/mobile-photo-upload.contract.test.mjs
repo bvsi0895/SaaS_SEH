@@ -68,7 +68,7 @@ test('existing finding editing and corrective action flows remain intact', async
   assert.match(source, /setEditingAccionId\(existingAction\?\.id \|\| null\)/);
   assert.match(source, /fechaCompromiso: accionFechaCompromiso/);
   assert.match(source, /responsableId: accionResponsableId/);
-  assert.match(source, /queryClient\.invalidateQueries\(\{ queryKey: \['acciones'\] \}\)/);
+  assert.match(source, /invalidateActionQueries\(queryClient, queryScope/);
 });
 
 test('the web proxy allows backend image limit plus multipart overhead', async () => {
