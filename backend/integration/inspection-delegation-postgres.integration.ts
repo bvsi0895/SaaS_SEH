@@ -34,6 +34,12 @@ async function cleanup() {
   await prisma.inspeccion.deleteMany({ where: { empresaId: { in: [ids.empresa, ids.empresaAjena] } } });
   await prisma.checklistItem.deleteMany({ where: { id: ids.checklistItem } });
   await prisma.checklist.deleteMany({ where: { id: ids.checklist } });
+  await prisma.accesoEstablecimiento.deleteMany({
+    where: {
+      accesoEmpresaId: { in: [ids.contextAccessAdmin, ids.contextAccessSupervisor, ids.contextAccessA, ids.contextAccessB] },
+      establecimientoId: ids.establecimiento,
+    },
+  });
   await prisma.establecimiento.deleteMany({ where: { id: ids.establecimiento } });
   await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.contextAccessAdmin, ids.contextAccessSupervisor, ids.contextAccessA, ids.contextAccessB] } } });
   await prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.memberAdmin, ids.memberSupervisor, ids.memberA, ids.memberB] } } });
