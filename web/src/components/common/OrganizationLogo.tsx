@@ -47,6 +47,11 @@ export default function OrganizationLogo({ contextId }: OrganizationLogoProps) {
 
   const src = loadedLogo.contextId === contextId ? loadedLogo.src : null;
 
+  const handleImageError = () => {
+    if (src) URL.revokeObjectURL(src);
+    setLoadedLogo({ contextId, src: null });
+  };
+
   if (!src) {
     return (
       <Typography variant="h6" color="primary" fontWeight="bold" data-testid="seh-logo-fallback">
@@ -61,6 +66,7 @@ export default function OrganizationLogo({ contextId }: OrganizationLogoProps) {
       src={src}
       alt="Logo de la consultora"
       data-testid="organization-logo"
+      onError={handleImageError}
       sx={{
         display: 'block',
         width: '100%',
