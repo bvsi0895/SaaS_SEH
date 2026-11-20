@@ -41,6 +41,14 @@ export class AdministracionService {
     return member;
   }
 
+  private async assertOrganizationMember(organizacionId: string, usuarioId: string) {
+    const member = await this.prisma.organizacionMiembro.findFirst({
+      where: { organizacionId, usuarioId, activa: true, organizacion: { activa: true } },
+      select: { id: true, rol: true },
+    });
+    if (!member) throw new ForbiddenException('No tiene acceso a esta organización');
+    return member;
+  }
   private async getRelation(organizacionId: string, organizacionEmpresaId: string, requireActive = true) {
     const relation = await this.prisma.organizacionEmpresa.findFirst({
       where: { id: organizacionEmpresaId, organizacionId, ...(requireActive && { estado: EstadoRelacionEmpresa.ACTIVA }) },
@@ -76,7 +84,7 @@ export class AdministracionService {
   }
 
   private async getOrganizationLogo(organizacionId: string, usuarioId: string) {
-    await this.assertAdmin(organizacionId, usuarioId);
+    await this.assertOrganizationMember(organizacionId, usuarioId);
     return this.prisma.organizacion.findUniqueOrThrow({ where: { id: organizacionId }, select: { logoUrl: true } });
   }
 
@@ -127,7 +135,8 @@ export class AdministracionService {
   }
 
   async deleteLogo(organizacionId: string, usuarioId: string) {
-    const current = await this.getOrganizationLogo(organizacionId, usuarioId);
+    await this.assertAdmin(organizacionId, usuarioId);
+    const current = await this.prisma.organizacion.findUniqueOrThrow({ where: { id: organizacionId }, select: { logoUrl: true } });
     const organization = await this.prisma.organizacion.update({ where: { id: organizacionId }, data: { logoUrl: null } });
     await this.removeStoredLogo(current.logoUrl, null);
     return organization;

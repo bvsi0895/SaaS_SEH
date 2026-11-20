@@ -34,6 +34,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import OrganizationLogo from '../components/common/OrganizationLogo';
 
 const DRAWER_WIDTH = 260;
 
@@ -96,9 +97,7 @@ export default function MainLayout() {
           p: 2,
         }}
       >
-        <Typography variant="h6" color="primary" fontWeight="bold">
-          SEH
-        </Typography>
+        <OrganizationLogo key={activeContextId || 'no-context'} contextId={activeContextId} />
         {isMobile && (
           <IconButton onClick={handleDrawerToggle}>
             <ChevronLeftIcon />

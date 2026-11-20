@@ -64,6 +64,34 @@ describe('AdministracionService logo storage', () => {
     expect(prisma.organizacionMiembro.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizacionId: 'org-1', usuarioId: 'admin-1' }) }));
   });
 
+  it.each([
+    ['Lucía', 'lucia-1', 'AUDITOR_ORGANIZACION'],
+    ['Juan', 'juan-1', 'AUDITOR_ORGANIZACION'],
+  ])('allows %s to read the active consultant logo without admin privileges', async (_name, usuarioId, rol) => {
+    prisma.organizacionMiembro.findFirst.mockResolvedValue({ id: `${usuarioId}-member`, rol });
+    prisma.organizacion.findUniqueOrThrow.mockResolvedValue({ logoUrl: 'uploads/logos/consultora-a.png' });
+    (readFile as jest.Mock).mockResolvedValue(onePixelPng);
+
+    await expect(service.getLogo('consultora-a', usuarioId)).resolves.toEqual(expect.objectContaining({ contentType: 'image/png' }));
+    expect(prisma.organizacionMiembro.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ organizacionId: 'consultora-a', usuarioId, activa: true }),
+    }));
+  });
+
+  it('denies a member from another organization and does not read the stored file', async () => {
+    prisma.organizacionMiembro.findFirst.mockResolvedValue(null);
+
+    await expect(service.getLogo('consultora-a', 'juan-de-consultora-b')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(readFile).not.toHaveBeenCalled();
+    expect(prisma.organizacion.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it('keeps logo deletion restricted to organization administrators', async () => {
+    prisma.organizacionMiembro.findFirst.mockResolvedValue({ id: 'member-1', rol: 'AUDITOR_ORGANIZACION' });
+
+    await expect(service.deleteLogo('org-1', 'member-1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.organizacion.update).not.toHaveBeenCalled();
+  });
   it('does not allow a member without organization admin role to write a logo', async () => {
     prisma.organizacionMiembro.findFirst.mockResolvedValue(null);
     await expect(service.uploadLogo('org-other', 'member-2', {
