@@ -7,7 +7,7 @@ const ONE_PIXEL_PNG = Buffer.from(
   'base64',
 );
 
-type LogoScenario = 'logo' | 'missing' | 'error' | 'switch';
+type LogoScenario = 'logo' | 'missing' | 'error' | 'corrupt' | 'switch';
 
 async function installApiMocks(page: Page, scenario: LogoScenario) {
   await page.addInitScript(() => {
@@ -47,6 +47,10 @@ async function installApiMocks(page: Page, scenario: LogoScenario) {
     if (url.pathname.endsWith('/organizaciones/me/logo')) {
       if (scenario === 'error') {
         await route.abort('failed');
+        return;
+      }
+      if (scenario === 'corrupt') {
+        await route.fulfill({ status: 200, contentType: 'image/png', body: 'not-a-renderable-png' });
         return;
       }
       if (scenario === 'missing' || (scenario === 'switch' && contextId === ORGANIZATION_B)) {
@@ -116,6 +120,13 @@ test.describe('PR #19 logo de consultora', () => {
     await openDashboard(page, 'error');
     await openMobileDrawer(page);
     await expect(page.getByTestId('seh-logo-fallback')).toHaveText('SEH');
+    await expect(page.getByTestId('organization-logo')).toHaveCount(0);
+  });
+
+  test('mantiene SEH si el navegador no puede renderizar una respuesta 200', async ({ page }) => {
+    await openDashboard(page, 'corrupt');
+    await openMobileDrawer(page);
+    await expect(page.getByTestId('seh-logo-fallback')).toBeVisible();
     await expect(page.getByTestId('organization-logo')).toHaveCount(0);
   });
 
