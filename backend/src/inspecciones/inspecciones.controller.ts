@@ -48,12 +48,14 @@ export class InspeccionesController {
   @ApiQuery({ name: 'sector', required: false })
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })
+  @ApiQuery({ name: 'establecimientoId', required: false })
   @ApiResponse({ status: 200, description: 'Lista de inspecciones' })
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('estado') estado?: EstadoInspeccion,
     @Query('usuarioId') usuarioId?: string,
     @Query('asignadoAId') asignadoAId?: string,
@@ -61,6 +63,7 @@ export class InspeccionesController {
     @Query('sector') sector?: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
+    @Query('establecimientoId') establecimientoId?: string,
   ) {
     return this.inspeccionesService.findAll(empresaId, {
       estado,
@@ -70,7 +73,8 @@ export class InspeccionesController {
       sector,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
-    }, organizacionEmpresaId, currentUserRole, currentUserId);
+      establecimientoId,
+    }, organizacionEmpresaId, currentUserRole, currentUserId, accesoEmpresaId);
   }
 
   @Get('me')
@@ -81,9 +85,11 @@ export class InspeccionesController {
     @CurrentUser('id') usuarioId: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('estado') estado?: EstadoInspeccion,
+    @Query('establecimientoId') establecimientoId?: string,
   ) {
-    return this.inspeccionesService.findMine(usuarioId, empresaId, { estado }, organizacionEmpresaId);
+    return this.inspeccionesService.findMine(usuarioId, empresaId, { estado, establecimientoId }, organizacionEmpresaId, accesoEmpresaId);
   }
 
   @Get(':id')
@@ -96,8 +102,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.findOne(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole, accesoEmpresaId);
   }
 
   @Get(':id/resumen')
@@ -109,8 +116,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.getResumen(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.getResumen(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole, accesoEmpresaId);
   }
 
   @Post()
@@ -123,8 +131,9 @@ export class InspeccionesController {
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId, organizacionEmpresaId, currentUserRole);
+    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId, organizacionEmpresaId, currentUserRole, accesoEmpresaId);
   }
 
   @Post(':id/iniciar')
@@ -135,8 +144,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.iniciar(id, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
+    return this.inspeccionesService.iniciar(id, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Post(':id/reasignar')
@@ -149,8 +159,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.reasignar(id, dto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
+    return this.inspeccionesService.reasignar(id, dto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Put(':id')
@@ -163,8 +174,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.update(id, updateInspeccionDto, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole, accesoEmpresaId);
   }
 
   @Patch(':id/item')
@@ -177,8 +189,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
+    return this.inspeccionesService.registrarItem(id, registrarItemDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Patch(':id/items')
@@ -191,8 +204,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
+    return this.inspeccionesService.registrarMultiplesItems(id, registrarDto.items, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Post(':id/finalizar')
@@ -206,8 +220,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole);
+    return this.inspeccionesService.finalizar(id, finalizarDto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Post(':id/cancelar')
@@ -219,8 +234,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
   ) {
-    return this.inspeccionesService.cancelar(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole);
+    return this.inspeccionesService.cancelar(id, empresaId, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, currentUserRole, accesoEmpresaId);
   }
 }
 

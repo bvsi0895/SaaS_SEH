@@ -114,7 +114,7 @@ describe('InspeccionesService respuestas', () => {
     prisma.inspeccion.create.mockResolvedValue({ id: 'inspection-1' });
 
     await service.create(
-      { checklistId: 'checklist-1', sector: 'Producción' },
+      { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1' },
       'user-1',
       'company-1',
       'context-1',
@@ -140,7 +140,7 @@ describe('InspeccionesService respuestas', () => {
     prisma.inspeccion.create.mockResolvedValue({ id: 'inspection-1', estado: EstadoInspeccion.PENDIENTE });
 
     await service.create(
-      { checklistId: 'checklist-1', sector: 'Producción', asignadoAId: 'technician-2', fechaProgramada: '2026-11-20T12:00:00.000Z' },
+      { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2', fechaProgramada: '2026-11-20T12:00:00.000Z' },
       'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR,
     );
 
@@ -159,7 +159,7 @@ describe('InspeccionesService respuestas', () => {
     });
 
     await expect(service.create(
-      { checklistId: 'checklist-1', sector: 'Producción', asignadoAId: 'technician-2' },
+      { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2' },
       'technician-1', 'company-1', 'context-1', Rol.TECNICO,
     )).rejects.toThrow('Un técnico solo puede crear inspecciones propias');
     expect(prisma.inspeccion.create).not.toHaveBeenCalled();
@@ -190,6 +190,7 @@ describe('InspeccionesService respuestas', () => {
       id: 'inspection-1',
       empresaId: 'company-1',
       organizacionEmpresaId: 'context-1',
+      establecimientoId: 'establishment-1',
       estado: EstadoInspeccion.PENDIENTE,
       asignadoAId: 'technician-1',
     });
@@ -210,6 +211,7 @@ describe('InspeccionesService respuestas', () => {
       id: 'inspection-1',
       empresaId: 'company-1',
       organizacionEmpresaId: 'context-1',
+      establecimientoId: 'establishment-1',
       estado: EstadoInspeccion.EN_PROGRESO,
       asignadoAId: 'technician-1',
       items: [{ id: 'inspection-item-1' }],

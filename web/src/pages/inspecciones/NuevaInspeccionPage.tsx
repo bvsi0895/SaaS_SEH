@@ -9,6 +9,7 @@ import { usuariosApi } from '../../api/usuarios';
 import PageHeader from '../../components/common/PageHeader';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useAuth } from '../../contexts/AuthContext';
+import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 
 export default function NuevaInspeccionPage() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function NuevaInspeccionPage() {
   const { user, activeContextId } = useAuth();
   const isTechnician = user?.rol === 'TECNICO';
   const [error, setError] = useState<string | null>(null);
+  const [establecimientoId, setEstablecimientoId] = useState('');
 
   const { data: checklists, isLoading: checklistsLoading } = useQuery({
     queryKey: ['checklists', 'activos', activeContextId, user?.id, user?.rol],
@@ -49,11 +51,16 @@ export default function NuevaInspeccionPage() {
     const normalizedAssignee = asignadoAId?.trim();
     const payload: CreateInspeccionDto = {
       ...requiredFields,
+      establecimientoId,
       ...(fechaProgramada?.trim()
         ? { fechaProgramada: new Date(`${fechaProgramada}T00:00:00.000Z`).toISOString() }
         : {}),
       ...(normalizedAssignee ? { asignadoAId: normalizedAssignee } : {}),
     };
+    if (!establecimientoId) {
+      setError('Seleccioná un establecimiento autorizado');
+      return;
+    }
     createMutation.mutate(payload);
   };
 
@@ -66,6 +73,7 @@ export default function NuevaInspeccionPage() {
             {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
             <Grid container spacing={3}>
               <Grid item xs={12}><Typography variant="h6" gutterBottom>Datos de la inspección</Typography></Grid>
+              <Grid item xs={12} md={6}><EstablishmentSelector value={establecimientoId} onChange={setEstablecimientoId} /></Grid>
               <Grid item xs={12} md={6}>
                 <TextField fullWidth select label="Checklist" error={!!errors.checklistId} helperText={errors.checklistId?.message} disabled={checklistsLoading} {...register('checklistId', { required: 'Selecciona un checklist' })}>
                   {checklists?.map((checklist) => <MenuItem key={checklist.id} value={checklist.id}>{checklist.nombre} ({checklist.tipo})</MenuItem>)}

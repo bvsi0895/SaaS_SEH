@@ -25,6 +25,7 @@ export const hallazgosApi = {
     limit?: number;
     nivelRiesgo?: string;
     inspeccionId?: string;
+    establecimientoId?: string;
   }): Promise<{ data: Hallazgo[]; total: number; isPaginated: boolean }> => {
     const response = await apiClient.get<Hallazgo[] | { data: Hallazgo[]; total: number }>(
       '/hallazgos',

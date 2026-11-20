@@ -26,6 +26,13 @@ export class CreateInspeccionDto {
   @MinLength(2, { message: 'El sector debe tener al menos 2 caracteres' })
   sector: string;
 
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Establecimiento autorizado donde se realizará la inspección',
+  })
+  @IsUUID('4', { message: 'El establecimiento debe ser un UUID válido' })
+  establecimientoId: string;
+
   @ApiPropertyOptional({
     example: 'Inspección mensual de orden y limpieza',
     description: 'Descripción adicional de la inspección',

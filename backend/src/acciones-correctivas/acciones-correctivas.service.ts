@@ -2,14 +2,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccionCorrectivaDto, UpdateAccionCorrectivaDto, CerrarAccionDto } from './dto';
 import { EstadoAccion } from '@prisma/client';
+import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
 export class AccionesCorrectivasService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService) {}
 
   /**
    * Obtener todas las acciones correctivas de una empresa
@@ -23,10 +25,15 @@ export class AccionesCorrectivasService {
       vencidas?: boolean;
       fechaDesde?: Date;
       fechaHasta?: Date;
+      establecimientoId?: string;
     },
     organizacionEmpresaId?: string,
+    accesoEmpresaId?: string,
   ) {
     const now = new Date();
+    const allowed = this.tenancy && accesoEmpresaId ? await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId) : undefined;
+    if (filters?.establecimientoId && allowed !== undefined && !allowed.includes(filters.establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
+    const establishmentFilter = filters?.establecimientoId ? { establecimientoId: filters.establecimientoId } : allowed !== undefined ? { establecimientoId: { in: allowed } } : {};
 
     return this.prisma.accionCorrectiva.findMany({
       where: {
@@ -41,6 +48,7 @@ export class AccionesCorrectivasService {
         }),
         ...(filters?.fechaDesde && { createdAt: { gte: filters.fechaDesde } }),
         ...(filters?.fechaHasta && { createdAt: { lte: filters.fechaHasta } }),
+        hallazgo: { inspeccion: establishmentFilter },
       },
       include: {
         hallazgo: {
@@ -67,7 +75,7 @@ export class AccionesCorrectivasService {
   /**
    * Obtener acción correctiva por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string, accesoEmpresaId?: string) {
     const accion = await this.prisma.accionCorrectiva.findUnique({
       where: { id },
       include: {
@@ -78,6 +86,7 @@ export class AccionesCorrectivasService {
                 id: true,
                 sector: true,
                 checklist: { select: { nombre: true } },
+                establecimientoId: true,
               },
             },
           },
@@ -103,6 +112,10 @@ export class AccionesCorrectivasService {
     }
     if (responsableId && accion.responsableId !== responsableId) {
       throw new NotFoundException('Acción correctiva no encontrada');
+    }
+    if (responsableId && this.tenancy && accesoEmpresaId) {
+      const allowed = await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId || accion.empresaId, organizacionEmpresaId);
+      if (!accion.hallazgo.inspeccion.establecimientoId || (allowed !== undefined && !allowed.includes(accion.hallazgo.inspeccion.establecimientoId))) throw new NotFoundException('Acción correctiva no encontrada');
     }
 
     return accion;
@@ -183,8 +196,8 @@ export class AccionesCorrectivasService {
   /**
    * Actualizar acción correctiva
    */
-  async update(id: string, updateDto: UpdateAccionCorrectivaDto, empresaId?: string, organizacionEmpresaId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async update(id: string, updateDto: UpdateAccionCorrectivaDto, empresaId?: string, organizacionEmpresaId?: string, accesoEmpresaId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, undefined, accesoEmpresaId);
 
     if (accion.estado === EstadoAccion.RESUELTA) {
       throw new BadRequestException('No se puede editar una acción cerrada');
@@ -212,8 +225,8 @@ export class AccionesCorrectivasService {
   /**
    * Cambiar estado a En Progreso
    */
-  async iniciar(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId);
+  async iniciar(id: string, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string, accesoEmpresaId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId, accesoEmpresaId);
 
     if (accion.estado !== EstadoAccion.PENDIENTE) {
       throw new BadRequestException('La acción ya fue iniciada');
@@ -228,8 +241,8 @@ export class AccionesCorrectivasService {
   /**
    * Cerrar acción correctiva
    */
-  async cerrar(id: string, cerrarDto: CerrarAccionDto, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId);
+  async cerrar(id: string, cerrarDto: CerrarAccionDto, empresaId?: string, organizacionEmpresaId?: string, responsableId?: string, accesoEmpresaId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, responsableId, accesoEmpresaId);
 
     if (accion.estado === EstadoAccion.RESUELTA) {
       throw new BadRequestException('La acción ya está cerrada');
@@ -249,8 +262,8 @@ export class AccionesCorrectivasService {
   /**
    * Reabrir acción correctiva
    */
-  async reabrir(id: string, empresaId?: string, organizacionEmpresaId?: string) {
-    const accion = await this.findOne(id, empresaId, organizacionEmpresaId);
+  async reabrir(id: string, empresaId?: string, organizacionEmpresaId?: string, accesoEmpresaId?: string) {
+    const accion = await this.findOne(id, empresaId, organizacionEmpresaId, undefined, accesoEmpresaId);
 
     if (accion.estado !== EstadoAccion.RESUELTA) {
       throw new BadRequestException('La acción no está cerrada');
@@ -268,8 +281,11 @@ export class AccionesCorrectivasService {
   /**
    * Obtener acciones asignadas al usuario actual
    */
-  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoAccion; vencidas?: boolean }, organizacionEmpresaId?: string) {
+  async findMine(usuarioId: string, empresaId: string, filters?: { estado?: EstadoAccion; vencidas?: boolean; establecimientoId?: string }, organizacionEmpresaId?: string, accesoEmpresaId?: string) {
     const now = new Date();
+    const allowed = this.tenancy && accesoEmpresaId ? await this.tenancy.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId) : undefined;
+    if (filters?.establecimientoId && allowed !== undefined && !allowed.includes(filters.establecimientoId)) throw new NotFoundException('Establecimiento no encontrado');
+    const establishmentFilter = filters?.establecimientoId ? { establecimientoId: filters.establecimientoId } : allowed !== undefined ? { establecimientoId: { in: allowed } } : {};
     return this.prisma.accionCorrectiva.findMany({
       where: {
         responsableId: usuarioId,
@@ -280,6 +296,7 @@ export class AccionesCorrectivasService {
           fechaCompromiso: { lt: now },
           estado: { in: [EstadoAccion.PENDIENTE, EstadoAccion.EN_PROGRESO] },
         }),
+        hallazgo: { inspeccion: establishmentFilter },
       },
       include: {
         hallazgo: {

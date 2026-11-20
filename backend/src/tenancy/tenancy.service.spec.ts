@@ -7,6 +7,7 @@ describe('TenancyService', () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
     },
+    establecimiento: { findMany: jest.fn() },
   };
   let service: TenancyService;
 
@@ -77,5 +78,40 @@ describe('TenancyService', () => {
       organizacionMiembroId: 'miembro-a',
       accesoEmpresaId: 'acceso-a',
     })).toThrow(NotFoundException);
+  });
+
+  it('returns only explicit technician assignments and keeps an empty assignment empty', async () => {
+    prisma.accesoEmpresa.findFirst.mockResolvedValue({
+      rol: 'TECNICO',
+      establecimientos: [
+        { establecimientoId: 'est-a', establecimiento: { empresaId: 'empresa-a', activo: true } },
+      ],
+    });
+
+    await expect(service.getEstablishmentScope('access-a', 'empresa-a', 'context-a')).resolves.toEqual(['est-a']);
+
+    prisma.accesoEmpresa.findFirst.mockResolvedValue({ rol: 'TECNICO', establecimientos: [] });
+    await expect(service.getEstablishmentScope('access-a', 'empresa-a', 'context-a')).resolves.toEqual([]);
+    prisma.establecimiento.findMany.mockResolvedValue([]);
+    await expect(service.listEstablishmentsForAccess('access-a', 'empresa-a')).resolves.toEqual([]);
+    expect(prisma.establecimiento.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: { in: [] } }) }));
+  });
+
+  it('returns every explicitly assigned establishment and no establishment outside that list', async () => {
+    prisma.accesoEmpresa.findFirst.mockResolvedValue({
+      rol: 'TECNICO',
+      establecimientos: [
+        { establecimientoId: 'est-a', establecimiento: { empresaId: 'empresa-a', activo: true } },
+        { establecimientoId: 'est-b', establecimiento: { empresaId: 'empresa-a', activo: true } },
+        { establecimientoId: 'est-other-company', establecimiento: { empresaId: 'empresa-b', activo: true } },
+      ],
+    });
+
+    await expect(service.getEstablishmentScope('access-a', 'empresa-a', 'context-a')).resolves.toEqual(['est-a', 'est-b']);
+  });
+
+  it('leaves administrative access unrestricted by establishment rows', async () => {
+    prisma.accesoEmpresa.findFirst.mockResolvedValue({ rol: 'SUPERVISOR', establecimientos: [] });
+    await expect(service.getEstablishmentScope('access-admin', 'empresa-a', 'context-a')).resolves.toBeUndefined();
   });
 });

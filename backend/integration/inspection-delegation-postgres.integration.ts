@@ -1,9 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { PrismaClient, Rol, RolOrganizacion, TipoOrganizacion, EstadoRelacionEmpresa, EstadoInspeccion, CumplimientoItem } from '@prisma/client';
 import { InspeccionesService } from '../src/inspecciones/inspecciones.service';
+import { TenancyService } from '../src/tenancy/tenancy.service';
 
 const prisma = new PrismaClient();
-const service = new InspeccionesService(prisma as never);
+const tenancy = new TenancyService(prisma as never);
+const service = new InspeccionesService(prisma as never, tenancy);
 const ids = {
   empresa: '00000000-0000-0000-0000-000000000501',
   empresaAjena: '00000000-0000-0000-0000-000000000502',
@@ -24,6 +26,7 @@ const ids = {
   contextAccessB: '00000000-0000-0000-0000-000000000517',
   checklist: '00000000-0000-0000-0000-000000000518',
   checklistItem: '00000000-0000-0000-0000-000000000519',
+  establecimiento: '00000000-0000-0000-0000-000000000520',
 };
 
 async function cleanup() {
@@ -31,6 +34,13 @@ async function cleanup() {
   await prisma.inspeccion.deleteMany({ where: { empresaId: { in: [ids.empresa, ids.empresaAjena] } } });
   await prisma.checklistItem.deleteMany({ where: { id: ids.checklistItem } });
   await prisma.checklist.deleteMany({ where: { id: ids.checklist } });
+  await prisma.accesoEstablecimiento.deleteMany({
+    where: {
+      accesoEmpresaId: { in: [ids.contextAccessAdmin, ids.contextAccessSupervisor, ids.contextAccessA, ids.contextAccessB] },
+      establecimientoId: ids.establecimiento,
+    },
+  });
+  await prisma.establecimiento.deleteMany({ where: { id: ids.establecimiento } });
   await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.contextAccessAdmin, ids.contextAccessSupervisor, ids.contextAccessA, ids.contextAccessB] } } });
   await prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.memberAdmin, ids.memberSupervisor, ids.memberA, ids.memberB] } } });
   await prisma.usuario.deleteMany({ where: { id: { in: [ids.admin, ids.supervisor, ids.tecnicoA, ids.tecnicoB, ids.tecnicoAjeno] } } });
@@ -45,6 +55,7 @@ async function main() {
     await prisma.empresa.createMany({ data: [{ id: ids.empresa, nombre: 'Delegation company' }, { id: ids.empresaAjena, nombre: 'Other company' }] });
     await prisma.organizacion.create({ data: { id: ids.organizacion, nombre: 'Delegation organization', tipo: TipoOrganizacion.CONSULTORA } });
     await prisma.organizacionEmpresa.create({ data: { id: ids.contexto, organizacionId: ids.organizacion, empresaId: ids.empresa, estado: EstadoRelacionEmpresa.ACTIVA } });
+    await prisma.establecimiento.create({ data: { id: ids.establecimiento, empresaId: ids.empresa, nombre: 'Delegation site' } });
     await prisma.usuario.createMany({ data: [
       { id: ids.admin, email: 'delegation-admin@seh.test', password: 'hash', nombre: 'Admin', apellido: 'Delegation', rol: Rol.ADMIN_EMPRESA, empresaId: ids.empresa },
       { id: ids.supervisor, email: 'delegation-supervisor@seh.test', password: 'hash', nombre: 'Supervisor', apellido: 'Delegation', rol: Rol.SUPERVISOR, empresaId: ids.empresa },
@@ -64,30 +75,34 @@ async function main() {
       { id: ids.contextAccessA, organizacionEmpresaId: ids.contexto, organizacionMiembroId: ids.memberA, organizacionId: ids.organizacion, empresaId: ids.empresa, rol: Rol.TECNICO },
       { id: ids.contextAccessB, organizacionEmpresaId: ids.contexto, organizacionMiembroId: ids.memberB, organizacionId: ids.organizacion, empresaId: ids.empresa, rol: Rol.TECNICO },
     ] });
+    await prisma.accesoEstablecimiento.createMany({ data: [
+      { accesoEmpresaId: ids.contextAccessA, establecimientoId: ids.establecimiento, empresaId: ids.empresa },
+      { accesoEmpresaId: ids.contextAccessB, establecimientoId: ids.establecimiento, empresaId: ids.empresa },
+    ] });
     await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Delegation checklist', empresaId: ids.empresa, organizacionEmpresaId: ids.contexto, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
 
-    const adminDelegated = await service.create({ checklistId: ids.checklist, sector: 'Admin sector', asignadoAId: ids.tecnicoA }, ids.admin, ids.empresa, ids.contexto, Rol.ADMIN_EMPRESA);
+    const adminDelegated = await service.create({ checklistId: ids.checklist, sector: 'Admin sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoA }, ids.admin, ids.empresa, ids.contexto, Rol.ADMIN_EMPRESA, ids.contextAccessAdmin);
     assert.equal(adminDelegated.estado, EstadoInspeccion.PENDIENTE, 'admin delegation must remain pending');
     assert.equal(adminDelegated.fechaHoraInicio, null, 'pending delegation must not have a real start date');
-    const supervisorDelegated = await service.create({ checklistId: ids.checklist, sector: 'Supervisor sector', asignadoAId: ids.tecnicoB }, ids.supervisor, ids.empresa, ids.contexto, Rol.SUPERVISOR);
+    const supervisorDelegated = await service.create({ checklistId: ids.checklist, sector: 'Supervisor sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoB }, ids.supervisor, ids.empresa, ids.contexto, Rol.SUPERVISOR, ids.contextAccessSupervisor);
     assert.equal(supervisorDelegated.estado, EstadoInspeccion.PENDIENTE, 'supervisor delegation must remain pending');
-    const technicianOwn = await service.create({ checklistId: ids.checklist, sector: 'Own sector' }, ids.tecnicoA, ids.empresa, ids.contexto, Rol.TECNICO);
+    const technicianOwn = await service.create({ checklistId: ids.checklist, sector: 'Own sector', establecimientoId: ids.establecimiento }, ids.tecnicoA, ids.empresa, ids.contexto, Rol.TECNICO, ids.contextAccessA);
     assert.equal(technicianOwn.asignadoAId, ids.tecnicoA);
     assert.equal(technicianOwn.estado, EstadoInspeccion.EN_PROGRESO);
 
-    const assigned = await service.findAll(ids.empresa, undefined, ids.contexto, Rol.TECNICO, ids.tecnicoA);
+    const assigned = await service.findAll(ids.empresa, undefined, ids.contexto, Rol.TECNICO, ids.tecnicoA, ids.contextAccessA);
     assert.deepEqual(assigned.map((inspection) => inspection.id).sort(), [adminDelegated.id, technicianOwn.id].sort());
-    await assert.rejects(service.findOne(supervisorDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO), /no encontrada/i);
+    await assert.rejects(service.findOne(supervisorDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO, ids.contextAccessA), /no encontrada/i);
     await assert.rejects(service.iniciar(adminDelegated.id, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
-    const started = await service.iniciar(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    const started = await service.iniciar(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO, ids.contextAccessA);
     assert.equal(started.estado, EstadoInspeccion.EN_PROGRESO);
     assert.ok(started.fechaHoraInicio, 'starting must set the real start date');
-    const startedDetail = await service.findOne(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    const startedDetail = await service.findOne(adminDelegated.id, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO, ids.contextAccessA);
     const inspectionItemId = startedDetail.items[0].id;
     await assert.rejects(service.registrarItem(adminDelegated.id, { inspeccionItemId: inspectionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA), /no encontrada/i);
-    await service.registrarItem(adminDelegated.id, { inspeccionItemId: inspectionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    await service.registrarItem(adminDelegated.id, { inspeccionItemId: inspectionItemId, cumplimiento: CumplimientoItem.CUMPLE }, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO, ids.contextAccessA);
     await assert.rejects(service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.supervisor, Rol.SUPERVISOR), /no encontrada/i);
-    const completed = await service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO);
+    const completed = await service.finalizar(adminDelegated.id, {}, ids.empresa, ids.contexto, ids.tecnicoA, Rol.TECNICO, ids.contextAccessA);
     assert.equal(completed.estado, EstadoInspeccion.COMPLETADA);
 
     const reassigned = await service.reasignar(supervisorDelegated.id, { asignadoAId: ids.tecnicoA }, ids.empresa, ids.contexto, ids.admin, Rol.ADMIN_EMPRESA);

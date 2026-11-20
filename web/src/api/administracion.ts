@@ -27,6 +27,6 @@ export const administracionApi = {
   createEstablishment: async (id: string, data: CreateEstablecimientoDto) => (await apiClient.post<Establecimiento>(`/organizaciones/me/empresas/${id}/establecimientos`, data)).data,
   updateEstablishment: async (relationId: string, id: string, data: Partial<CreateEstablecimientoDto> & { activo?: boolean }) => (await apiClient.patch<Establecimiento>(`/organizaciones/me/empresas/${relationId}/establecimientos/${id}`, data)).data,
   getAssignments: async (id: string) => (await apiClient.get(`/organizaciones/me/empresas/${id}/asignaciones`)).data,
-  assign: async (id: string, organizacionMiembroId: string, rol: Rol) => (await apiClient.post(`/organizaciones/me/empresas/${id}/asignaciones`, { organizacionMiembroId, rol })).data,
+  assign: async (id: string, organizacionMiembroId: string, rol: Rol, establecimientoIds: string[] = []) => (await apiClient.post(`/organizaciones/me/empresas/${id}/asignaciones`, { organizacionMiembroId, rol, establecimientoIds })).data,
   revokeAssignment: async (relationId: string, accessId: string) => (await apiClient.post(`/organizaciones/me/empresas/${relationId}/asignaciones/${accessId}/revocar`)).data,
 };
