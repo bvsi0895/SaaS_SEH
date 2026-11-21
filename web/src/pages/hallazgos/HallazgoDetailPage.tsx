@@ -28,7 +28,7 @@ import {
 import { Add as AddIcon, Close as CloseIcon, PhotoLibrary as PhotoLibraryIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { hallazgosApi } from '../../api/hallazgos';
+import { hallazgosApi, ResolverHallazgoDto } from '../../api/hallazgos';
 import { accionesApi, CreateAccionDto } from '../../api/acciones';
 import { getQueryScope, invalidateActionQueries, invalidateFindingQueries, queryKeys } from '../../queryKeys';
 import { usuariosApi } from '../../api/usuarios';
@@ -78,6 +78,12 @@ export default function HallazgoDetailPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [resolutionDialogOpen, setResolutionDialogOpen] = useState(false);
+  const [resolutionMode, setResolutionMode] = useState<'immediate' | 'verify'>('immediate');
+  const [resolution, setResolution] = useState<ResolverHallazgoDto>({
+    descripcionSolucion: '',
+    fechaResolucion: new Date().toISOString().slice(0, 16),
+  });
 
   const { data: hallazgo, isLoading } = useQuery({
     queryKey: queryKeys.finding(id || '', queryScope),
@@ -191,6 +197,19 @@ export default function HallazgoDetailPage() {
     }
   };
 
+  const resolutionMutation = useMutation({
+    mutationFn: (data: ResolverHallazgoDto) => resolutionMode === 'immediate'
+      ? hallazgosApi.resolver(id!, data)
+      : hallazgosApi.verificarResolucion(id!, data),
+    onSuccess: async () => {
+      showSuccess(resolutionMode === 'immediate' ? 'Corrección inmediata registrada' : 'Hallazgo solucionado y verificado');
+      await invalidateFindingQueries(queryClient, queryScope, id);
+      setResolutionDialogOpen(false);
+      setResolution({ descripcionSolucion: '', fechaResolucion: new Date().toISOString().slice(0, 16) });
+    },
+    onError: (error: any) => showError(error?.response?.data?.message || 'No se pudo registrar la resolución'),
+  });
+
   if (isLoading) {
     return (
       <Box>
@@ -205,6 +224,10 @@ export default function HallazgoDetailPage() {
   }
 
   const canModifyHallazgo = !isTechnician || hallazgo.inspeccion?.asignadoA?.id === user?.id;
+  const canResolveHallazgo = canModifyHallazgo && hallazgo.estado !== 'SOLUCIONADO';
+  const correctiveActions = hallazgo.accionesCorrectivas || [];
+  const hasCorrectiveActions = correctiveActions.length > 0;
+  const allActionsResolved = hasCorrectiveActions && correctiveActions.every((accion) => accion.estado === 'RESUELTA');
 
   return (
     <Box>
@@ -245,6 +268,32 @@ export default function HallazgoDetailPage() {
                   <Box sx={{ mt: 0.5 }}>
                     <StatusChip status={hallazgo.nivelRiesgo} type="riesgo" />
                   </Box>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Estado del hallazgo</Typography>
+                  <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <StatusChip status={hallazgo.estado} type="hallazgo" />
+                    {hallazgo.fechaResolucion && <Typography variant="caption">Resuelto el {format(new Date(hallazgo.fechaResolucion), 'dd/MM/yyyy HH:mm', { locale: es })}</Typography>}
+                  </Box>
+                  {hallazgo.descripcionSolucion && <Typography variant="body2" sx={{ mt: 1 }}>{hallazgo.descripcionSolucion}</Typography>}
+                  {canResolveHallazgo && (
+                    <>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                        {!hasCorrectiveActions && <Button size="small" variant="contained" onClick={() => { setResolutionMode('immediate'); setResolutionDialogOpen(true); }}>
+                          Registrar corrección inmediata
+                        </Button>}
+                        {allActionsResolved && <Button size="small" variant="outlined" onClick={() => { setResolutionMode('verify'); setResolutionDialogOpen(true); }}>
+                          Verificar solución
+                        </Button>}
+                      </Box>
+                      {hasCorrectiveActions && !allActionsResolved && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                          Las acciones pendientes deben ejecutarse antes de verificar el hallazgo.
+                        </Typography>
+                      )}
+                    </>
+                  )}
                 </Box>
 
                 <Box>
@@ -401,6 +450,21 @@ export default function HallazgoDetailPage() {
                   ))}
                 </List>
               )}
+              {hallazgo.historial && hallazgo.historial.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>Historial de resolución</Typography>
+                  <List dense>
+                    {hallazgo.historial.map((evento) => (
+                      <ListItem key={evento.id} divider>
+                        <ListItemText
+                          primary={`${evento.tipo.replace(/_/g, ' ')} · ${format(new Date(evento.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}`}
+                          secondary={`${evento.descripcion}${evento.usuario ? ` · por ${evento.usuario.nombre} ${evento.usuario.apellido}` : ''}`}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -421,6 +485,72 @@ export default function HallazgoDetailPage() {
       </Dialog>
 
       {/* Dialog para nueva accion */}
+      <Dialog
+        open={resolutionDialogOpen}
+        onClose={() => setResolutionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{resolutionMode === 'immediate' ? 'Registrar corrección inmediata' : 'Verificar solución'}</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+            El hallazgo se conserva y esta intervención quedará registrada en el historial de auditoría.
+          </Alert>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Descripción de la solución"
+            value={resolution.descripcionSolucion}
+            onChange={(e) => setResolution({ ...resolution, descripcionSolucion: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            type="datetime-local"
+            label="Fecha y hora"
+            value={resolution.fechaResolucion}
+            onChange={(e) => setResolution({ ...resolution, fechaResolucion: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+            sx={{ mb: 2 }}
+          />
+          {resolutionMode === 'verify' && (
+            <TextField
+              fullWidth
+              select
+              label="Acción correctiva verificada"
+              value={resolution.accionCorrectivaId || ''}
+              onChange={(e) => setResolution({ ...resolution, accionCorrectivaId: e.target.value })}
+              sx={{ mb: 2 }}
+            >
+              {(hallazgo.accionesCorrectivas || []).filter((accion) => accion.estado === 'RESUELTA').map((accion) => (
+                <MenuItem key={accion.id} value={accion.id}>{accion.descripcion}</MenuItem>
+              ))}
+            </TextField>
+          )}
+          <TextField
+            fullWidth
+            select
+            label="Responsable de la solución (opcional)"
+            value={resolution.responsableId || ''}
+            onChange={(e) => setResolution({ ...resolution, responsableId: e.target.value || undefined })}
+          >
+            <MenuItem value="">Sin asignar</MenuItem>
+            {tecnicos?.map((tecnico) => <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>)}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResolutionDialogOpen(false)}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={() => resolutionMutation.mutate({ ...resolution, evidenciaUrls: getPhotoPaths(hallazgo.fotosUrls) })}
+            disabled={resolution.descripcionSolucion.trim().length < 10 || resolutionMutation.isPending}
+          >
+            {resolutionMutation.isPending ? 'Guardando...' : 'Guardar resolución'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog
         open={accionDialogOpen}
         onClose={() => setAccionDialogOpen(false)}

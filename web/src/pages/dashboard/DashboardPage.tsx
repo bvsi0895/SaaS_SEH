@@ -260,6 +260,28 @@ export default function DashboardPage() {
             )}
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
+            {kpisLoading ? <Skeleton variant="rectangular" height={140} /> : kpis && (
+              <KPICard
+                title="Hallazgos en corrección"
+                value={kpis.hallazgosEnCorreccion}
+                subtitle="Intervención pendiente de verificación"
+                icon={<AccionIcon />}
+                color="#1976d2"
+              />
+            )}
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            {kpisLoading ? <Skeleton variant="rectangular" height={140} /> : kpis && (
+              <KPICard
+                title="Hallazgos solucionados"
+                value={kpis.hallazgosSolucionados}
+                subtitle="Corrección verificada"
+                icon={<CheckIcon />}
+                color="#2e7d32"
+              />
+            )}
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
             {kpisLoading ? (
               <Skeleton variant="rectangular" height={140} />
             ) : (

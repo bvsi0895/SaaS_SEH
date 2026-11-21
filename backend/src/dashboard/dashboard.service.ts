@@ -4,6 +4,7 @@ import { TenancyService } from '../tenancy/tenancy.service';
 import {
   CumplimientoItem,
   EstadoAccion,
+  EstadoHallazgo,
   EstadoInspeccion,
   Rol,
 } from '@prisma/client';
@@ -106,8 +107,8 @@ export class DashboardService {
 
   /**
    * Definitions: started inspections have fechaHoraInicio; pending inspections
-   * are excluded. A finding is open when it has no corrective action or at
-   * least one action that is not RESUELTA. Compliance is CUMPLE divided by all
+   * are excluded. A finding is open while its lifecycle state is PENDIENTE or
+   * EN_CORRECCION; SOLUCIONADO is the only closed state. Compliance is CUMPLE divided by all
    * evaluable items; NO_APLICA is excluded, while pending/NO_CUMPLE/OBSERVACION
    * remain in the denominator as not fulfilled.
    */
@@ -148,6 +149,7 @@ export class DashboardService {
       hallazgos,
       hallazgosAbiertos,
       hallazgosPorNivel,
+      hallazgosPorEstado,
       hallazgosSinAccion,
       acciones,
       accionesPorEstado,
@@ -171,18 +173,16 @@ export class DashboardService {
       this.prisma.hallazgo.count({
         where: {
           ...findingWhere,
-          OR: [
-            { accionesCorrectivas: { none: {} } },
-            {
-              accionesCorrectivas: {
-                some: { estado: { not: EstadoAccion.RESUELTA } },
-              },
-            },
-          ],
+          estado: { in: [EstadoHallazgo.PENDIENTE, EstadoHallazgo.EN_CORRECCION] },
         },
       }),
       this.prisma.hallazgo.groupBy({
         by: ['nivelRiesgo'],
+        _count: true,
+        where: findingWhere,
+      }),
+      this.prisma.hallazgo.groupBy({
+        by: ['estado'],
         _count: true,
         where: findingWhere,
       }),
@@ -240,6 +240,7 @@ export class DashboardService {
         abiertos: hallazgosAbiertos,
         sinAccion: hallazgosSinAccion,
         porNivel: this.formatGroupBy(hallazgosPorNivel, 'nivelRiesgo'),
+        porEstado: this.formatGroupBy(hallazgosPorEstado, 'estado'),
       },
       accionesCorrectivas: {
         total: acciones,
@@ -472,6 +473,8 @@ export class DashboardService {
       hallazgosAbiertos: resumen.hallazgos.abiertos,
       hallazgosCriticos: porNivel.CRITICO || 0,
       hallazgosAltos: porNivel.ALTO || 0,
+      hallazgosEnCorreccion: resumen.hallazgos.porEstado[EstadoHallazgo.EN_CORRECCION] || 0,
+      hallazgosSolucionados: resumen.hallazgos.porEstado[EstadoHallazgo.SOLUCIONADO] || 0,
       accionesTotal: resumen.accionesCorrectivas.total,
       accionesPendientes: porEstado.PENDIENTE || 0,
       accionesEnProgreso: porEstado.EN_PROGRESO || 0,

@@ -71,6 +71,19 @@ enum NivelRiesgo {
   CRITICO
 }
 
+enum EstadoHallazgo {
+  PENDIENTE
+  EN_CORRECCION
+  SOLUCIONADO
+}
+
+enum TipoEventoHallazgo {
+  CREACION
+  CAMBIO_ESTADO
+  CORRECCION_INMEDIATA
+  VERIFICACION
+}
+
 enum EstadoAccion {
   PENDIENTE
   EN_PROGRESO
@@ -131,6 +144,9 @@ model Usuario {
   reasignacionesRealizadas InspeccionReasignacion[] @relation("ReasignacionEfectuadaPor")
   accionesAsignadas        AccionCorrectiva[]       @relation("AccionAsignada")
   accionesCreadoras        AccionCorrectiva[]       @relation("AccionCreador")
+  resolucionesHallazgos    Hallazgo[]               @relation("HallazgoResponsableResolucion")
+  historialHallazgos       HallazgoHistorial[]      @relation("HallazgoHistorialUsuario")
+  historialResponsables    HallazgoHistorial[]      @relation("HallazgoHistorialResponsable")
   membresiasOrganizacion   OrganizacionMiembro[]
 
   @@index([email])
@@ -288,7 +304,13 @@ model Hallazgo {
   titulo         String
   descripcion    String
   nivelRiesgo    NivelRiesgo @default(MEDIO)
+  estado         EstadoHallazgo @default(PENDIENTE)
   ubicacionTexto String
+
+  fechaResolucion        DateTime?
+  descripcionSolucion    String?
+  responsableResolucionId String?
+  responsableResolucion  Usuario? @relation("HallazgoResponsableResolucion", fields: [responsableResolucionId], references: [id])
 
   // Fotos (almacenamos URLs separadas por comas o JSON)
   fotosUrls String? // JSON array de URLs
@@ -306,10 +328,35 @@ model Hallazgo {
 
   // Relaciones
   accionesCorrectivas AccionCorrectiva[]
+  historial           HallazgoHistorial[]
 
   @@index([inspeccionId])
   @@index([nivelRiesgo])
+  @@index([estado])
+  @@index([responsableResolucionId])
   @@map("hallazgos")
+}
+
+model HallazgoHistorial {
+  id              String             @id @default(uuid())
+  hallazgoId      String
+  tipo            TipoEventoHallazgo
+  estadoAnterior  EstadoHallazgo?
+  estadoNuevo     EstadoHallazgo?
+  descripcion     String
+  evidenciaUrls   String?
+  accionCorrectivaId String?
+  usuarioId       String
+  responsableId   String?
+  createdAt       DateTime           @default(now())
+
+  hallazgo        Hallazgo @relation(fields: [hallazgoId], references: [id], onDelete: Cascade)
+  usuario         Usuario  @relation("HallazgoHistorialUsuario", fields: [usuarioId], references: [id])
+  responsable     Usuario? @relation("HallazgoHistorialResponsable", fields: [responsableId], references: [id])
+
+  @@index([hallazgoId, createdAt])
+  @@index([accionCorrectivaId])
+  @@map("hallazgos_historial")
 }
 
 model AccionCorrectiva {

@@ -3,7 +3,7 @@ import { statusColors, riskColors } from '../../theme';
 
 interface StatusChipProps extends Omit<ChipProps, 'color'> {
   status: string;
-  type?: 'estado' | 'riesgo' | 'cumplimiento';
+  type?: 'estado' | 'riesgo' | 'cumplimiento' | 'hallazgo';
 }
 
 const estadoLabels: Record<string, string> = {
@@ -38,6 +38,18 @@ const cumplimientoColors: Record<string, string> = {
   OBSERVACION: '#ed6c02',
 };
 
+const hallazgoLabels: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  EN_CORRECCION: 'En corrección',
+  SOLUCIONADO: 'Solucionado',
+};
+
+const hallazgoColors: Record<string, string> = {
+  PENDIENTE: '#d99a00',
+  EN_CORRECCION: '#1976d2',
+  SOLUCIONADO: '#2e7d32',
+};
+
 export default function StatusChip({ status, type = 'estado', ...props }: StatusChipProps) {
   let label = status;
   let backgroundColor = '#9e9e9e';
@@ -51,6 +63,9 @@ export default function StatusChip({ status, type = 'estado', ...props }: Status
   } else if (type === 'cumplimiento') {
     label = cumplimientoLabels[status] || status;
     backgroundColor = cumplimientoColors[status] || '#9e9e9e';
+  } else if (type === 'hallazgo') {
+    label = hallazgoLabels[status] || status;
+    backgroundColor = hallazgoColors[status] || '#9e9e9e';
   }
 
   return (

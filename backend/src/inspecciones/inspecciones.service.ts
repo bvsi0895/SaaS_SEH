@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,7 +14,7 @@ import {
   FinalizarInspeccionDto,
   ReasignarInspeccionDto,
 } from './dto';
-import { EstadoInspeccion, CumplimientoItem, Rol, EstadoRelacionEmpresa } from '@prisma/client';
+import { EstadoHallazgo, EstadoInspeccion, CumplimientoItem, Rol, EstadoRelacionEmpresa } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
@@ -219,6 +220,7 @@ export class InspeccionesService {
     const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('La inspección no está en progreso');
     if (!inspeccion.items.some((item) => item.id === dto.inspeccionItemId)) throw new NotFoundException('Item no encontrado en esta inspección');
+    await this.assertNoOpenFindingBeforeCompliance(inspeccion.id, [{ inspeccionItemId: dto.inspeccionItemId, cumplimiento: dto.cumplimiento }]);
     return this.prisma.inspeccionItem.update({ where: { id: dto.inspeccionItemId }, data: { cumplimiento: dto.cumplimiento, observacion: dto.observacion }, include: { checklistItem: true } });
   }
 
@@ -226,8 +228,32 @@ export class InspeccionesService {
     const inspeccion = await this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
     if (inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) throw new BadRequestException('La inspección no está en progreso');
     if (items.some((item) => !inspeccion.items.some((existing) => existing.id === item.inspeccionItemId))) throw new NotFoundException('Uno de los items no pertenece a esta inspección');
+    await this.assertNoOpenFindingBeforeCompliance(inspeccion.id, items);
     await this.prisma.$transaction(items.map((item) => this.prisma.inspeccionItem.update({ where: { id: item.inspeccionItemId }, data: { cumplimiento: item.cumplimiento, observacion: item.observacion } })));
     return this.findOne(id, empresaId, organizacionEmpresaId, usuarioId, currentUserRole, accesoEmpresaId);
+  }
+
+  private async assertNoOpenFindingBeforeCompliance(inspeccionId: string, items: Array<{ inspeccionItemId: string; cumplimiento: CumplimientoItem }>) {
+    const itemIds = items.filter((item) => item.cumplimiento === CumplimientoItem.CUMPLE).map((item) => item.inspeccionItemId);
+    if (itemIds.length === 0) return;
+    // Keeps isolated unit callers that provide only the inspection mock backward compatible;
+    // the real Prisma client always exposes this delegate.
+    if (!this.prisma.hallazgo?.findMany) return;
+    const findings = await this.prisma.hallazgo.findMany({
+      where: {
+        inspeccionId,
+        inspeccionItemId: { in: itemIds },
+        estado: { not: EstadoHallazgo.SOLUCIONADO },
+      },
+      select: { id: true, titulo: true, estado: true, inspeccionItemId: true },
+    });
+    if (findings.length > 0) {
+      throw new ConflictException({
+        code: 'OPEN_FINDING_REQUIRES_RESOLUTION',
+        message: 'El ítem tiene un hallazgo abierto. Registre y verifique su resolución antes de cambiarlo a Cumple.',
+        findings,
+      });
+    }
   }
 
   async update(id: string, dto: UpdateInspeccionDto, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, currentUserRole?: Rol, accesoEmpresaId?: string) {

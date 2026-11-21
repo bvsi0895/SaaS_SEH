@@ -44,3 +44,18 @@ test('PR #22 loads authorized evidence photos for the inspection report', async 
   assert.match(generator, /\.rotate\(\)\.png\(\)/);
   assert.match(generator, /doc\.image\(photo\.buffer/);
 });
+
+test('PR #23 reports preserve finding lifecycle state and resolution details', async () => {
+  const [service, inspectionGenerator, monthlyGenerator] = await Promise.all([
+    read('backend/src/reportes/reportes.service.ts'),
+    read('backend/src/reportes/generators/pdf-inspeccion.generator.ts'),
+    read('backend/src/reportes/generators/pdf-mensual.generator.ts'),
+  ]);
+  assert.match(service, /fechaResolucion: true/);
+  assert.match(service, /descripcionSolucion: true/);
+  assert.match(service, /responsableResolucion: \{ select: \{ nombre: true, apellido: true \} \}/);
+  assert.match(inspectionGenerator, /Estado: \$\{this\.getHallazgoStatusText\(hallazgo\.estado\)\}/);
+  assert.match(inspectionGenerator, /Resolución\$\{fecha\}\$\{responsable\}/);
+  assert.match(monthlyGenerator, /estado: \$\{this\.hallazgoState\(item\.estado\)\}/);
+  assert.match(monthlyGenerator, /descripcionSolucion/);
+});

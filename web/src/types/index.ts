@@ -14,6 +14,7 @@ export type EstadoInspeccion =
 export type CumplimientoItem =
   'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA' | 'OBSERVACION';
 export type NivelRiesgo = 'BAJO' | 'MEDIO' | 'ALTO' | 'CRITICO';
+export type EstadoHallazgo = 'PENDIENTE' | 'EN_CORRECCION' | 'SOLUCIONADO';
 export type EstadoAccion = 'PENDIENTE' | 'EN_PROGRESO' | 'RESUELTA' | 'VENCIDA';
 
 // Entities
@@ -176,15 +177,33 @@ export interface Hallazgo {
   titulo: string;
   descripcion: string;
   nivelRiesgo: NivelRiesgo;
+  estado: EstadoHallazgo;
   ubicacionTexto: string;
+  fechaResolucion?: string;
+  descripcionSolucion?: string;
+  responsableResolucion?: Usuario;
   ubicacionGps?: string;
   fotosUrls?: string;
   inspeccionId: string;
   inspeccionItemId?: string;
   inspeccion?: Inspeccion;
   accionesCorrectivas?: AccionCorrectiva[];
+  historial?: HallazgoHistorial[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface HallazgoHistorial {
+  id: string;
+  tipo: 'CREACION' | 'CAMBIO_ESTADO' | 'CORRECCION_INMEDIATA' | 'VERIFICACION';
+  estadoAnterior?: EstadoHallazgo;
+  estadoNuevo?: EstadoHallazgo;
+  descripcion: string;
+  evidenciaUrls?: string;
+  accionCorrectivaId?: string;
+  usuario?: Pick<Usuario, 'id' | 'nombre' | 'apellido'>;
+  responsable?: Pick<Usuario, 'id' | 'nombre' | 'apellido'>;
+  createdAt: string;
 }
 
 export interface AccionCorrectiva {
@@ -233,6 +252,8 @@ export interface DashboardKPIs {
   hallazgosAbiertos: number;
   hallazgosCriticos: number;
   hallazgosAltos: number;
+  hallazgosEnCorreccion: number;
+  hallazgosSolucionados: number;
   accionesTotal: number;
   accionesPendientes: number;
   accionesEnProgreso: number;

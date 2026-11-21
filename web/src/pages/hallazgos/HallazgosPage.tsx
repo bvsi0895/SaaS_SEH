@@ -39,17 +39,19 @@ export default function HallazgosPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [nivelRiesgoFilter, setNivelRiesgoFilter] = useState<string>('');
+  const [estadoFilter, setEstadoFilter] = useState<string>('');
   const [establecimientoId, setEstablecimientoId] = useState('');
   const { user, activeContextId } = useAuth();
   const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
   const { data, isLoading } = useQuery({
-    queryKey: [...queryKeys.findings(queryScope), page, pageSize, nivelRiesgoFilter, establecimientoId],
+    queryKey: [...queryKeys.findings(queryScope), page, pageSize, nivelRiesgoFilter, estadoFilter, establecimientoId],
     queryFn: () =>
       hallazgosApi.getAll({
         page: page + 1,
         limit: pageSize,
         nivelRiesgo: nivelRiesgoFilter || undefined,
+        estado: estadoFilter || undefined,
         establecimientoId: establecimientoId || undefined,
       }),
   });
@@ -70,10 +72,18 @@ export default function HallazgosPage() {
     {
       field: 'nivelRiesgo',
       headerName: 'Nivel de Riesgo',
-      width: 130,
+      width: 120,
+      renderHeader: () => <span>Nivel de<br />Riesgo</span>,
+      headerAlign: 'center',
       renderCell: (params: GridRenderCellParams) => (
         <StatusChip status={params.value} type="riesgo" />
       ),
+    },
+    {
+      field: 'estado',
+      headerName: 'Estado',
+      width: 130,
+      renderCell: (params: GridRenderCellParams) => <StatusChip status={params.value} type="hallazgo" />,
     },
     {
       field: 'inspeccion',
@@ -87,6 +97,7 @@ export default function HallazgosPage() {
       headerName: 'Técnico inspector',
       flex: 1,
       minWidth: 170,
+      renderHeader: () => <span>Técnico<br />inspector</span>,
       valueGetter: (params) => {
         const usuario = params.row.inspeccion?.usuario;
         return usuario ? `${usuario.nombre} ${usuario.apellido}` : '-';
@@ -97,6 +108,7 @@ export default function HallazgosPage() {
       headerName: 'Responsables de acciones',
       flex: 1,
       minWidth: 190,
+      renderHeader: () => <span>Responsables<br />de acciones</span>,
       valueGetter: (params) => {
         const responsables = (params.row.accionesCorrectivas || [])
           .map((accion: any) => accion.responsable)
@@ -163,6 +175,20 @@ export default function HallazgosPage() {
               <TextField
                 fullWidth
                 select
+                label="Estado"
+                value={estadoFilter}
+                onChange={(e) => { setEstadoFilter(e.target.value); setPage(0); }}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="PENDIENTE">Pendiente</MenuItem>
+                <MenuItem value="EN_CORRECCION">En corrección</MenuItem>
+                <MenuItem value="SOLUCIONADO">Solucionado</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                select
                 label="Nivel de Riesgo"
                 value={nivelRiesgoFilter}
                 onChange={(e) => {
@@ -196,8 +222,10 @@ export default function HallazgosPage() {
           pageSizeOptions={[10, 25, 50]}
           disableRowSelectionOnClick
           autoHeight
+          columnHeaderHeight={58}
           sx={{
-            border: 'none',
+            minWidth: 980,
+            '& .MuiDataGrid-columnHeaderTitle': { whiteSpace: 'normal', lineHeight: 1.15 },
             '& .MuiDataGrid-cell:focus': {
               outline: 'none',
             },

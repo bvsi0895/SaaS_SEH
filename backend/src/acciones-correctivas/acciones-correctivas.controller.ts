@@ -167,7 +167,8 @@ export class AccionesCorrectivasController {
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
   ) {
-    return this.accionesCorrectivasService.reabrir(id, empresaId, organizacionEmpresaId, accesoEmpresaId);
+    return this.accionesCorrectivasService.reabrir(id, empresaId, organizacionEmpresaId, accesoEmpresaId, currentUserId);
   }
 }

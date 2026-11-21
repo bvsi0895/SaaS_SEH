@@ -38,6 +38,10 @@ interface InspeccionData {
     titulo: string;
     descripcion: string;
     nivelRiesgo: NivelRiesgo;
+    estado?: string;
+    fechaResolucion?: Date | null;
+    descripcionSolucion?: string | null;
+    responsableResolucion?: { nombre: string; apellido: string } | null;
     ubicacionTexto?: string | null;
     fotosUrls?: string | null;
     accionesCorrectivas: Array<{ descripcion: string; estado: string }>;
@@ -214,14 +218,24 @@ export class PDFInspeccionGenerator {
     }
     doc.fillColor('#222').font('Helvetica').fontSize(9).text(`Total: ${data.hallazgos.length} hallazgo(s)`).moveDown(0.45);
     data.hallazgos.forEach((hallazgo, index) => {
-      this.ensureSpace(doc, 90, data);
+      this.ensureSpace(doc, 135, data);
       const start = doc.y;
       const riskColor = this.getRiesgoColor(hallazgo.nivelRiesgo);
       doc.rect(this.left, start, 5, 20).fill(riskColor);
       doc.fillColor('#222').font('Helvetica-Bold').fontSize(10.5).text(`${index + 1}. ${this.display(hallazgo.titulo)}`, this.left + 14, start, { width: this.contentWidth - 14 });
       doc.fillColor(riskColor).font('Helvetica-Bold').fontSize(8.5).text(`Nivel de riesgo: ${hallazgo.nivelRiesgo}`, this.left + 14, doc.y + 3);
+      doc.fillColor(this.getHallazgoStatusColor(hallazgo.estado)).font('Helvetica-Bold').fontSize(8.5)
+        .text(`Estado: ${this.getHallazgoStatusText(hallazgo.estado)}`, this.left + 14, doc.y + 3);
       doc.fillColor('#333').font('Helvetica').fontSize(9).text(`Ubicación: ${this.display(hallazgo.ubicacionTexto || 'No informada')}`, this.left + 14, doc.y + 3, { width: this.contentWidth - 14 });
       doc.text(`Descripción: ${this.display(hallazgo.descripcion)}`, this.left + 14, doc.y + 3, { width: this.contentWidth - 14, lineGap: 2 });
+      if (hallazgo.descripcionSolucion) {
+        const responsable = hallazgo.responsableResolucion
+          ? ` — ${this.display(hallazgo.responsableResolucion.nombre)} ${this.display(hallazgo.responsableResolucion.apellido)}`
+          : '';
+        const fecha = hallazgo.fechaResolucion ? ` (${this.formatDate(hallazgo.fechaResolucion)})` : '';
+        doc.font('Helvetica-Bold').text(`Resolución${fecha}${responsable}:`, this.left + 14, doc.y + 4, { width: this.contentWidth - 14 });
+        doc.font('Helvetica').text(this.display(hallazgo.descripcionSolucion), this.left + 14, doc.y + 2, { width: this.contentWidth - 14, lineGap: 2 });
+      }
       if (hallazgo.accionesCorrectivas.length > 0) {
         doc.font('Helvetica-Bold').text('Acciones correctivas vinculadas:', this.left + 14, doc.y + 4, { width: this.contentWidth - 14 });
         hallazgo.accionesCorrectivas.forEach((action) => {
@@ -364,6 +378,24 @@ export class PDFInspeccionGenerator {
       case 'ALTO': return this.colors.danger;
       case 'MEDIO': return this.colors.warning;
       case 'BAJO': return this.colors.success;
+      default: return this.colors.gray;
+    }
+  }
+
+  private getHallazgoStatusText(estado?: string): string {
+    switch (estado) {
+      case 'EN_CORRECCION': return 'En corrección';
+      case 'SOLUCIONADO': return 'Solucionado';
+      case 'PENDIENTE': return 'Pendiente';
+      default: return this.display(estado || 'Pendiente');
+    }
+  }
+
+  private getHallazgoStatusColor(estado?: string): string {
+    switch (estado) {
+      case 'SOLUCIONADO': return this.colors.success;
+      case 'EN_CORRECCION': return this.colors.warning;
+      case 'PENDIENTE': return this.colors.danger;
       default: return this.colors.gray;
     }
   }

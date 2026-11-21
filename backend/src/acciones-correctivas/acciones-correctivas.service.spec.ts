@@ -18,7 +18,7 @@ describe('AccionesCorrectivasService technician authorization', () => {
     const prisma = {
       accionCorrectiva: {
         findUnique: jest.fn().mockResolvedValue(action),
-        update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     const service = new AccionesCorrectivasService(prisma as never);
@@ -27,21 +27,21 @@ describe('AccionesCorrectivasService technician authorization', () => {
       .rejects.toBeInstanceOf(NotFoundException);
     await expect(service.iniciar('action-1', 'company-1', 'context-1', 'technician-b'))
       .rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.accionCorrectiva.update).not.toHaveBeenCalled();
+    expect(prisma.accionCorrectiva.updateMany).not.toHaveBeenCalled();
   });
 
   it('allows the assigned technician to initiate and close the action', async () => {
     const prisma = {
       accionCorrectiva: {
         findUnique: jest.fn().mockResolvedValue(action),
-        update: jest.fn().mockResolvedValue(action),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const service = new AccionesCorrectivasService(prisma as never);
 
     await service.iniciar('action-1', 'company-1', 'context-1', 'technician-a');
-    expect(prisma.accionCorrectiva.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'action-1' },
+    expect(prisma.accionCorrectiva.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'action-1', estado: EstadoAccion.PENDIENTE },
       data: { estado: EstadoAccion.EN_PROGRESO },
     }));
   });
@@ -59,5 +59,40 @@ describe('AccionesCorrectivasService technician authorization', () => {
         responsable: { select: { id: true, nombre: true, apellido: true } },
       }),
     }));
+  });
+
+  it('creates the action and finding transition through the same transaction client', async () => {
+    const created = { id: 'action-2', hallazgoId: 'finding-1', estado: EstadoAccion.PENDIENTE };
+    const tx = {
+      accionCorrectiva: { create: jest.fn().mockResolvedValue(created) },
+    };
+    const prisma: any = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue({
+          estado: 'PENDIENTE',
+          inspeccion: { empresaId: 'company-1', organizacionEmpresaId: 'context-1' },
+        }),
+      },
+      usuario: { findFirst: jest.fn() },
+      $transaction: jest.fn(async (callback: (client: any) => Promise<unknown>) => callback(tx)),
+    };
+    const hallazgos = { markInCorrectionInTransaction: jest.fn().mockResolvedValue(undefined) };
+    const service = new AccionesCorrectivasService(prisma as never, undefined, hallazgos as never);
+
+    await service.create({
+      hallazgoId: 'finding-1',
+      descripcion: 'Instalar una protección física permanente',
+      fechaCompromiso: '2026-12-01',
+    }, 'admin-1', 'company-1', 'context-1');
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.accionCorrectiva.create).toHaveBeenCalledTimes(1);
+    expect(hallazgos.markInCorrectionInTransaction).toHaveBeenCalledWith(
+      tx,
+      'finding-1',
+      'admin-1',
+      'company-1',
+      'context-1',
+    );
   });
 });
