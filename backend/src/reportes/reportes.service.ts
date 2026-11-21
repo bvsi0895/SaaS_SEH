@@ -161,6 +161,7 @@ export class ReportesService {
             accionesCorrectivas: {
               select: { descripcion: true, estado: true },
             },
+            responsableResolucion: { select: { nombre: true, apellido: true } },
           },
         },
       },
@@ -285,7 +286,19 @@ export class ReportesService {
           establecimiento: { select: { nombre: true } },
           checklist: { select: { nombre: true } },
           usuario: { select: { nombre: true, apellido: true, email: true } },
-          hallazgos: { select: { id: true, titulo: true, nivelRiesgo: true, createdAt: true, fotosUrls: true } },
+          hallazgos: {
+            select: {
+              id: true,
+              titulo: true,
+              nivelRiesgo: true,
+              estado: true,
+              fechaResolucion: true,
+              descripcionSolucion: true,
+              responsableResolucion: { select: { nombre: true, apellido: true } },
+              createdAt: true,
+              fotosUrls: true,
+            },
+          },
         },
         orderBy: { fechaHoraInicio: 'asc' },
       }),
@@ -310,6 +323,12 @@ export class ReportesService {
     const hallazgos = inspections.flatMap((inspection) => inspection.hallazgos.map((hallazgo) => ({
       titulo: hallazgo.titulo,
       nivel: hallazgo.nivelRiesgo,
+      estado: hallazgo.estado,
+      fechaResolucion: hallazgo.fechaResolucion,
+      descripcionSolucion: hallazgo.descripcionSolucion,
+      responsableResolucion: hallazgo.responsableResolucion
+        ? `${hallazgo.responsableResolucion.nombre} ${hallazgo.responsableResolucion.apellido}`
+        : null,
       establecimiento: inspection.establecimiento?.nombre,
       sector: inspection.sector,
       fecha: hallazgo.createdAt,

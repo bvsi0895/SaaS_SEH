@@ -15,7 +15,17 @@ export interface ReporteMensualData {
     tecnico: string;
     hallazgos: number;
   }>;
-  hallazgos: Array<{ titulo: string; nivel: string; establecimiento?: string | null; sector?: string | null; fecha: Date }>;
+  hallazgos: Array<{
+    titulo: string;
+    nivel: string;
+    estado?: string;
+    fechaResolucion?: Date | null;
+    descripcionSolucion?: string | null;
+    responsableResolucion?: string | null;
+    establecimiento?: string | null;
+    sector?: string | null;
+    fecha: Date;
+  }>;
   acciones: Array<{ descripcion: string; estado: string; fechaCompromiso: Date; establecimiento?: string | null }>;
   fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }>;
   incidenciasFotografias: number;
@@ -79,7 +89,10 @@ export class PDFMensualGenerator {
       doc.fontSize(10).fillColor('#222').text(riskCounts.map(([risk, count]) => `${risk}: ${count}`).join('   '));
       preparedData.hallazgos.forEach((item, index) => {
         this.ensureSpace(doc, 38);
-        doc.fontSize(9).text(`${index + 1}. ${item.titulo} — ${item.nivel} — ${item.establecimiento || 'Sin establecimiento'} — ${this.date(item.fecha)}`);
+        const resolution = item.descripcionSolucion
+          ? ` — resolución: ${item.descripcionSolucion}${item.responsableResolucion ? ` (${item.responsableResolucion})` : ''}`
+          : '';
+        doc.fontSize(9).text(`${index + 1}. ${item.titulo} — ${item.nivel} — estado: ${this.hallazgoState(item.estado)} — ${item.establecimiento || 'Sin establecimiento'} — ${this.date(item.fecha)}${item.fechaResolucion ? ` — resuelto: ${this.date(item.fechaResolucion)}` : ''}${resolution}`);
       });
 
       this.section(doc, 'ACCIONES CORRECTIVAS');
@@ -181,5 +194,14 @@ export class PDFMensualGenerator {
     const day = String(date.getUTCDate()).padStart(2, '0');
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     return `${day}/${month}/${date.getUTCFullYear()}`;
+  }
+
+  private hallazgoState(value?: string): string {
+    switch (value) {
+      case 'EN_CORRECCION': return 'En corrección';
+      case 'SOLUCIONADO': return 'Solucionado';
+      case 'PENDIENTE': return 'Pendiente';
+      default: return value || 'Pendiente';
+    }
   }
 }
