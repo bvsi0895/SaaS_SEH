@@ -107,8 +107,8 @@ export class DashboardService {
 
   /**
    * Definitions: started inspections have fechaHoraInicio; pending inspections
-   * are excluded. A finding is open when it has no corrective action or at
-   * least one action that is not RESUELTA. Compliance is CUMPLE divided by all
+   * are excluded. A finding is open while its lifecycle state is PENDIENTE or
+   * EN_CORRECCION; SOLUCIONADO is the only closed state. Compliance is CUMPLE divided by all
    * evaluable items; NO_APLICA is excluded, while pending/NO_CUMPLE/OBSERVACION
    * remain in the denominator as not fulfilled.
    */

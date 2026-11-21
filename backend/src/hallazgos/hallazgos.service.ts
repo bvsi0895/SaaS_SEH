@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Optional,
 } from '@nestjs/common';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
@@ -11,7 +12,7 @@ import { randomUUID } from 'crypto';
 const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHallazgoDto, UpdateHallazgoDto, ResolverHallazgoDto } from './dto';
-import { EstadoHallazgo, EstadoInspeccion, NivelRiesgo, Rol, TipoEventoHallazgo } from '@prisma/client';
+import { EstadoHallazgo, EstadoInspeccion, NivelRiesgo, Prisma, Rol, TipoEventoHallazgo } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
@@ -320,35 +321,38 @@ export class HallazgosService {
       }
     }
 
-    const hallazgo = await this.prisma.hallazgo.create({
-      data: {
-        inspeccionId: createHallazgoDto.inspeccionId,
-        ...(createHallazgoDto.inspeccionItemId && { inspeccionItemId: createHallazgoDto.inspeccionItemId }),
-        titulo: createHallazgoDto.titulo,
-        descripcion: createHallazgoDto.descripcion,
-        nivelRiesgo: createHallazgoDto.nivelRiesgo,
-        ubicacionTexto: createHallazgoDto.ubicacionTexto,
-        fotosUrls: createHallazgoDto.fotosUrls
-          ? JSON.stringify(createHallazgoDto.fotosUrls)
-          : null,
-      },
-      include: {
-        inspeccion: {
-          select: { id: true, sector: true },
-        },
-      },
-    });
-    if (usuarioId) {
-      await this.prisma.hallazgoHistorial.create({
+    const hallazgo = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.hallazgo.create({
         data: {
-          hallazgoId: hallazgo.id,
-          tipo: TipoEventoHallazgo.CREACION,
-          estadoNuevo: EstadoHallazgo.PENDIENTE,
-          descripcion: 'Hallazgo registrado durante la inspección',
-          usuarioId,
+          inspeccionId: createHallazgoDto.inspeccionId,
+          ...(createHallazgoDto.inspeccionItemId && { inspeccionItemId: createHallazgoDto.inspeccionItemId }),
+          titulo: createHallazgoDto.titulo,
+          descripcion: createHallazgoDto.descripcion,
+          nivelRiesgo: createHallazgoDto.nivelRiesgo,
+          ubicacionTexto: createHallazgoDto.ubicacionTexto,
+          fotosUrls: createHallazgoDto.fotosUrls
+            ? JSON.stringify(createHallazgoDto.fotosUrls)
+            : null,
+        },
+        include: {
+          inspeccion: {
+            select: { id: true, sector: true },
+          },
         },
       });
-    }
+      if (usuarioId) {
+        await tx.hallazgoHistorial.create({
+          data: {
+            hallazgoId: created.id,
+            tipo: TipoEventoHallazgo.CREACION,
+            estadoNuevo: EstadoHallazgo.PENDIENTE,
+            descripcion: 'Hallazgo registrado durante la inspección',
+            usuarioId,
+          },
+        });
+      }
+      return created;
+    });
     return hallazgo;
   }
 
@@ -373,6 +377,34 @@ export class HallazgosService {
     if (!responsible) throw new BadRequestException('El responsable de la resolución no está autorizado');
   }
 
+  private parseEvidenceUrls(fotosUrls: string | null | undefined): string[] {
+    if (!fotosUrls) return [];
+    try {
+      const parsed = JSON.parse(fotosUrls);
+      return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string') ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private assertAuthorizedEvidenceUrls(hallazgo: { fotosUrls?: string | null }, evidenceUrls?: string[]) {
+    if (!evidenceUrls?.length) return;
+    const authorized = new Set(this.parseEvidenceUrls(hallazgo.fotosUrls));
+    if (evidenceUrls.some((url) => !authorized.has(url))) {
+      throw new BadRequestException('Cada evidencia debe pertenecer al mismo hallazgo y contexto autorizado');
+    }
+  }
+
+  async validateEvidenceUrlsForFinding(
+    id: string,
+    evidenceUrls: string[] | undefined,
+    empresaId: string,
+    organizacionEmpresaId?: string,
+  ) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId);
+    this.assertAuthorizedEvidenceUrls(hallazgo, evidenceUrls);
+  }
+
   private assertCanResolve(hallazgo: any, usuarioId?: string, rol?: Rol) {
     if (rol === Rol.TECNICO && hallazgo.inspeccion.asignadoA?.id !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
@@ -391,23 +423,30 @@ export class HallazgosService {
     const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
     this.assertCanResolve(hallazgo, usuarioId, rol);
     if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO) throw new BadRequestException('El hallazgo ya está solucionado');
+    if (hallazgo.accionesCorrectivas.length > 0) {
+      throw new BadRequestException('Este hallazgo tiene acciones correctivas; cierre mediante verificación de una acción ejecutada');
+    }
     if (dto.accionCorrectivaId && !hallazgo.accionesCorrectivas.some((action) => action.id === dto.accionCorrectivaId)) {
       throw new BadRequestException('La acción correctiva no está vinculada a este hallazgo');
     }
+    this.assertAuthorizedEvidenceUrls(hallazgo, dto.evidenciaUrls);
     await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
     const resolvedAt = new Date(dto.fechaResolucion);
     if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
-    await this.prisma.$transaction([
-      this.prisma.hallazgo.update({
-        where: { id },
+    await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.hallazgo.updateMany({
+        where: { id, estado: hallazgo.estado },
         data: {
           estado: EstadoHallazgo.SOLUCIONADO,
           fechaResolucion: resolvedAt,
           descripcionSolucion: dto.descripcionSolucion,
           responsableResolucionId: dto.responsableId,
         },
-      }),
-      this.prisma.hallazgoHistorial.create({
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException('El hallazgo cambió de estado mientras se registraba la corrección');
+      }
+      await tx.hallazgoHistorial.create({
         data: {
           hallazgoId: id,
           tipo: TipoEventoHallazgo.CORRECCION_INMEDIATA,
@@ -415,12 +454,11 @@ export class HallazgosService {
           estadoNuevo: EstadoHallazgo.SOLUCIONADO,
           descripcion: dto.descripcionSolucion,
           evidenciaUrls: dto.evidenciaUrls?.length ? JSON.stringify(dto.evidenciaUrls) : null,
-          accionCorrectivaId: dto.accionCorrectivaId,
           usuarioId,
           responsableId: dto.responsableId,
         },
-      }),
-    ]);
+      });
+    });
     return this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
   }
 
@@ -439,26 +477,37 @@ export class HallazgosService {
     const action = dto.accionCorrectivaId
       ? hallazgo.accionesCorrectivas.find((candidate) => candidate.id === dto.accionCorrectivaId)
       : hallazgo.accionesCorrectivas.find((candidate) => candidate.estado === 'RESUELTA');
-    if (hallazgo.accionesCorrectivas.length > 0 && (!action || action.estado !== 'RESUELTA')) {
+    if (!action || action.estado !== 'RESUELTA' || hallazgo.accionesCorrectivas.some((candidate) => candidate.estado !== 'RESUELTA')) {
       throw new BadRequestException('La acción correctiva debe estar ejecutada antes de verificar el hallazgo');
     }
-    if (hallazgo.accionesCorrectivas.length === 0) {
-      throw new BadRequestException('Este hallazgo no tiene una acción correctiva para verificar; registre una corrección inmediata');
-    }
+    this.assertAuthorizedEvidenceUrls(hallazgo, dto.evidenciaUrls);
     await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
     const resolvedAt = new Date(dto.fechaResolucion);
     if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
-    await this.prisma.$transaction([
-      this.prisma.hallazgo.update({
-        where: { id },
+    await this.prisma.$transaction(async (tx) => {
+      const currentActions = await tx.accionCorrectiva.findMany({
+        where: { hallazgoId: id },
+        select: { id: true, estado: true },
+      });
+      if (!currentActions.length || currentActions.some((candidate) => candidate.estado !== 'RESUELTA')) {
+        throw new ConflictException('Las acciones correctivas deben permanecer ejecutadas hasta completar la verificación');
+      }
+      if (!currentActions.some((candidate) => candidate.id === action.id && candidate.estado === 'RESUELTA')) {
+        throw new ConflictException('La acción correctiva seleccionada cambió de estado');
+      }
+      const changed = await tx.hallazgo.updateMany({
+        where: { id, estado: hallazgo.estado },
         data: {
           estado: EstadoHallazgo.SOLUCIONADO,
           fechaResolucion: resolvedAt,
           descripcionSolucion: dto.descripcionSolucion,
           responsableResolucionId: dto.responsableId,
         },
-      }),
-      this.prisma.hallazgoHistorial.create({
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException('El hallazgo cambió de estado mientras se verificaba la resolución');
+      }
+      await tx.hallazgoHistorial.create({
         data: {
           hallazgoId: id,
           tipo: TipoEventoHallazgo.VERIFICACION,
@@ -466,32 +515,74 @@ export class HallazgosService {
           estadoNuevo: EstadoHallazgo.SOLUCIONADO,
           descripcion: dto.descripcionSolucion,
           evidenciaUrls: dto.evidenciaUrls?.length ? JSON.stringify(dto.evidenciaUrls) : null,
-          accionCorrectivaId: action?.id,
+          accionCorrectivaId: action.id,
           usuarioId,
           responsableId: dto.responsableId,
         },
-      }),
-    ]);
+      });
+    });
     return this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
   }
 
-  async markInCorrection(id: string, usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
-    const hallazgo = await this.prisma.hallazgo.findFirst({ where: { id, inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } }, select: { id: true, estado: true } });
+  async markInCorrectionInTransaction(tx: Prisma.TransactionClient, id: string, usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
+    const hallazgo = await tx.hallazgo.findFirst({ where: { id, inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } }, select: { id: true, estado: true } });
     if (!hallazgo) throw new NotFoundException('Hallazgo no encontrado');
-    if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO || hallazgo.estado === EstadoHallazgo.EN_CORRECCION) return;
-    await this.prisma.$transaction([
-      this.prisma.hallazgo.update({ where: { id }, data: { estado: EstadoHallazgo.EN_CORRECCION } }),
-      this.prisma.hallazgoHistorial.create({
-        data: {
-          hallazgoId: id,
-          tipo: TipoEventoHallazgo.CAMBIO_ESTADO,
-          estadoAnterior: hallazgo.estado,
-          estadoNuevo: EstadoHallazgo.EN_CORRECCION,
-          descripcion: 'Se registró una acción correctiva; la solución queda pendiente de verificación',
-          usuarioId,
-        },
-      }),
-    ]);
+    if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO) throw new BadRequestException('No se puede crear una acción para un hallazgo solucionado');
+    if (hallazgo.estado === EstadoHallazgo.EN_CORRECCION) return;
+
+    const changed = await tx.hallazgo.updateMany({
+      where: { id, estado: hallazgo.estado },
+      data: { estado: EstadoHallazgo.EN_CORRECCION },
+    });
+    if (changed.count !== 1) {
+      const current = await tx.hallazgo.findUnique({ where: { id }, select: { estado: true } });
+      if (current?.estado === EstadoHallazgo.EN_CORRECCION) return;
+      if (current?.estado === EstadoHallazgo.SOLUCIONADO) throw new ConflictException('No se puede crear una acción para un hallazgo solucionado');
+      throw new ConflictException('El hallazgo cambió de estado mientras se registraba la acción correctiva');
+    }
+    await tx.hallazgoHistorial.create({
+      data: {
+        hallazgoId: id,
+        tipo: TipoEventoHallazgo.CAMBIO_ESTADO,
+        estadoAnterior: hallazgo.estado,
+        estadoNuevo: EstadoHallazgo.EN_CORRECCION,
+        descripcion: 'Se registró una acción correctiva; la solución queda pendiente de verificación',
+        usuarioId,
+      },
+    });
+  }
+
+  async markInCorrection(id: string, usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
+    await this.prisma.$transaction((tx) => this.markInCorrectionInTransaction(tx, id, usuarioId, empresaId, organizacionEmpresaId));
+  }
+
+  async reopenForActionInTransaction(tx: Prisma.TransactionClient, id: string, usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
+    const hallazgo = await tx.hallazgo.findFirst({
+      where: { id, inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } },
+      select: { id: true, estado: true },
+    });
+    if (!hallazgo) throw new NotFoundException('Hallazgo no encontrado');
+    if (hallazgo.estado === EstadoHallazgo.EN_CORRECCION) return;
+
+    const changed = await tx.hallazgo.updateMany({
+      where: { id, estado: hallazgo.estado },
+      data: { estado: EstadoHallazgo.EN_CORRECCION, fechaResolucion: null },
+    });
+    if (changed.count !== 1) {
+      const current = await tx.hallazgo.findUnique({ where: { id }, select: { estado: true } });
+      if (current?.estado === EstadoHallazgo.EN_CORRECCION) return;
+      throw new ConflictException('El hallazgo cambió de estado mientras se reabría la acción correctiva');
+    }
+    await tx.hallazgoHistorial.create({
+      data: {
+        hallazgoId: id,
+        tipo: TipoEventoHallazgo.CAMBIO_ESTADO,
+        estadoAnterior: hallazgo.estado,
+        estadoNuevo: EstadoHallazgo.EN_CORRECCION,
+        descripcion: 'Se reabrió una acción correctiva; el hallazgo requiere una nueva verificación',
+        usuarioId,
+      },
+    });
   }
 
   /**

@@ -15,6 +15,8 @@ test('PR #23 persists finding state and an append-only resolution history', asyn
   assert.match(migration, /ADD COLUMN "estado"/);
   assert.match(migration, /CREATE TABLE "hallazgos_historial"/);
   assert.match(service, /hallazgoHistorial\.create/);
+  assert.match(service, /hallazgo\.create\([\s\S]*?hallazgoHistorial\.create/);
+  assert.match(service, /this\.prisma\.\$transaction\(async \(tx\)/);
   assert.match(service, /fechaResolucion/);
   assert.match(service, /descripcionSolucion/);
 });
@@ -31,7 +33,12 @@ test('PR #23 exposes immediate correction and verified action resolution', async
   assert.match(service, /VERIFICACION/);
   assert.match(service, /estado === EstadoHallazgo\.SOLUCIONADO/);
   assert.match(service, /estado !== 'RESUELTA'/);
+  assert.match(service, /accionesCorrectivas\.length > 0/);
+  assert.match(service, /assertAuthorizedEvidenceUrls/);
+  assert.match(service, /updateMany\([\s\S]*?estado: hallazgo\.estado/);
   assert.match(actionService, /markInCorrection/);
+  assert.match(actionService, /this\.prisma\.\$transaction\(async \(tx\)/);
+  assert.match(actionService, /updateMany\([\s\S]*?estado: accion\.estado/);
   assert.match(actionService, /No se puede crear una acción para un hallazgo solucionado/);
 });
 

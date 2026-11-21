@@ -225,7 +225,9 @@ export default function HallazgoDetailPage() {
 
   const canModifyHallazgo = !isTechnician || hallazgo.inspeccion?.asignadoA?.id === user?.id;
   const canResolveHallazgo = canModifyHallazgo && hallazgo.estado !== 'SOLUCIONADO';
-  const hasCompletedAction = (hallazgo.accionesCorrectivas || []).some((accion) => accion.estado === 'RESUELTA');
+  const correctiveActions = hallazgo.accionesCorrectivas || [];
+  const hasCorrectiveActions = correctiveActions.length > 0;
+  const allActionsResolved = hasCorrectiveActions && correctiveActions.every((accion) => accion.estado === 'RESUELTA');
 
   return (
     <Box>
@@ -276,14 +278,21 @@ export default function HallazgoDetailPage() {
                   </Box>
                   {hallazgo.descripcionSolucion && <Typography variant="body2" sx={{ mt: 1 }}>{hallazgo.descripcionSolucion}</Typography>}
                   {canResolveHallazgo && (
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                      <Button size="small" variant="contained" onClick={() => { setResolutionMode('immediate'); setResolutionDialogOpen(true); }}>
-                        Registrar corrección inmediata
-                      </Button>
-                      {hasCompletedAction && <Button size="small" variant="outlined" onClick={() => { setResolutionMode('verify'); setResolutionDialogOpen(true); }}>
-                        Verificar solución
-                      </Button>}
-                    </Box>
+                    <>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                        {!hasCorrectiveActions && <Button size="small" variant="contained" onClick={() => { setResolutionMode('immediate'); setResolutionDialogOpen(true); }}>
+                          Registrar corrección inmediata
+                        </Button>}
+                        {allActionsResolved && <Button size="small" variant="outlined" onClick={() => { setResolutionMode('verify'); setResolutionDialogOpen(true); }}>
+                          Verificar solución
+                        </Button>}
+                      </Box>
+                      {hasCorrectiveActions && !allActionsResolved && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                          Las acciones pendientes deben ejecutarse antes de verificar el hallazgo.
+                        </Typography>
+                      )}
+                    </>
                   )}
                 </Box>
 

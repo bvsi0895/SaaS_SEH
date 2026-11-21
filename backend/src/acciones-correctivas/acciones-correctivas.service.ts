@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -174,29 +175,33 @@ export class AccionesCorrectivasService {
       }
     }
 
-    const action = await this.prisma.accionCorrectiva.create({
-      data: {
-        hallazgoId: createDto.hallazgoId,
-        empresaId,
-        organizacionEmpresaId,
-        creadorId,
-        descripcion: createDto.descripcion,
-        fechaCompromiso: new Date(createDto.fechaCompromiso),
-        responsableId: createDto.responsableId,
-        responsableTexto: createDto.responsableTexto,
-        estado: EstadoAccion.PENDIENTE,
-      },
-      include: {
-        hallazgo: {
-          select: { id: true, titulo: true },
+    return this.prisma.$transaction(async (tx) => {
+      const action = await tx.accionCorrectiva.create({
+        data: {
+          hallazgoId: createDto.hallazgoId,
+          empresaId,
+          organizacionEmpresaId,
+          creadorId,
+          descripcion: createDto.descripcion,
+          fechaCompromiso: new Date(createDto.fechaCompromiso),
+          responsableId: createDto.responsableId,
+          responsableTexto: createDto.responsableTexto,
+          estado: EstadoAccion.PENDIENTE,
         },
-        responsable: {
-          select: { id: true, nombre: true, apellido: true },
+        include: {
+          hallazgo: {
+            select: { id: true, titulo: true },
+          },
+          responsable: {
+            select: { id: true, nombre: true, apellido: true },
+          },
         },
-      },
+      });
+      if (this.hallazgos) {
+        await this.hallazgos.markInCorrectionInTransaction(tx, createDto.hallazgoId, creadorId, empresaId, organizacionEmpresaId);
+      }
+      return action;
     });
-    if (this.hallazgos) await this.hallazgos.markInCorrection(createDto.hallazgoId, creadorId, empresaId, organizacionEmpresaId);
-    return action;
   }
 
   /**
@@ -238,10 +243,12 @@ export class AccionesCorrectivasService {
       throw new BadRequestException('La acción ya fue iniciada');
     }
 
-    return this.prisma.accionCorrectiva.update({
-      where: { id },
+    const changed = await this.prisma.accionCorrectiva.updateMany({
+      where: { id, estado: EstadoAccion.PENDIENTE },
       data: { estado: EstadoAccion.EN_PROGRESO },
     });
+    if (changed.count !== 1) throw new ConflictException('La acción cambió de estado mientras se iniciaba');
+    return this.prisma.accionCorrectiva.findUnique({ where: { id } });
   }
 
   /**
@@ -254,33 +261,53 @@ export class AccionesCorrectivasService {
       throw new BadRequestException('La acción ya está cerrada');
     }
 
-    return this.prisma.accionCorrectiva.update({
-      where: { id },
-      data: {
-        estado: EstadoAccion.RESUELTA,
-        fechaCierre: new Date(),
-        notasCierre: cerrarDto.notasCierre,
-        evidenciaUrl: cerrarDto.evidenciaUrl,
-      },
+    if (cerrarDto.evidenciaUrl && this.hallazgos && empresaId) {
+      await this.hallazgos.validateEvidenceUrlsForFinding(
+        accion.hallazgoId,
+        [cerrarDto.evidenciaUrl],
+        empresaId,
+        organizacionEmpresaId,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const changed = await tx.accionCorrectiva.updateMany({
+        where: { id, estado: accion.estado },
+        data: {
+          estado: EstadoAccion.RESUELTA,
+          fechaCierre: new Date(),
+          notasCierre: cerrarDto.notasCierre,
+          evidenciaUrl: cerrarDto.evidenciaUrl,
+        },
+      });
+      if (changed.count !== 1) throw new ConflictException('La acción cambió de estado mientras se cerraba');
+      return tx.accionCorrectiva.findUnique({ where: { id } });
     });
   }
 
   /**
    * Reabrir acción correctiva
    */
-  async reabrir(id: string, empresaId?: string, organizacionEmpresaId?: string, accesoEmpresaId?: string) {
+  async reabrir(id: string, empresaId?: string, organizacionEmpresaId?: string, accesoEmpresaId?: string, usuarioId?: string) {
     const accion = await this.findOne(id, empresaId, organizacionEmpresaId, undefined, accesoEmpresaId);
 
     if (accion.estado !== EstadoAccion.RESUELTA) {
       throw new BadRequestException('La acción no está cerrada');
     }
 
-    return this.prisma.accionCorrectiva.update({
-      where: { id },
-      data: {
-        estado: EstadoAccion.EN_PROGRESO,
-        fechaCierre: null,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const changed = await tx.accionCorrectiva.updateMany({
+        where: { id, estado: EstadoAccion.RESUELTA },
+        data: {
+          estado: EstadoAccion.EN_PROGRESO,
+          fechaCierre: null,
+        },
+      });
+      if (changed.count !== 1) throw new ConflictException('La acción cambió de estado mientras se reabría');
+      if (this.hallazgos && empresaId && usuarioId) {
+        await this.hallazgos.reopenForActionInTransaction(tx, accion.hallazgoId, usuarioId, empresaId, organizacionEmpresaId);
+      }
+      return tx.accionCorrectiva.findUnique({ where: { id } });
     });
   }
 
