@@ -130,7 +130,7 @@ export class PDFInspeccionGenerator {
   }
 
   private addDatosGenerales(doc: PdfDocument, data: InspeccionData) {
-    this.sectionTitle(doc, 'DATOS GENERALES');
+    this.sectionTitle(doc, 'DATOS GENERALES', data);
     const inspector = data.asignadoA ?? data.usuario;
     const rows: Array<[string, string]> = [
       ['Empresa', data.empresa?.nombre || 'No informada'],
@@ -149,19 +149,31 @@ export class PDFInspeccionGenerator {
 
     const labelWidth = 125;
     const valueWidth = this.contentWidth - labelWidth - 10;
+    const labelX = this.left + 7;
+    const valueX = this.left + labelWidth;
     rows.forEach(([label, value], index) => {
-      const height = Math.max(18, doc.heightOfString(this.display(value), { width: valueWidth, lineGap: 2 }) + 6);
+      const labelText = `${this.display(label)}:`;
+      const valueText = this.display(value);
+      doc.font('Helvetica-Bold').fontSize(9);
+      const labelHeight = doc.heightOfString(labelText, { width: labelWidth - 10, lineGap: 2 });
+      doc.font('Helvetica').fontSize(9);
+      const valueHeight = doc.heightOfString(valueText, { width: valueWidth, lineGap: 2 });
+      const height = Math.max(20, labelHeight, valueHeight) + 8;
       this.ensureSpace(doc, height + 2, data);
-      if (index % 2 === 0) doc.rect(this.left, doc.y - 2, this.contentWidth, height).fill(this.colors.paleBlue);
-      doc.fillColor(this.colors.gray).font('Helvetica-Bold').fontSize(9).text(`${this.display(label)}:`, this.left + 7, doc.y + 2, { width: labelWidth - 10 });
-      doc.fillColor('#222').font('Helvetica').fontSize(9).text(this.display(value), this.left + labelWidth, doc.y + 2, { width: valueWidth, lineGap: 2 });
-      doc.y = doc.y + Math.max(0, height - 15);
+      const rowY = doc.y;
+      if (index % 2 === 0) doc.rect(this.left, rowY - 2, this.contentWidth, height).fill(this.colors.paleBlue);
+      doc.fillColor(this.colors.gray).font('Helvetica-Bold').fontSize(9)
+        .text(labelText, labelX, rowY + 4, { width: labelWidth - 10, lineGap: 2 });
+      doc.fillColor('#222').font('Helvetica').fontSize(9)
+        .text(valueText, valueX, rowY + 4, { width: valueWidth, lineGap: 2 });
+      doc.x = this.left;
+      doc.y = rowY + height;
     });
     doc.moveDown(0.7);
   }
 
   private addChecklist(doc: PdfDocument, data: InspeccionData) {
-    this.sectionTitle(doc, 'RESULTADOS DEL CHECKLIST');
+    this.sectionTitle(doc, 'RESULTADOS DEL CHECKLIST', data);
     const counts = {
       cumple: data.items.filter((item) => item.cumplimiento === 'CUMPLE').length,
       noCumple: data.items.filter((item) => item.cumplimiento === 'NO_CUMPLE').length,
@@ -177,9 +189,17 @@ export class PDFInspeccionGenerator {
     data.items.forEach((item, index) => {
       const itemText = `${item.checklistItem.orden}. ${this.display(item.checklistItem.descripcion)}`;
       const observationText = this.display(item.observacion || '-');
+      const itemX = this.left + 6;
+      const estadoX = this.left + columns.item + 6;
+      const observationX = this.left + columns.item + columns.estado + 6;
+      doc.font('Helvetica').fontSize(8.5);
       const itemHeight = doc.heightOfString(itemText, { width: columns.item - 12, lineGap: 2 });
+      doc.font('Helvetica-Bold').fontSize(8.5);
+      const statusText = this.getStatusText(item.cumplimiento);
+      const statusHeight = doc.heightOfString(statusText, { width: columns.estado - 12, lineGap: 2 });
+      doc.font('Helvetica').fontSize(8.5);
       const observationHeight = doc.heightOfString(observationText, { width: columns.observacion - 12, lineGap: 2 });
-      const rowHeight = Math.max(25, itemHeight, observationHeight) + 8;
+      const rowHeight = Math.max(25, itemHeight, statusHeight, observationHeight) + 10;
       if (doc.y + rowHeight > this.bottom) {
         doc.addPage();
         this.addContinuationHeader(doc, data);
@@ -188,9 +208,13 @@ export class PDFInspeccionGenerator {
       const tableY = doc.y;
       if (index % 2 === 0) doc.rect(this.left, tableY, this.contentWidth, rowHeight).fill('#f7fafc');
       doc.strokeColor(this.colors.lightGray).lineWidth(0.5).rect(this.left, tableY, this.contentWidth, rowHeight).stroke();
-      doc.fillColor('#222').font('Helvetica').fontSize(8.5).text(itemText, this.left + 6, tableY + 5, { width: columns.item - 12, lineGap: 2 });
-      doc.fillColor(this.getStatusColor(item.cumplimiento)).font('Helvetica-Bold').text(this.getStatusText(item.cumplimiento), this.left + columns.item + 6, tableY + 5, { width: columns.estado - 12, lineGap: 2 });
-      doc.fillColor('#333').font('Helvetica').text(observationText, this.left + columns.item + columns.estado + 6, tableY + 5, { width: columns.observacion - 12, lineGap: 2 });
+      doc.fillColor('#222').font('Helvetica').fontSize(8.5)
+        .text(itemText, itemX, tableY + 5, { width: columns.item - 12, lineGap: 2, align: 'left' });
+      doc.fillColor(this.getStatusColor(item.cumplimiento)).font('Helvetica-Bold').fontSize(8.5)
+        .text(statusText, estadoX, tableY + 5, { width: columns.estado - 12, lineGap: 2, align: 'left' });
+      doc.fillColor('#333').font('Helvetica').fontSize(8.5)
+        .text(observationText, observationX, tableY + 5, { width: columns.observacion - 12, lineGap: 2, align: 'left' });
+      doc.x = this.left;
       doc.y = tableY + rowHeight;
     });
     doc.moveDown(0.8);
@@ -201,22 +225,25 @@ export class PDFInspeccionGenerator {
     const y = doc.y;
     doc.rect(this.left, y, this.contentWidth, 22).fill(this.colors.primary);
     doc.fillColor('white').font('Helvetica-Bold').fontSize(8.5)
-      .text('Ítem del checklist', this.left + 6, y + 6, { width: columns.item - 12 })
-      .text('Estado', this.left + columns.item + 6, y + 6, { width: columns.estado - 12 })
-      .text('Observación', this.left + columns.item + columns.estado + 6, y + 6, { width: columns.observacion - 12 });
+        .text('Ítem del checklist', this.left + 6, y + 6, { width: columns.item - 12, align: 'left' })
+        .text('Estado', this.left + columns.item + 6, y + 6, { width: columns.estado - 12, align: 'left' })
+        .text('Observación', this.left + columns.item + columns.estado + 6, y + 6, { width: columns.observacion - 12, align: 'left' });
+      doc.x = this.left;
     doc.y = y + 22;
     return doc.y;
   }
 
   private addHallazgos(doc: PdfDocument, data: InspeccionData) {
-    this.sectionTitle(doc, 'HALLAZGOS DETECTADOS');
+    this.sectionTitle(doc, 'HALLAZGOS DETECTADOS', data);
     if (data.hallazgos.length === 0) {
       doc.fillColor(this.colors.success).font('Helvetica').fontSize(10)
         .text('No se detectaron hallazgos durante esta inspección.', { lineGap: 3 });
       doc.moveDown(0.8);
       return;
     }
-    doc.fillColor('#222').font('Helvetica').fontSize(9).text(`Total: ${data.hallazgos.length} hallazgo(s)`).moveDown(0.45);
+    doc.fillColor('#222').font('Helvetica').fontSize(9)
+      .text(`Total: ${data.hallazgos.length} hallazgo(s)`, this.left, doc.y, { width: this.contentWidth, align: 'left' })
+      .moveDown(0.45);
     data.hallazgos.forEach((hallazgo, index) => {
       this.ensureSpace(doc, 135, data);
       const start = doc.y;
@@ -252,7 +279,7 @@ export class PDFInspeccionGenerator {
     if (!data.fotos?.length) return;
     // Keep the section heading with at least its first evidence block.
     this.ensureSpace(doc, 230, data);
-    this.sectionTitle(doc, 'FOTOGRAFÍAS Y EVIDENCIAS');
+    this.sectionTitle(doc, 'FOTOGRAFÍAS Y EVIDENCIAS', data);
     data.fotos.forEach((photo, index) => {
       this.ensureSpace(doc, 195, data);
       const context = [photo.titulo, photo.establecimiento ? `Establecimiento: ${photo.establecimiento}` : null, photo.sector ? `Sector: ${photo.sector}` : null]
@@ -284,9 +311,17 @@ export class PDFInspeccionGenerator {
     doc.moveDown(0.5).fontSize(8).text(`Reporte generado el ${this.formatDate(new Date())}`, { align: 'center' });
   }
 
-  private sectionTitle(doc: PdfDocument, title: string) {
-    this.ensureSpace(doc, 42);
-    doc.fillColor(this.colors.primary).font('Helvetica-Bold').fontSize(12).text(this.display(title), { underline: true }).moveDown(0.35);
+  private sectionTitle(doc: PdfDocument, title: string, data?: InspeccionData) {
+    this.ensureSpace(doc, 42, data);
+    const y = doc.y;
+    const text = this.display(title);
+    doc.font('Helvetica-Bold').fontSize(12);
+    const height = doc.heightOfString(text, { width: this.contentWidth, lineGap: 2 });
+    doc.x = this.left;
+    doc.fillColor(this.colors.primary).font('Helvetica-Bold').fontSize(12)
+      .text(text, this.left, y, { width: this.contentWidth, align: 'left', underline: true, lineGap: 2 });
+    doc.x = this.left;
+    doc.y = y + height + 10;
   }
 
   private ensureSpace(doc: PdfDocument, height: number, data?: InspeccionData) {
@@ -296,9 +331,13 @@ export class PDFInspeccionGenerator {
   }
 
   private addContinuationHeader(doc: PdfDocument, data: InspeccionData) {
-    doc.fillColor(this.colors.primary).font('Helvetica-Bold').fontSize(9).text(this.display(data.organizacion?.nombre || 'SEH'), this.left, this.top, { width: 260, lineBreak: false });
-    doc.fillColor(this.colors.gray).font('Helvetica').text('Reporte de inspección — continuación', this.left, this.top + 14, { width: 300, lineBreak: false });
+    doc.x = this.left;
+    doc.fillColor(this.colors.primary).font('Helvetica-Bold').fontSize(9)
+      .text(this.display(data.organizacion?.nombre || 'SEH'), this.left, this.top, { width: 260, align: 'left', lineBreak: false });
+    doc.fillColor(this.colors.gray).font('Helvetica').fontSize(9)
+      .text('Reporte de inspección — continuación', this.left, this.top + 14, { width: 300, align: 'left', lineBreak: false });
     doc.strokeColor(this.colors.lightGray).lineWidth(0.7).moveTo(this.left, this.top + 30).lineTo(this.right, this.top + 30).stroke();
+    doc.x = this.left;
     doc.y = this.top + 45;
   }
 
@@ -327,14 +366,14 @@ export class PDFInspeccionGenerator {
     return { fotos: normalized, incidencias };
   }
 
-  /** Normaliza UTF-8 y repara sólo mojibake visible en la salida, nunca en la base. */
+  /** Normaliza UTF-8 y repara sólo mojibake inequívoco en la salida, nunca en la base. */
   private display(value: unknown): string {
     const original = String(value ?? '').normalize('NFC');
-    if (!/[ÃÂâ]/.test(original)) return original;
+    const mojibakeMarkers = (text: string) => (text.match(/[ÃÂâ�]/g) || []).length;
+    if (mojibakeMarkers(original) === 0) return original;
     try {
       const repaired = Buffer.from(original, 'latin1').toString('utf8').normalize('NFC');
-      const bad = (text: string) => (text.match(/[ÃÂâ�]/g) || []).length;
-      if (!repaired.includes('�') && bad(repaired) < bad(original)) return repaired;
+      if (!repaired.includes('�') && mojibakeMarkers(repaired) < mojibakeMarkers(original)) return repaired;
     } catch {
       // Leave the original text in place if it is not safely repairable.
     }
