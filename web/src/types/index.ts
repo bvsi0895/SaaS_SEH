@@ -182,6 +182,8 @@ export interface Hallazgo {
   fechaResolucion?: string;
   descripcionSolucion?: string;
   responsableResolucion?: Usuario;
+  responsableResolucionTexto?: string;
+  responsableResolucionCargo?: string;
   ubicacionGps?: string;
   fotosUrls?: string;
   inspeccionId: string;
@@ -203,6 +205,8 @@ export interface HallazgoHistorial {
   accionCorrectivaId?: string;
   usuario?: Pick<Usuario, 'id' | 'nombre' | 'apellido'>;
   responsable?: Pick<Usuario, 'id' | 'nombre' | 'apellido'>;
+  responsableTexto?: string;
+  responsableCargo?: string;
   createdAt: string;
 }
 

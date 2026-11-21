@@ -91,6 +91,12 @@ export default function HallazgoDetailPage() {
     enabled: !!id,
   });
 
+  const establecimientoId = hallazgo?.inspeccion?.establecimientoId || undefined;
+  const { data: responsablesResolucion } = useQuery({
+    queryKey: ['usuarios', 'responsables-resolucion', activeContextId, establecimientoId, user?.id, user?.rol],
+    queryFn: () => usuariosApi.getResponsablesResolucion(establecimientoId),
+    enabled: !!hallazgo && !!activeContextId,
+  });
   const { data: tecnicos } = useQuery({
     queryKey: ['usuarios', 'tecnicos', activeContextId, user?.id, user?.rol],
     queryFn: usuariosApi.getTecnicos,
@@ -277,6 +283,15 @@ export default function HallazgoDetailPage() {
                     {hallazgo.fechaResolucion && <Typography variant="caption">Resuelto el {format(new Date(hallazgo.fechaResolucion), 'dd/MM/yyyy HH:mm', { locale: es })}</Typography>}
                   </Box>
                   {hallazgo.descripcionSolucion && <Typography variant="body2" sx={{ mt: 1 }}>{hallazgo.descripcionSolucion}</Typography>}
+                  {(hallazgo.responsableResolucion || hallazgo.responsableResolucionTexto) && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>Responsable de la solución:</strong>{' '}
+                      {hallazgo.responsableResolucion
+                        ? `${hallazgo.responsableResolucion.nombre} ${hallazgo.responsableResolucion.apellido}`
+                        : hallazgo.responsableResolucionTexto}
+                      {hallazgo.responsableResolucionCargo ? ` · ${hallazgo.responsableResolucionCargo}` : ''}
+                    </Typography>
+                  )}
                   {canResolveHallazgo && (
                     <>
                       <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
@@ -458,7 +473,7 @@ export default function HallazgoDetailPage() {
                       <ListItem key={evento.id} divider>
                         <ListItemText
                           primary={`${evento.tipo.replace(/_/g, ' ')} · ${format(new Date(evento.createdAt), 'dd/MM/yyyy HH:mm', { locale: es })}`}
-                          secondary={`${evento.descripcion}${evento.usuario ? ` · por ${evento.usuario.nombre} ${evento.usuario.apellido}` : ''}`}
+                          secondary={`${evento.descripcion}${evento.responsable ? ` · responsable: ${evento.responsable.nombre} ${evento.responsable.apellido}` : evento.responsableTexto ? ` · responsable: ${evento.responsableTexto}${evento.responsableCargo ? ` (${evento.responsableCargo})` : ''}` : ''}${evento.usuario ? ` · por ${evento.usuario.nombre} ${evento.usuario.apellido}` : ''}`}
                         />
                       </ListItem>
                     ))}
@@ -532,19 +547,50 @@ export default function HallazgoDetailPage() {
             fullWidth
             select
             label="Responsable de la solución (opcional)"
-            value={resolution.responsableId || ''}
-            onChange={(e) => setResolution({ ...resolution, responsableId: e.target.value || undefined })}
+            value={resolution.responsableTexto !== undefined ? '__EXTERNAL__' : resolution.responsableId || ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              setResolution({
+                ...resolution,
+                responsableId: value && value !== '__EXTERNAL__' ? value : undefined,
+                responsableTexto: value === '__EXTERNAL__' ? resolution.responsableTexto || '' : undefined,
+                responsableCargo: value === '__EXTERNAL__' ? resolution.responsableCargo : undefined,
+              });
+            }}
+            sx={{ mb: resolution.responsableTexto !== undefined ? 2 : 0 }}
           >
             <MenuItem value="">Sin asignar</MenuItem>
-            {tecnicos?.map((tecnico) => <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>)}
+            {responsablesResolucion?.map((responsable) => <MenuItem key={responsable.id} value={responsable.id}>{responsable.nombre} {responsable.apellido} · {responsable.rol === 'ADMIN_EMPRESA' ? 'Administrador' : responsable.rol === 'SUPERVISOR' ? 'Supervisor' : 'Técnico'}</MenuItem>)}
+            <MenuItem value="__EXTERNAL__">Persona no registrada</MenuItem>
           </TextField>
+          {resolution.responsableTexto !== undefined && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={7}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Nombre completo"
+                  value={resolution.responsableTexto}
+                  onChange={(e) => setResolution({ ...resolution, responsableTexto: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  fullWidth
+                  label="Cargo (opcional)"
+                  value={resolution.responsableCargo || ''}
+                  onChange={(e) => setResolution({ ...resolution, responsableCargo: e.target.value })}
+                />
+              </Grid>
+            </Grid>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setResolutionDialogOpen(false)}>Cancelar</Button>
           <Button
             variant="contained"
             onClick={() => resolutionMutation.mutate({ ...resolution, evidenciaUrls: getPhotoPaths(hallazgo.fotosUrls) })}
-            disabled={resolution.descripcionSolucion.trim().length < 10 || resolutionMutation.isPending}
+            disabled={resolution.descripcionSolucion.trim().length < 10 || (resolution.responsableTexto !== undefined && resolution.responsableTexto.trim().length < 3) || resolutionMutation.isPending}
           >
             {resolutionMutation.isPending ? 'Guardando...' : 'Guardar resolución'}
           </Button>

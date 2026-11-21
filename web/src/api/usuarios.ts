@@ -49,4 +49,11 @@ export const usuariosApi = {
     const response = await apiClient.get<Usuario[]>('/usuarios/tecnicos');
     return response.data;
   },
+
+  getResponsablesResolucion: async (establecimientoId?: string): Promise<Usuario[]> => {
+    const response = await apiClient.get<Usuario[]>('/usuarios/responsables-resolucion', {
+      params: establecimientoId ? { establecimientoId } : undefined,
+    });
+    return response.data;
+  },
 };

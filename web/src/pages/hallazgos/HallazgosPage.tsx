@@ -72,9 +72,9 @@ export default function HallazgosPage() {
     {
       field: 'nivelRiesgo',
       headerName: 'Nivel de Riesgo',
-      width: 120,
-      renderHeader: () => <span>Nivel de<br />Riesgo</span>,
+      width: 118,
       headerAlign: 'center',
+      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Nivel de<br />Riesgo</span>,
       renderCell: (params: GridRenderCellParams) => (
         <StatusChip status={params.value} type="riesgo" />
       ),
@@ -95,9 +95,9 @@ export default function HallazgosPage() {
     {
       field: 'tecnicoInspector',
       headerName: 'Técnico inspector',
-      flex: 1,
-      minWidth: 170,
-      renderHeader: () => <span>Técnico<br />inspector</span>,
+      width: 155,
+      headerAlign: 'center',
+      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Técnico<br />inspector</span>,
       valueGetter: (params) => {
         const usuario = params.row.inspeccion?.usuario;
         return usuario ? `${usuario.nombre} ${usuario.apellido}` : '-';
@@ -106,9 +106,9 @@ export default function HallazgosPage() {
     {
       field: 'responsablesAcciones',
       headerName: 'Responsables de acciones',
-      flex: 1,
-      minWidth: 190,
-      renderHeader: () => <span>Responsables<br />de acciones</span>,
+      width: 175,
+      headerAlign: 'center',
+      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Responsables<br />de acciones</span>,
       valueGetter: (params) => {
         const responsables = (params.row.accionesCorrectivas || [])
           .map((accion: any) => accion.responsable)
@@ -225,7 +225,17 @@ export default function HallazgosPage() {
           columnHeaderHeight={58}
           sx={{
             minWidth: 980,
-            '& .MuiDataGrid-columnHeaderTitle': { whiteSpace: 'normal', lineHeight: 1.15 },
+            '& .MuiDataGrid-columnHeaderTitleContainer': {
+              alignItems: 'center',
+            },
+            '& .MuiDataGrid-columnHeaderTitle': {
+              whiteSpace: 'normal',
+              lineHeight: 1.15,
+              fontFamily: 'inherit',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              textAlign: 'center',
+            },
             '& .MuiDataGrid-cell:focus': {
               outline: 'none',
             },

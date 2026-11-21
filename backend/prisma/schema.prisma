@@ -311,6 +311,8 @@ model Hallazgo {
   descripcionSolucion    String?
   responsableResolucionId String?
   responsableResolucion  Usuario? @relation("HallazgoResponsableResolucion", fields: [responsableResolucionId], references: [id])
+  responsableResolucionTexto String?
+  responsableResolucionCargo String?
 
   // Fotos (almacenamos URLs separadas por comas o JSON)
   fotosUrls String? // JSON array de URLs
@@ -348,6 +350,8 @@ model HallazgoHistorial {
   accionCorrectivaId String?
   usuarioId       String
   responsableId   String?
+  responsableTexto String?
+  responsableCargo String?
   createdAt       DateTime           @default(now())
 
   hallazgo        Hallazgo @relation(fields: [hallazgoId], references: [id], onDelete: Cascade)

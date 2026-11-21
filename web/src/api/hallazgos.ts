@@ -24,6 +24,7 @@ export interface ResolverHallazgoDto {
   fechaResolucion: string;
   responsableId?: string;
   responsableTexto?: string;
+  responsableCargo?: string;
   evidenciaUrls?: string[];
   accionCorrectivaId?: string;
 }
