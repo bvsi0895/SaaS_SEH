@@ -127,8 +127,16 @@ export class ReportesService {
       where: { id: inspeccionId },
       include: {
         empresa: {
-          select: { nombre: true, logoUrl: true },
+          select: { nombre: true, cuit: true },
         },
+        organizacionEmpresa: {
+          select: {
+            organizacion: {
+              select: { nombre: true, logoUrl: true, emailContacto: true, telefono: true, direccion: true },
+            },
+          },
+        },
+        establecimiento: { select: { nombre: true, direccion: true } },
         checklist: {
           select: { nombre: true, tipo: true },
         },
@@ -172,7 +180,19 @@ export class ReportesService {
       throw new NotFoundException('Inspección no encontrada');
     }
 
-    return this.pdfGenerator.generate(inspeccion);
+    const organization = inspeccion.organizacionEmpresa?.organizacion;
+    const logoResult = await this.loadConfiguredLogo(organization?.logoUrl);
+    const photoResult = empresaId && organizacionEmpresaId
+      ? await this.loadReportPhotos([{ sector: inspeccion.sector, establecimiento: inspeccion.establecimiento, hallazgos: inspeccion.hallazgos }], empresaId, organizacionEmpresaId)
+      : { fotos: [], incidencias: 0 };
+
+    return this.pdfGenerator.generate({
+      ...inspeccion,
+      organizacion: organization || { nombre: 'Sistema de Seguridad e Higiene' },
+      logo: logoResult.buffer,
+      fotos: photoResult.fotos,
+      incidenciasFotografias: photoResult.incidencias,
+    });
   }
 
   /**
