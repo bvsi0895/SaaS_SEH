@@ -8,10 +8,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccionCorrectivaDto, UpdateAccionCorrectivaDto, CerrarAccionDto } from './dto';
 import { EstadoAccion } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
+import { HallazgosService } from '../hallazgos/hallazgos.service';
 
 @Injectable()
 export class AccionesCorrectivasService {
-  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService) {}
+  constructor(private prisma: PrismaService, @Optional() private tenancy?: TenancyService, @Optional() private hallazgos?: HallazgosService) {}
 
   /**
    * Obtener todas las acciones correctivas de una empresa
@@ -146,6 +147,9 @@ export class AccionesCorrectivasService {
     if (organizacionEmpresaId && hallazgo.inspeccion.organizacionEmpresaId !== organizacionEmpresaId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
+    if (hallazgo.estado === 'SOLUCIONADO') {
+      throw new BadRequestException('No se puede crear una acción para un hallazgo solucionado');
+    }
 
     // Verificar responsable si se proporciona ID
     if (createDto.responsableId) {
@@ -170,7 +174,7 @@ export class AccionesCorrectivasService {
       }
     }
 
-    return this.prisma.accionCorrectiva.create({
+    const action = await this.prisma.accionCorrectiva.create({
       data: {
         hallazgoId: createDto.hallazgoId,
         empresaId,
@@ -191,6 +195,8 @@ export class AccionesCorrectivasService {
         },
       },
     });
+    if (this.hallazgos) await this.hallazgos.markInCorrection(createDto.hallazgoId, creadorId, empresaId, organizacionEmpresaId);
+    return action;
   }
 
   /**

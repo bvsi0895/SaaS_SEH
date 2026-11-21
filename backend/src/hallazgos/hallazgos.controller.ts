@@ -24,12 +24,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { HallazgosService } from './hallazgos.service';
-import { CreateHallazgoDto, UpdateHallazgoDto } from './dto';
+import { CreateHallazgoDto, ResolverHallazgoDto, UpdateHallazgoDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Rol, NivelRiesgo } from '@prisma/client';
+import { EstadoHallazgo, Rol, NivelRiesgo } from '@prisma/client';
 
 @ApiTags('hallazgos')
 @ApiBearerAuth()
@@ -41,6 +41,7 @@ export class HallazgosController {
   @Get()
   @ApiOperation({ summary: 'Listar hallazgos de la empresa' })
   @ApiQuery({ name: 'nivelRiesgo', enum: NivelRiesgo, required: false })
+  @ApiQuery({ name: 'estado', enum: EstadoHallazgo, required: false })
   @ApiQuery({ name: 'inspeccionId', required: false })
   @ApiQuery({ name: 'conAccionesCorrectivas', type: Boolean, required: false })
   @ApiQuery({ name: 'fechaDesde', required: false })
@@ -54,6 +55,7 @@ export class HallazgosController {
     @CurrentUser('rol') currentUserRole: Rol,
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
     @Query('nivelRiesgo') nivelRiesgo?: NivelRiesgo,
+    @Query('estado') estado?: EstadoHallazgo,
     @Query('inspeccionId') inspeccionId?: string,
     @Query('conAccionesCorrectivas') conAccionesCorrectivas?: boolean,
     @Query('fechaDesde') fechaDesde?: string,
@@ -62,6 +64,7 @@ export class HallazgosController {
   ) {
     return this.hallazgosService.findAll(empresaId, {
       nivelRiesgo,
+      estado,
       inspeccionId,
       conAccionesCorrectivas,
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
@@ -146,6 +149,35 @@ export class HallazgosController {
       throw new BadRequestException('Se requiere una imagen JPG, PNG o WEBP');
     }
     return this.hallazgosService.addPhoto(id, empresaId, file, organizacionEmpresaId, currentUserRole === Rol.TECNICO ? currentUserId : undefined, accesoEmpresaId);
+  }
+
+  @Post(':id/resolver')
+  @ApiOperation({ summary: 'Registrar una corrección inmediata y solucionar un hallazgo' })
+  async resolver(
+    @Param('id') id: string,
+    @Body() dto: ResolverHallazgoDto,
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+  ) {
+    return this.hallazgosService.resolver(id, dto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
+  }
+
+  @Post(':id/verificar-resolucion')
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
+  @ApiOperation({ summary: 'Verificar una acción ejecutada y solucionar el hallazgo' })
+  async verificarResolucion(
+    @Param('id') id: string,
+    @Body() dto: ResolverHallazgoDto,
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('rol') currentUserRole: Rol,
+    @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+  ) {
+    return this.hallazgosService.verificarResolucion(id, dto, empresaId, organizacionEmpresaId, currentUserId, currentUserRole, accesoEmpresaId);
   }
 
   @Get(':id/fotos/:filename')

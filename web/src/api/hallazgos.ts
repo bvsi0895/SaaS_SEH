@@ -19,11 +19,21 @@ export interface UpdateHallazgoDto {
   ubicacionTexto?: string;
 }
 
+export interface ResolverHallazgoDto {
+  descripcionSolucion: string;
+  fechaResolucion: string;
+  responsableId?: string;
+  responsableTexto?: string;
+  evidenciaUrls?: string[];
+  accionCorrectivaId?: string;
+}
+
 export const hallazgosApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
     nivelRiesgo?: string;
+    estado?: string;
     inspeccionId?: string;
     establecimientoId?: string;
   }): Promise<{ data: Hallazgo[]; total: number; isPaginated: boolean }> => {
@@ -86,4 +96,6 @@ export const hallazgosApi = {
     const response = await apiClient.get<Hallazgo[]>('/hallazgos', { params: { nivelRiesgo: 'CRITICO' } });
     return response.data;
   },
+  resolver: async (id: string, data: ResolverHallazgoDto): Promise<Hallazgo> => (await apiClient.post<Hallazgo>(`/hallazgos/${id}/resolver`, data)).data,
+  verificarResolucion: async (id: string, data: ResolverHallazgoDto): Promise<Hallazgo> => (await apiClient.post<Hallazgo>(`/hallazgos/${id}/verificar-resolucion`, data)).data,
 };

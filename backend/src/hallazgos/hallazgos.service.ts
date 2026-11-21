@@ -10,8 +10,8 @@ import { randomUUID } from 'crypto';
 // Sharp is CommonJS at runtime in the current Nest/Jest toolchain.
 const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateHallazgoDto, UpdateHallazgoDto } from './dto';
-import { NivelRiesgo, EstadoInspeccion } from '@prisma/client';
+import { CreateHallazgoDto, UpdateHallazgoDto, ResolverHallazgoDto } from './dto';
+import { EstadoHallazgo, EstadoInspeccion, NivelRiesgo, Rol, TipoEventoHallazgo } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
@@ -96,9 +96,9 @@ export class HallazgosService {
     if (usuarioId && (hallazgo.inspeccion.asignadoA?.id ?? hallazgo.inspeccion.usuario?.id) !== usuarioId) {
       throw new NotFoundException('Hallazgo no encontrado');
     }
-    if (usuarioId && hallazgo.inspeccion.estado !== EstadoInspeccion.EN_PROGRESO) {
-      throw new BadRequestException('No se pueden agregar evidencias a una inspección finalizada');
-    }
+    // A follow-up resolution may happen after the inspection is finalized. The
+    // finding remains immutable as an inspection response, while its evidence
+    // is appended to the finding lifecycle.
     if (!this.isSupportedImage(file.buffer)) {
       throw new BadRequestException('El contenido no corresponde a una imagen JPG, PNG o WEBP válida');
     }
@@ -142,6 +142,7 @@ export class HallazgosService {
     empresaId: string,
     filters?: {
       nivelRiesgo?: NivelRiesgo;
+      estado?: EstadoHallazgo;
       inspeccionId?: string;
       conAccionesCorrectivas?: boolean;
       fechaDesde?: Date;
@@ -159,6 +160,7 @@ export class HallazgosService {
       where: {
         inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }), ...establishmentFilter },
         ...(filters?.nivelRiesgo && { nivelRiesgo: filters.nivelRiesgo }),
+        ...(filters?.estado && { estado: filters.estado }),
         ...(filters?.inspeccionId && { inspeccionId: filters.inspeccionId }),
         ...(filters?.conAccionesCorrectivas !== undefined && {
           accionesCorrectivas: filters.conAccionesCorrectivas
@@ -224,6 +226,13 @@ export class HallazgosService {
           include: {
             responsable: { select: { id: true, nombre: true, apellido: true } },
             creador: { select: { id: true, nombre: true, apellido: true } },
+          },
+        },
+        historial: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            usuario: { select: { id: true, nombre: true, apellido: true } },
+            responsable: { select: { id: true, nombre: true, apellido: true } },
           },
         },
       },
@@ -311,7 +320,7 @@ export class HallazgosService {
       }
     }
 
-    return this.prisma.hallazgo.create({
+    const hallazgo = await this.prisma.hallazgo.create({
       data: {
         inspeccionId: createHallazgoDto.inspeccionId,
         ...(createHallazgoDto.inspeccionItemId && { inspeccionItemId: createHallazgoDto.inspeccionItemId }),
@@ -329,6 +338,160 @@ export class HallazgosService {
         },
       },
     });
+    if (usuarioId) {
+      await this.prisma.hallazgoHistorial.create({
+        data: {
+          hallazgoId: hallazgo.id,
+          tipo: TipoEventoHallazgo.CREACION,
+          estadoNuevo: EstadoHallazgo.PENDIENTE,
+          descripcion: 'Hallazgo registrado durante la inspección',
+          usuarioId,
+        },
+      });
+    }
+    return hallazgo;
+  }
+
+  private async validateResolutionResponsible(responsableId: string | undefined, empresaId: string, organizacionEmpresaId?: string) {
+    if (!responsableId) return;
+    const responsible = await this.prisma.usuario.findFirst({
+      where: {
+        id: responsableId,
+        empresaId,
+        activo: true,
+        ...(organizacionEmpresaId && {
+          membresiasOrganizacion: {
+            some: {
+              activa: true,
+              accesosEmpresa: { some: { organizacionEmpresaId, activo: true } },
+            },
+          },
+        }),
+      },
+      select: { id: true },
+    });
+    if (!responsible) throw new BadRequestException('El responsable de la resolución no está autorizado');
+  }
+
+  private assertCanResolve(hallazgo: any, usuarioId?: string, rol?: Rol) {
+    if (rol === Rol.TECNICO && hallazgo.inspeccion.asignadoA?.id !== usuarioId) {
+      throw new NotFoundException('Hallazgo no encontrado');
+    }
+  }
+
+  async resolver(
+    id: string,
+    dto: ResolverHallazgoDto,
+    empresaId: string,
+    organizacionEmpresaId: string,
+    usuarioId: string,
+    rol: Rol,
+    accesoEmpresaId?: string,
+  ) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
+    this.assertCanResolve(hallazgo, usuarioId, rol);
+    if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO) throw new BadRequestException('El hallazgo ya está solucionado');
+    if (dto.accionCorrectivaId && !hallazgo.accionesCorrectivas.some((action) => action.id === dto.accionCorrectivaId)) {
+      throw new BadRequestException('La acción correctiva no está vinculada a este hallazgo');
+    }
+    await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
+    const resolvedAt = new Date(dto.fechaResolucion);
+    if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
+    await this.prisma.$transaction([
+      this.prisma.hallazgo.update({
+        where: { id },
+        data: {
+          estado: EstadoHallazgo.SOLUCIONADO,
+          fechaResolucion: resolvedAt,
+          descripcionSolucion: dto.descripcionSolucion,
+          responsableResolucionId: dto.responsableId,
+        },
+      }),
+      this.prisma.hallazgoHistorial.create({
+        data: {
+          hallazgoId: id,
+          tipo: TipoEventoHallazgo.CORRECCION_INMEDIATA,
+          estadoAnterior: hallazgo.estado,
+          estadoNuevo: EstadoHallazgo.SOLUCIONADO,
+          descripcion: dto.descripcionSolucion,
+          evidenciaUrls: dto.evidenciaUrls?.length ? JSON.stringify(dto.evidenciaUrls) : null,
+          accionCorrectivaId: dto.accionCorrectivaId,
+          usuarioId,
+          responsableId: dto.responsableId,
+        },
+      }),
+    ]);
+    return this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
+  }
+
+  async verificarResolucion(
+    id: string,
+    dto: ResolverHallazgoDto,
+    empresaId: string,
+    organizacionEmpresaId: string,
+    usuarioId: string,
+    rol: Rol,
+    accesoEmpresaId?: string,
+  ) {
+    const hallazgo = await this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
+    this.assertCanResolve(hallazgo, usuarioId, rol);
+    if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO) throw new BadRequestException('El hallazgo ya está solucionado');
+    const action = dto.accionCorrectivaId
+      ? hallazgo.accionesCorrectivas.find((candidate) => candidate.id === dto.accionCorrectivaId)
+      : hallazgo.accionesCorrectivas.find((candidate) => candidate.estado === 'RESUELTA');
+    if (hallazgo.accionesCorrectivas.length > 0 && (!action || action.estado !== 'RESUELTA')) {
+      throw new BadRequestException('La acción correctiva debe estar ejecutada antes de verificar el hallazgo');
+    }
+    if (hallazgo.accionesCorrectivas.length === 0) {
+      throw new BadRequestException('Este hallazgo no tiene una acción correctiva para verificar; registre una corrección inmediata');
+    }
+    await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
+    const resolvedAt = new Date(dto.fechaResolucion);
+    if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
+    await this.prisma.$transaction([
+      this.prisma.hallazgo.update({
+        where: { id },
+        data: {
+          estado: EstadoHallazgo.SOLUCIONADO,
+          fechaResolucion: resolvedAt,
+          descripcionSolucion: dto.descripcionSolucion,
+          responsableResolucionId: dto.responsableId,
+        },
+      }),
+      this.prisma.hallazgoHistorial.create({
+        data: {
+          hallazgoId: id,
+          tipo: TipoEventoHallazgo.VERIFICACION,
+          estadoAnterior: hallazgo.estado,
+          estadoNuevo: EstadoHallazgo.SOLUCIONADO,
+          descripcion: dto.descripcionSolucion,
+          evidenciaUrls: dto.evidenciaUrls?.length ? JSON.stringify(dto.evidenciaUrls) : null,
+          accionCorrectivaId: action?.id,
+          usuarioId,
+          responsableId: dto.responsableId,
+        },
+      }),
+    ]);
+    return this.findOne(id, empresaId, organizacionEmpresaId, rol === Rol.TECNICO ? usuarioId : undefined, accesoEmpresaId);
+  }
+
+  async markInCorrection(id: string, usuarioId: string, empresaId: string, organizacionEmpresaId?: string) {
+    const hallazgo = await this.prisma.hallazgo.findFirst({ where: { id, inspeccion: { empresaId, ...(organizacionEmpresaId && { organizacionEmpresaId }) } }, select: { id: true, estado: true } });
+    if (!hallazgo) throw new NotFoundException('Hallazgo no encontrado');
+    if (hallazgo.estado === EstadoHallazgo.SOLUCIONADO || hallazgo.estado === EstadoHallazgo.EN_CORRECCION) return;
+    await this.prisma.$transaction([
+      this.prisma.hallazgo.update({ where: { id }, data: { estado: EstadoHallazgo.EN_CORRECCION } }),
+      this.prisma.hallazgoHistorial.create({
+        data: {
+          hallazgoId: id,
+          tipo: TipoEventoHallazgo.CAMBIO_ESTADO,
+          estadoAnterior: hallazgo.estado,
+          estadoNuevo: EstadoHallazgo.EN_CORRECCION,
+          descripcion: 'Se registró una acción correctiva; la solución queda pendiente de verificación',
+          usuarioId,
+        },
+      }),
+    ]);
   }
 
   /**
@@ -400,10 +563,15 @@ export class HallazgosService {
       ...(fechaHasta && { createdAt: { lte: fechaHasta } }),
     };
 
-    const [total, porNivel, conAcciones, sinAcciones] = await Promise.all([
+    const [total, porNivel, porEstado, conAcciones, sinAcciones] = await Promise.all([
       this.prisma.hallazgo.count({ where: whereClause }),
       this.prisma.hallazgo.groupBy({
         by: ['nivelRiesgo'],
+        _count: true,
+        where: whereClause,
+      }),
+      this.prisma.hallazgo.groupBy({
+        by: ['estado'],
         _count: true,
         where: whereClause,
       }),
@@ -420,6 +588,13 @@ export class HallazgosService {
       porNivel: porNivel.reduce(
         (acc, item) => {
           acc[item.nivelRiesgo] = item._count;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      porEstado: porEstado.reduce(
+        (acc, item) => {
+          acc[item.estado] = item._count;
           return acc;
         },
         {} as Record<string, number>,

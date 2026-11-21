@@ -136,6 +136,7 @@ export class ReportesController {
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })
   @ApiQuery({ name: 'nivelRiesgo', required: false })
+  @ApiQuery({ name: 'estado', required: false })
   @ApiResponse({ status: 200, description: 'Reporte de hallazgos' })
   async getReporteHallazgos(
     @CurrentUser('empresaId') empresaId: string,
@@ -143,11 +144,13 @@ export class ReportesController {
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
     @Query('nivelRiesgo') nivelRiesgo?: string,
+    @Query('estado') estado?: string,
   ) {
     return this.reportesService.generarReporteHallazgos(empresaId, {
       fechaDesde: fechaDesde ? new Date(fechaDesde) : undefined,
       fechaHasta: fechaHasta ? new Date(fechaHasta) : undefined,
       nivelRiesgo,
+      estado,
     }, organizacionEmpresaId);
   }
 

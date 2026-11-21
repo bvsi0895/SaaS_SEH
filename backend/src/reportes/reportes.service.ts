@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PDFInspeccionGenerator } from './generators/pdf-inspeccion.generator';
 import { PDFMensualGenerator } from './generators/pdf-mensual.generator';
-import { EstadoInspeccion, Rol } from '@prisma/client';
+import { EstadoHallazgo, EstadoInspeccion, Rol } from '@prisma/client';
 import { readFile } from 'fs/promises';
 import { basename, extname, relative, resolve } from 'path';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
@@ -330,7 +330,7 @@ export class ReportesService {
    */
   async generarReporteHallazgos(
     empresaId: string,
-    filtros: { fechaDesde?: Date; fechaHasta?: Date; nivelRiesgo?: string },
+    filtros: { fechaDesde?: Date; fechaHasta?: Date; nivelRiesgo?: string; estado?: string },
     organizacionEmpresaId?: string,
   ) {
     const hallazgos = await this.prisma.hallazgo.findMany({
@@ -339,6 +339,7 @@ export class ReportesService {
         ...(filtros.fechaDesde && { createdAt: { gte: filtros.fechaDesde } }),
         ...(filtros.fechaHasta && { createdAt: { lte: filtros.fechaHasta } }),
         ...(filtros.nivelRiesgo && { nivelRiesgo: filtros.nivelRiesgo as any }),
+        ...(filtros.estado && { estado: filtros.estado as EstadoHallazgo }),
       },
       include: {
         inspeccion: {
@@ -353,6 +354,11 @@ export class ReportesService {
         accionesCorrectivas: {
           select: { estado: true },
         },
+        responsableResolucion: { select: { id: true, nombre: true, apellido: true } },
+        historial: {
+          select: { id: true, tipo: true, estadoAnterior: true, estadoNuevo: true, descripcion: true, evidenciaUrls: true, accionCorrectivaId: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -366,6 +372,11 @@ export class ReportesService {
         BAJO: hallazgos.filter((h) => h.nivelRiesgo === 'BAJO').length,
       },
       conAccionCorrectiva: hallazgos.filter((h) => h.accionesCorrectivas.length > 0).length,
+      porEstado: {
+        PENDIENTE: hallazgos.filter((h) => h.estado === EstadoHallazgo.PENDIENTE).length,
+        EN_CORRECCION: hallazgos.filter((h) => h.estado === EstadoHallazgo.EN_CORRECCION).length,
+        SOLUCIONADO: hallazgos.filter((h) => h.estado === EstadoHallazgo.SOLUCIONADO).length,
+      },
     };
 
     return {
@@ -379,6 +390,11 @@ export class ReportesService {
         titulo: h.titulo,
         descripcion: h.descripcion,
         nivelRiesgo: h.nivelRiesgo,
+        estado: h.estado,
+        fechaResolucion: h.fechaResolucion,
+        responsableResolucion: h.responsableResolucion ? `${h.responsableResolucion.nombre} ${h.responsableResolucion.apellido}` : null,
+        descripcionSolucion: h.descripcionSolucion,
+        historial: h.historial,
         ubicacion: h.ubicacionTexto,
         fecha: h.createdAt,
         inspeccion: {
