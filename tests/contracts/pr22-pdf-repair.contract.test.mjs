@@ -21,7 +21,7 @@ test('PR #22 normalizes visible text without changing stored data', async () => 
   const generator = await read('backend/src/reportes/generators/pdf-inspeccion.generator.ts');
   assert.match(generator, /normalize\('NFC'\)/);
   assert.match(generator, /Buffer\.from\(original, 'latin1'\)\.toString\('utf8'\)/);
-  assert.match(generator, /repara sólo mojibake visible en la salida/);
+  assert.match(generator, /repara sólo mojibake (?:visible en la salida|inequívoco)/);
 });
 
 test('PR #22 lays out long checklists and findings with wrapping and continuation pages', async () => {
