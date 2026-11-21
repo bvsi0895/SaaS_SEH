@@ -77,6 +77,62 @@ describe('HallazgosService lifecycle', () => {
     }));
   });
 
+  it('persists an external resolution responsible and keeps the registering user as auditor', async () => {
+    const finding = baseFinding();
+    const prisma: any = {
+      hallazgo: {
+        findUnique: jest.fn().mockResolvedValue(finding),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      hallazgoHistorial: { create: jest.fn().mockResolvedValue({}) },
+      usuario: { findFirst: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation(async (callback: (tx: any) => Promise<unknown>) => callback(prisma));
+    const service = new HallazgosService(prisma as never);
+
+    await service.resolver('finding-1', {
+      descripcionSolucion: 'Se corrigió la condición insegura con un proveedor externo.',
+      fechaResolucion: '2026-11-20T15:00:00.000Z',
+      responsableTexto: 'María Proveedora',
+      responsableCargo: 'Contratista eléctrica',
+    }, 'company-1', 'context-1', 'admin-1', 'ADMIN_EMPRESA' as never);
+
+    expect(prisma.usuario.findFirst).not.toHaveBeenCalled();
+    expect(prisma.hallazgo.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        responsableResolucionId: undefined,
+        responsableResolucionTexto: 'María Proveedora',
+        responsableResolucionCargo: 'Contratista eléctrica',
+      }),
+    }));
+    expect(prisma.hallazgoHistorial.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        usuarioId: 'admin-1',
+        responsableId: undefined,
+        responsableTexto: 'María Proveedora',
+        responsableCargo: 'Contratista eléctrica',
+      }),
+    }));
+  });
+
+  it('rejects an internal responsible outside the active company context', async () => {
+    const finding = baseFinding();
+    const prisma: any = {
+      hallazgo: { findUnique: jest.fn().mockResolvedValue(finding), updateMany: jest.fn() },
+      hallazgoHistorial: { create: jest.fn() },
+      usuario: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new HallazgosService(prisma as never);
+
+    await expect(service.resolver('finding-1', {
+      descripcionSolucion: 'Se verificó el trabajo realizado en el establecimiento.',
+      fechaResolucion: '2026-11-20T15:00:00.000Z',
+      responsableId: 'user-from-another-tenant',
+    }, 'company-1', 'context-1', 'admin-1', 'ADMIN_EMPRESA' as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.hallazgo.updateMany).not.toHaveBeenCalled();
+  });
+
   it('does not verify a finding while its action is only pending', async () => {
     const finding = baseFinding([{ id: 'action-1', estado: 'PENDIENTE' }]);
     const prisma = {

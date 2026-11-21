@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ResolverHallazgoDto {
@@ -19,7 +19,14 @@ export class ResolverHallazgoDto {
   @ApiPropertyOptional({ description: 'Responsable que no pertenece al directorio de usuarios' })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   responsableTexto?: string;
+
+  @ApiPropertyOptional({ description: 'Cargo del tercero responsable de la solución' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  responsableCargo?: string;
 
   @ApiPropertyOptional({ type: [String], description: 'URLs de evidencias ya autorizadas' })
   @IsOptional()

@@ -189,6 +189,12 @@ export class ReportesService {
 
     return this.pdfGenerator.generate({
       ...inspeccion,
+      hallazgos: inspeccion.hallazgos.map((hallazgo) => ({
+        ...hallazgo,
+        responsableResolucion: hallazgo.responsableResolucion || (hallazgo.responsableResolucionTexto
+          ? { nombre: hallazgo.responsableResolucionTexto, apellido: hallazgo.responsableResolucionCargo ? `(${hallazgo.responsableResolucionCargo})` : '' }
+          : null),
+      })),
       organizacion: organization || { nombre: 'Sistema de Seguridad e Higiene' },
       logo: logoResult.buffer,
       fotos: photoResult.fotos,
@@ -294,6 +300,8 @@ export class ReportesService {
               estado: true,
               fechaResolucion: true,
               descripcionSolucion: true,
+              responsableResolucionTexto: true,
+              responsableResolucionCargo: true,
               responsableResolucion: { select: { nombre: true, apellido: true } },
               createdAt: true,
               fotosUrls: true,
@@ -328,7 +336,9 @@ export class ReportesService {
       descripcionSolucion: hallazgo.descripcionSolucion,
       responsableResolucion: hallazgo.responsableResolucion
         ? `${hallazgo.responsableResolucion.nombre} ${hallazgo.responsableResolucion.apellido}`
-        : null,
+        : hallazgo.responsableResolucionTexto
+          ? `${hallazgo.responsableResolucionTexto}${hallazgo.responsableResolucionCargo ? ` (${hallazgo.responsableResolucionCargo})` : ''}`
+          : null,
       establecimiento: inspection.establecimiento?.nombre,
       sector: inspection.sector,
       fecha: hallazgo.createdAt,
@@ -395,7 +405,20 @@ export class ReportesService {
         },
         responsableResolucion: { select: { id: true, nombre: true, apellido: true } },
         historial: {
-          select: { id: true, tipo: true, estadoAnterior: true, estadoNuevo: true, descripcion: true, evidenciaUrls: true, accionCorrectivaId: true, createdAt: true },
+          select: {
+            id: true,
+            tipo: true,
+            estadoAnterior: true,
+            estadoNuevo: true,
+            descripcion: true,
+            evidenciaUrls: true,
+            accionCorrectivaId: true,
+            responsableId: true,
+            responsableTexto: true,
+            responsableCargo: true,
+            responsable: { select: { id: true, nombre: true, apellido: true } },
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -431,7 +454,11 @@ export class ReportesService {
         nivelRiesgo: h.nivelRiesgo,
         estado: h.estado,
         fechaResolucion: h.fechaResolucion,
-        responsableResolucion: h.responsableResolucion ? `${h.responsableResolucion.nombre} ${h.responsableResolucion.apellido}` : null,
+        responsableResolucion: h.responsableResolucion
+          ? `${h.responsableResolucion.nombre} ${h.responsableResolucion.apellido}`
+          : h.responsableResolucionTexto
+            ? `${h.responsableResolucionTexto}${h.responsableResolucionCargo ? ` (${h.responsableResolucionCargo})` : ''}`
+            : null,
         descripcionSolucion: h.descripcionSolucion,
         historial: h.historial,
         ubicacion: h.ubicacionTexto,

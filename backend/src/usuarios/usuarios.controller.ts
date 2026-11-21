@@ -58,6 +58,18 @@ export class UsuariosController {
     return this.usuariosService.findAuthorizedTechnicians(empresaId, organizacionEmpresaId);
   }
 
+  @Get('responsables-resolucion')
+  @Roles(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO)
+  @ApiOperation({ summary: 'Listar responsables habilitados para resolver un hallazgo' })
+  @ApiQuery({ name: 'establecimientoId', required: false })
+  async findResolutionResponsibles(
+    @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @Query('establecimientoId') establecimientoId?: string,
+  ) {
+    return this.usuariosService.findResolutionResponsibles(empresaId, organizacionEmpresaId, establecimientoId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
   @ApiResponse({ status: 200, description: 'Usuario encontrado' })

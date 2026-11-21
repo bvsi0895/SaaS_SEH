@@ -77,6 +77,59 @@ export class UsuariosService {
     });
   }
 
+  async findResolutionResponsibles(
+    empresaId: string,
+    organizacionEmpresaId: string,
+    establecimientoId?: string,
+  ) {
+    return this.prisma.usuario.findMany({
+      where: {
+        empresaId,
+        activo: true,
+        rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
+        membresiasOrganizacion: {
+          some: {
+            activa: true,
+            accesosEmpresa: {
+              some: {
+                empresaId,
+                organizacionEmpresaId,
+                activo: true,
+                organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                ...(establecimientoId && {
+                  OR: [
+                    { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } },
+                    {
+                      rol: Rol.TECNICO,
+                      establecimientos: {
+                        some: {
+                          establecimientoId,
+                          establecimiento: { empresaId, activo: true },
+                        },
+                      },
+                    },
+                  ],
+                }),
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        rol: true,
+        activo: true,
+        ultimoAcceso: true,
+        createdAt: true,
+        empresaId: true,
+      },
+      orderBy: [{ nombre: 'asc' }, { apellido: 'asc' }],
+    });
+  }
+
   /**
    * Obtener un usuario por ID
    */

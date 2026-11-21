@@ -12,7 +12,7 @@ import { randomUUID } from 'crypto';
 const sharp = require('sharp') as any;
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHallazgoDto, UpdateHallazgoDto, ResolverHallazgoDto } from './dto';
-import { EstadoHallazgo, EstadoInspeccion, NivelRiesgo, Prisma, Rol, TipoEventoHallazgo } from '@prisma/client';
+import { EstadoHallazgo, EstadoInspeccion, EstadoRelacionEmpresa, NivelRiesgo, Prisma, Rol, TipoEventoHallazgo } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
 
 @Injectable()
@@ -356,25 +356,66 @@ export class HallazgosService {
     return hallazgo;
   }
 
-  private async validateResolutionResponsible(responsableId: string | undefined, empresaId: string, organizacionEmpresaId?: string) {
-    if (!responsableId) return;
+  private async validateResolutionResponsible(
+    responsableId: string | undefined,
+    responsableTexto: string | undefined,
+    responsableCargo: string | undefined,
+    empresaId: string,
+    organizacionEmpresaId: string,
+    establecimientoId?: string | null,
+  ) {
+    const normalizedText = responsableTexto?.trim() || undefined;
+    const normalizedCargo = responsableCargo?.trim() || undefined;
+    if (responsableId && normalizedText) {
+      throw new BadRequestException('Seleccione un responsable interno o una persona no registrada, no ambos');
+    }
+    if (!normalizedText && normalizedCargo) {
+      throw new BadRequestException('El cargo requiere el nombre de una persona no registrada');
+    }
+    if (!responsableId && !normalizedText) {
+      return { responsableTexto: undefined, responsableCargo: undefined };
+    }
+    if (normalizedText) {
+      return { responsableTexto: normalizedText, responsableCargo: normalizedCargo };
+    }
     const responsible = await this.prisma.usuario.findFirst({
       where: {
         id: responsableId,
         empresaId,
         activo: true,
-        ...(organizacionEmpresaId && {
-          membresiasOrganizacion: {
-            some: {
-              activa: true,
-              accesosEmpresa: { some: { organizacionEmpresaId, activo: true } },
+        rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
+        membresiasOrganizacion: {
+          some: {
+            activa: true,
+            accesosEmpresa: {
+              some: {
+                empresaId,
+                organizacionEmpresaId,
+                activo: true,
+                organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                ...(establecimientoId && {
+                  OR: [
+                    { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } },
+                    {
+                      rol: Rol.TECNICO,
+                      establecimientos: {
+                        some: {
+                          establecimientoId,
+                          establecimiento: { empresaId, activo: true },
+                        },
+                      },
+                    },
+                  ],
+                }),
+              },
             },
           },
-        }),
+        },
       },
       select: { id: true },
     });
     if (!responsible) throw new BadRequestException('El responsable de la resolución no está autorizado');
+    return { responsableTexto: undefined, responsableCargo: undefined };
   }
 
   private parseEvidenceUrls(fotosUrls: string | null | undefined): string[] {
@@ -430,7 +471,14 @@ export class HallazgosService {
       throw new BadRequestException('La acción correctiva no está vinculada a este hallazgo');
     }
     this.assertAuthorizedEvidenceUrls(hallazgo, dto.evidenciaUrls);
-    await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
+    const resolutionResponsible = await this.validateResolutionResponsible(
+      dto.responsableId,
+      dto.responsableTexto,
+      dto.responsableCargo,
+      empresaId,
+      organizacionEmpresaId,
+      hallazgo.inspeccion.establecimientoId,
+    );
     const resolvedAt = new Date(dto.fechaResolucion);
     if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
     await this.prisma.$transaction(async (tx) => {
@@ -441,6 +489,8 @@ export class HallazgosService {
           fechaResolucion: resolvedAt,
           descripcionSolucion: dto.descripcionSolucion,
           responsableResolucionId: dto.responsableId,
+          responsableResolucionTexto: resolutionResponsible.responsableTexto,
+          responsableResolucionCargo: resolutionResponsible.responsableCargo,
         },
       });
       if (changed.count !== 1) {
@@ -456,6 +506,8 @@ export class HallazgosService {
           evidenciaUrls: dto.evidenciaUrls?.length ? JSON.stringify(dto.evidenciaUrls) : null,
           usuarioId,
           responsableId: dto.responsableId,
+          responsableTexto: resolutionResponsible.responsableTexto,
+          responsableCargo: resolutionResponsible.responsableCargo,
         },
       });
     });
@@ -481,7 +533,14 @@ export class HallazgosService {
       throw new BadRequestException('La acción correctiva debe estar ejecutada antes de verificar el hallazgo');
     }
     this.assertAuthorizedEvidenceUrls(hallazgo, dto.evidenciaUrls);
-    await this.validateResolutionResponsible(dto.responsableId, empresaId, organizacionEmpresaId);
+    const resolutionResponsible = await this.validateResolutionResponsible(
+      dto.responsableId,
+      dto.responsableTexto,
+      dto.responsableCargo,
+      empresaId,
+      organizacionEmpresaId,
+      hallazgo.inspeccion.establecimientoId,
+    );
     const resolvedAt = new Date(dto.fechaResolucion);
     if (Number.isNaN(resolvedAt.getTime())) throw new BadRequestException('La fecha de resolución no es válida');
     await this.prisma.$transaction(async (tx) => {
@@ -502,6 +561,8 @@ export class HallazgosService {
           fechaResolucion: resolvedAt,
           descripcionSolucion: dto.descripcionSolucion,
           responsableResolucionId: dto.responsableId,
+          responsableResolucionTexto: resolutionResponsible.responsableTexto,
+          responsableResolucionCargo: resolutionResponsible.responsableCargo,
         },
       });
       if (changed.count !== 1) {
@@ -518,6 +579,8 @@ export class HallazgosService {
           accionCorrectivaId: action.id,
           usuarioId,
           responsableId: dto.responsableId,
+          responsableTexto: resolutionResponsible.responsableTexto,
+          responsableCargo: resolutionResponsible.responsableCargo,
         },
       });
     });
