@@ -85,6 +85,7 @@ export default function HallazgosPage() {
       headerName: 'Nivel de Riesgo',
       width: 118,
       headerAlign: 'center',
+      headerClassName: 'hallazgos-stable-header',
       renderHeader: () => <Box component="span" sx={customHeaderSx}>Nivel de<br />Riesgo</Box>,
       renderCell: (params: GridRenderCellParams) => (
         <StatusChip status={params.value} type="riesgo" />
@@ -108,6 +109,7 @@ export default function HallazgosPage() {
       headerName: 'Técnico inspector',
       width: 155,
       headerAlign: 'center',
+      headerClassName: 'hallazgos-stable-header',
       renderHeader: () => <Box component="span" sx={customHeaderSx}>Técnico<br />inspector</Box>,
       valueGetter: (params) => {
         const usuario = params.row.inspeccion?.usuario;
@@ -119,6 +121,7 @@ export default function HallazgosPage() {
       headerName: 'Responsables de acciones',
       width: 175,
       headerAlign: 'center',
+      headerClassName: 'hallazgos-stable-header',
       renderHeader: () => <Box component="span" sx={customHeaderSx}>Responsables<br />de acciones</Box>,
       valueGetter: (params) => {
         const responsables = (params.row.accionesCorrectivas || [])
@@ -246,6 +249,22 @@ export default function HallazgosPage() {
               fontSize: '0.875rem',
               fontWeight: 600,
               textAlign: 'center',
+            },
+            '& .hallazgos-stable-header .MuiDataGrid-iconButtonContainer': {
+              visibility: 'hidden',
+              width: 'auto',
+              flexShrink: 0,
+            },
+            '& .hallazgos-stable-header .MuiDataGrid-menuIcon': {
+              visibility: 'hidden',
+              width: 'auto',
+              flexShrink: 0,
+            },
+            '& .hallazgos-stable-header:hover .MuiDataGrid-iconButtonContainer, & .hallazgos-stable-header.MuiDataGrid-columnHeader--sorted .MuiDataGrid-iconButtonContainer, & .hallazgos-stable-header.MuiDataGrid-columnHeader--filtered .MuiDataGrid-iconButtonContainer': {
+              visibility: 'visible',
+            },
+            '& .hallazgos-stable-header:hover .MuiDataGrid-menuIcon, & .hallazgos-stable-header .MuiDataGrid-menuOpen': {
+              visibility: 'visible',
             },
             '& .MuiDataGrid-cell:focus': {
               outline: 'none',
