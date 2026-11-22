@@ -44,6 +44,17 @@ export default function HallazgosPage() {
   const { user, activeContextId } = useAuth();
   const queryScope = getQueryScope(activeContextId, user?.id, user?.rol);
 
+  const customHeaderSx = {
+    display: 'block',
+    width: '100%',
+    fontFamily: 'inherit',
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    lineHeight: 1.15,
+    textAlign: 'center',
+    whiteSpace: 'normal',
+  } as const;
+
   const { data, isLoading } = useQuery({
     queryKey: [...queryKeys.findings(queryScope), page, pageSize, nivelRiesgoFilter, estadoFilter, establecimientoId],
     queryFn: () =>
@@ -74,7 +85,7 @@ export default function HallazgosPage() {
       headerName: 'Nivel de Riesgo',
       width: 118,
       headerAlign: 'center',
-      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Nivel de<br />Riesgo</span>,
+      renderHeader: () => <Box component="span" sx={customHeaderSx}>Nivel de<br />Riesgo</Box>,
       renderCell: (params: GridRenderCellParams) => (
         <StatusChip status={params.value} type="riesgo" />
       ),
@@ -97,7 +108,7 @@ export default function HallazgosPage() {
       headerName: 'Técnico inspector',
       width: 155,
       headerAlign: 'center',
-      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Técnico<br />inspector</span>,
+      renderHeader: () => <Box component="span" sx={customHeaderSx}>Técnico<br />inspector</Box>,
       valueGetter: (params) => {
         const usuario = params.row.inspeccion?.usuario;
         return usuario ? `${usuario.nombre} ${usuario.apellido}` : '-';
@@ -108,7 +119,7 @@ export default function HallazgosPage() {
       headerName: 'Responsables de acciones',
       width: 175,
       headerAlign: 'center',
-      renderHeader: () => <span style={{ font: 'inherit', lineHeight: 1.15 }}>Responsables<br />de acciones</span>,
+      renderHeader: () => <Box component="span" sx={customHeaderSx}>Responsables<br />de acciones</Box>,
       valueGetter: (params) => {
         const responsables = (params.row.accionesCorrectivas || [])
           .map((accion: any) => accion.responsable)
