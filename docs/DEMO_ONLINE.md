@@ -23,6 +23,11 @@ deben reutilizar en producción ni publicar en documentación comercial.
 
 ## Compose reproducible
 
+La preparación actual de la demo pública está documentada en
+[`docs/DEMO_DEPLOYMENT.md`](DEMO_DEPLOYMENT.md). Esta rama usa Caddy como
+servicio Compose para terminar HTTPS; no requiere publicar directamente el
+puerto de Nginx ni exponer PostgreSQL.
+
 1. Copiar `deploy/demo.env.example` a `.env` fuera del control de versiones.
 2. Reemplazar todos los valores `REEMPLAZAR_*` con secretos generados.
 3. Validar la configuración:
@@ -43,17 +48,18 @@ El backend ejecuta `prisma migrate deploy` al iniciar y expone
 
 ## HTTPS y proxy
 
-Usar un proxy inverso administrado por infraestructura, por ejemplo Caddy con
-`deploy/Caddyfile.example`, terminando TLS delante del servicio `web`. No
-exponer PostgreSQL públicamente. En producción, limitar CORS al dominio real
-de la demo y configurar `VITE_API_URL=/api` detrás del mismo dominio.
+`deploy/Caddyfile.example` termina TLS delante del servicio `web` y conserva
+`/api` en el mismo origen. No exponer PostgreSQL públicamente. Si existe un
+proxy HTTPS compartido, seguir el procedimiento de coexistencia de
+`docs/INFRAESTRUCTURA_DEMO.md` y no iniciar dos terminadores para el mismo
+puerto o dominio.
 
 ## Backups y recuperación
 
-Respaldar PostgreSQL con `pg_dump` antes de actualizar la demo y conservar el
-volumen de fotografías junto con el dump. La recuperación debe probarse sobre
-una base nueva mediante `prisma migrate deploy` y restauración del dump; nunca
-usar `prisma migrate reset` en el entorno publicado.
+Usar `scripts/backup-demo.sh` antes de actualizar y
+`scripts/restore-demo.sh` sólo con confirmación explícita. El procedimiento
+completo conserva PostgreSQL y fotografías; nunca usar `prisma migrate reset`
+ni `docker compose down -v` en el entorno publicado.
 
 ## Seguridad y bloqueos
 

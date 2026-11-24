@@ -1,3 +1,13 @@
-demo.seh.example {
-  reverse_proxy 127.0.0.1:8080
+{$DOMAIN} {
+  encode gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  # Caddy terminates HTTPS; Nginx serves the SPA and proxies /api internally.
+  reverse_proxy web:80
 }

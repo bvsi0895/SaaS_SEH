@@ -7,10 +7,12 @@ SEH. La revisión se realizó sólo sobre `D:\Proyectos\SEH`, rama
 `feature/demo-online`, commit `850ce46`. No se accedió a Oracle Cloud, no se
 modificaron servidores y no se ejecutó ningún despliegue.
 
-La configuración actual usa PostgreSQL 16, backend NestJS, frontend Nginx y
-volúmenes Docker persistentes. PostgreSQL y backend no publican puertos al
-host; web se enlaza a `127.0.0.1:8080` para que un proxy HTTPS existente pueda
-servir el dominio.
+La configuración de `feature/demo-deployment` usa PostgreSQL 16, backend
+NestJS, frontend Nginx, Caddy y volúmenes Docker persistentes. PostgreSQL,
+backend y web no publican puertos al host; Caddy es el único servicio que
+publica 80/443. Si se decide reutilizar un proxy HTTPS existente, debe
+seguirse un procedimiento de coexistencia explícito y no iniciar Caddy en los
+mismos puertos.
 
 ## Recomendación ejecutiva
 
@@ -77,10 +79,11 @@ compartir el almacenamiento de evidencias con otros sistemas.
 
 ## Convivencia con un proxy existente
 
-La configuración entregada presupone que Caddy o Nginx corre en el host y que
-el bloque de dominio apunta a `127.0.0.1:8080`, como en
-`deploy/Caddyfile.example`. Esto evita ocupar los puertos 80/443 del proxy
-existente.
+La configuración entregada incluye Caddy dentro del Compose y presupone que
+80/443 están disponibles para ese servicio. `deploy/Caddyfile.example` apunta
+internamente a `web:80`. Si Caddy o Nginx ya corre en el host, no se debe
+iniciar el Caddy del Compose sin remapear puertos y validar previamente la
+red; el proxy existente debe apuntar al endpoint elegido de forma explícita.
 
 Procedimiento seguro:
 
@@ -157,7 +160,7 @@ mayor carga.
 |---|---|---|
 | Competencia por RAM/CPU | Lentitud o reinicios | Margen libre sostenido; no usar swap como reserva normal. |
 | Disco compartido | Falta de espacio o corrupción operativa | Cuota, alertas y backup externo; separar volumen de evidencias. |
-| Puertos/proxy compartidos | Interrupción de otros sistemas | SEH sólo en loopback 8080; no tocar 80/443 sin procedimiento. |
+| Puertos/proxy compartidos | Interrupción de otros sistemas | Caddy de SEH requiere 80/443 libres; no iniciar dos terminadores sin procedimiento. |
 | Docker compartido | Error de proyecto o nombres | Verificar contenedores, volúmenes y `container_name` antes de iniciar. |
 | Logs mezclados | Exposición de datos o diagnóstico ambiguo | Rotación, nombres únicos y no registrar secretos. |
 | Fallo de la VM | Caída simultánea | VPS independiente o aceptación formal del riesgo y backups externos. |
