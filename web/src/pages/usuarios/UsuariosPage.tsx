@@ -20,7 +20,6 @@ import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  LockReset as ResetIcon,
   Visibility,
   VisibilityOff,
 } from '@mui/icons-material';
@@ -62,11 +61,8 @@ export default function UsuariosPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
-  const [newPassword, setNewPassword] = useState('');
   const [showCreatePassword, setShowCreatePassword] = useState(false);
-  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const { data: usuarios, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -84,7 +80,6 @@ export default function UsuariosPage() {
     register: registerEdit,
     handleSubmit: handleSubmitEdit,
     setValue: setEditValue,
-    formState: { errors: errorsEdit },
   } = useForm<UpdateUsuarioDto>();
 
   const createMutation = useMutation({
@@ -125,19 +120,6 @@ export default function UsuariosPage() {
     },
   });
 
-  const changePasswordMutation = useMutation({
-    mutationFn: ({ id, password }: { id: string; password: string }) =>
-      usuariosApi.changePassword(id, password),
-    onSuccess: () => {
-      showSuccess('Contraseña actualizada exitosamente');
-      setResetPasswordDialogOpen(false);
-      setNewPassword('');
-    },
-    onError: (error) => {
-      showError(getBackendErrorMessage(error, 'Error al cambiar la contraseña'));
-    },
-  });
-
   const onCreateSubmit = (data: CreateUsuarioDto) => {
     createMutation.mutate(data);
   };
@@ -154,16 +136,8 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleResetPassword = () => {
-    if (selectedUser && newPassword) {
-      changePasswordMutation.mutate({ id: selectedUser.id, password: newPassword });
-    }
-  };
-
   const openEditDialog = (user: Usuario) => {
     setSelectedUser(user);
-    setEditValue('nombre', user.nombre);
-    setEditValue('apellido', user.apellido);
     setEditValue('rol', user.rol);
     setEditValue('activo', user.activo);
     setEditDialogOpen(true);
@@ -217,17 +191,6 @@ export default function UsuariosPage() {
           <Tooltip title="Editar">
             <IconButton size="small" onClick={() => openEditDialog(params.row)}>
               <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Cambiar contraseña">
-            <IconButton
-              size="small"
-              onClick={() => {
-                setSelectedUser(params.row);
-                setResetPasswordDialogOpen(true);
-              }}
-            >
-              <ResetIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Eliminar">
@@ -381,21 +344,10 @@ export default function UsuariosPage() {
           <DialogTitle>Editar Usuario</DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Nombre"
-                  error={!!errorsEdit.nombre}
-                  {...registerEdit('nombre')}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Apellido"
-                  error={!!errorsEdit.apellido}
-                  {...registerEdit('apellido')}
-                />
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">
+                  La identidad global del usuario no se modifica desde una consultora. Solo se administra su rol y acceso en la empresa activa.
+                </Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
@@ -431,50 +383,6 @@ export default function UsuariosPage() {
             </Button>
           </DialogActions>
         </form>
-      </Dialog>
-
-      {/* Dialog para cambiar contraseña */}
-      <Dialog
-        open={resetPasswordDialogOpen}
-        onClose={() => setResetPasswordDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Cambiar contraseña</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Ingrese la nueva contraseña para {selectedUser?.nombre} {selectedUser?.apellido}
-          </Typography>
-          <TextField
-            fullWidth
-            label="Nueva contraseña"
-            type={showResetPassword ? 'text' : 'password'}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            helperText="Mínimo 8 caracteres"
-            InputProps={{
-              endAdornment: (
-                <IconButton
-                  aria-label={showResetPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  onClick={() => setShowResetPassword((visible) => !visible)}
-                  edge="end"
-                >
-                  {showResetPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              ),
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setResetPasswordDialogOpen(false)}>Cancelar</Button>
-          <Button
-            variant="contained"
-            onClick={handleResetPassword}
-            disabled={newPassword.length < 8 || changePasswordMutation.isPending}
-          >
-            {changePasswordMutation.isPending ? 'Cambiando...' : 'Cambiar'}
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* Dialog para eliminar */}

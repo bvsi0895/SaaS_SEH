@@ -155,14 +155,15 @@ export class AdministracionService {
     return this.prisma.organizacion.update({ where: { id: organizacionId }, data: dto });
   }
 
-  async listMembers(organizacionId: string, usuarioId: string) {
+  async listMembers(organizacionId: string, usuarioId: string, organizacionEmpresaId?: string) {
     await this.assertAdmin(organizacionId, usuarioId);
-    return this.prisma.organizacionMiembro.findMany({
+    const members = await this.prisma.organizacionMiembro.findMany({
       where: { organizacionId },
       select: {
         id: true, rol: true, activa: true, usuarioId: true,
         usuario: { select: { id: true, email: true, nombre: true, apellido: true, rol: true, activo: true } },
         accesosEmpresa: {
+          ...(organizacionEmpresaId ? { where: { organizacionEmpresaId } } : {}),
           select: {
             id: true, rol: true, activo: true, empresaId: true,
             organizacionEmpresa: { select: { id: true, empresa: { select: { nombre: true } }, estado: true } },
@@ -170,6 +171,13 @@ export class AdministracionService {
         },
       },
       orderBy: [{ activa: 'desc' }, { usuario: { nombre: 'asc' } }],
+    });
+    if (!organizacionEmpresaId) return members;
+    return members.map((member) => {
+      const contextualAccess = member.accesosEmpresa[0];
+      return contextualAccess
+        ? { ...member, usuario: { ...member.usuario, rol: contextualAccess.rol, activo: contextualAccess.activo } }
+        : member;
     });
   }
 

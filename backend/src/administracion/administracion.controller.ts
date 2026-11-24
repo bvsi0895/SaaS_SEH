@@ -61,8 +61,8 @@ export class AdministracionController {
   }
 
   @Get('me/miembros')
-  listMembers(@CurrentUser('organizacionId') orgId: string, @CurrentUser('id') userId: string) {
-    return this.service.listMembers(orgId, userId);
+  listMembers(@CurrentUser('organizacionId') orgId: string, @CurrentUser('organizacionEmpresaId') relationId: string, @CurrentUser('id') userId: string) {
+    return this.service.listMembers(orgId, userId, relationId);
   }
 
   @Post('me/miembros')

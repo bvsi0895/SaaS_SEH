@@ -10,14 +10,18 @@ import {
   TipoOrganizacion,
 } from '@prisma/client';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
+import { AdministracionService } from '../src/administracion/administracion.service';
 import { HallazgosService } from '../src/hallazgos/hallazgos.service';
 import { InspeccionesService } from '../src/inspecciones/inspecciones.service';
 import { TenancyService } from '../src/tenancy/tenancy.service';
+import { UsuariosService } from '../src/usuarios/usuarios.service';
 
 const prisma = new PrismaClient();
 const tenancy = new TenancyService(prisma as never);
 const inspections = new InspeccionesService(prisma as never, tenancy);
 const findings = new HallazgosService(prisma as never, tenancy);
+const users = new UsuariosService(prisma as never);
+const administration = new AdministracionService(prisma as never);
 const jwtStrategy = new JwtStrategy({ get: () => 'integration-secret' } as never, prisma as never);
 
 const ids = {
@@ -29,30 +33,35 @@ const ids = {
   usuarioA: '00000000-0000-0000-0000-000000000606',
   usuarioB: '00000000-0000-0000-0000-000000000607',
   usuarioMulti: '00000000-0000-0000-0000-000000000608',
+  usuarioAdminA: '00000000-0000-0000-0000-000000000623',
   miembroA: '00000000-0000-0000-0000-000000000609',
   miembroB: '00000000-0000-0000-0000-000000000610',
   miembroMultiA: '00000000-0000-0000-0000-000000000611',
   miembroMultiB: '00000000-0000-0000-0000-000000000612',
+  miembroAdminA: '00000000-0000-0000-0000-000000000624',
   accesoA: '00000000-0000-0000-0000-000000000613',
   accesoB: '00000000-0000-0000-0000-000000000614',
   accesoMultiA: '00000000-0000-0000-0000-000000000615',
   accesoMultiB: '00000000-0000-0000-0000-000000000616',
+  accesoAdminA: '00000000-0000-0000-0000-000000000625',
   establecimientoA: '00000000-0000-0000-0000-000000000617',
   establecimientoB: '00000000-0000-0000-0000-000000000618',
   checklistA: '00000000-0000-0000-0000-000000000619',
   checklistB: '00000000-0000-0000-0000-000000000620',
   checklistItemA: '00000000-0000-0000-0000-000000000621',
   checklistItemB: '00000000-0000-0000-0000-000000000622',
+  inspeccionMultiB: '00000000-0000-0000-0000-000000000626',
+  hallazgoMultiB: '00000000-0000-0000-0000-000000000627',
 };
 
 async function cleanup() {
   await prisma.inspeccion.deleteMany({ where: { empresaId: ids.empresa } });
   await prisma.checklist.deleteMany({ where: { id: { in: [ids.checklistA, ids.checklistB] } } });
-  await prisma.accesoEstablecimiento.deleteMany({ where: { accesoEmpresaId: { in: [ids.accesoA, ids.accesoB, ids.accesoMultiA, ids.accesoMultiB] } } });
+  await prisma.accesoEstablecimiento.deleteMany({ where: { accesoEmpresaId: { in: [ids.accesoA, ids.accesoB, ids.accesoMultiA, ids.accesoMultiB, ids.accesoAdminA] } } });
   await prisma.establecimiento.deleteMany({ where: { id: { in: [ids.establecimientoA, ids.establecimientoB] } } });
-  await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accesoA, ids.accesoB, ids.accesoMultiA, ids.accesoMultiB] } } });
-  await prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.miembroA, ids.miembroB, ids.miembroMultiA, ids.miembroMultiB] } } });
-  await prisma.usuario.deleteMany({ where: { id: { in: [ids.usuarioA, ids.usuarioB, ids.usuarioMulti] } } });
+  await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accesoA, ids.accesoB, ids.accesoMultiA, ids.accesoMultiB, ids.accesoAdminA] } } });
+  await prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.miembroA, ids.miembroB, ids.miembroMultiA, ids.miembroMultiB, ids.miembroAdminA] } } });
+  await prisma.usuario.deleteMany({ where: { id: { in: [ids.usuarioA, ids.usuarioB, ids.usuarioMulti, ids.usuarioAdminA] } } });
   await prisma.organizacionEmpresa.deleteMany({ where: { id: { in: [ids.relacionA, ids.relacionB] } } });
   await prisma.organizacion.deleteMany({ where: { id: { in: [ids.organizacionA, ids.organizacionB] } } });
   await prisma.empresa.deleteMany({ where: { id: ids.empresa } });
@@ -83,18 +92,21 @@ async function main() {
       { id: ids.usuarioB, email: 'pr28-b@seh.test', password: 'hash', nombre: 'Técnico', apellido: 'B', rol: Rol.TECNICO, empresaId: ids.empresa },
       // Global role is deliberately different from the role in relation B.
       { id: ids.usuarioMulti, email: 'pr28-multi@seh.test', password: 'hash', nombre: 'Usuario', apellido: 'Multiempresa', rol: Rol.ADMIN_EMPRESA, empresaId: ids.empresa },
+      { id: ids.usuarioAdminA, email: 'pr28-admin-a@seh.test', password: 'hash', nombre: 'Admin', apellido: 'A', rol: Rol.ADMIN_EMPRESA, empresaId: ids.empresa },
     ] });
     await prisma.organizacionMiembro.createMany({ data: [
       { id: ids.miembroA, organizacionId: ids.organizacionA, usuarioId: ids.usuarioA, rol: RolOrganizacion.AUDITOR_ORGANIZACION },
       { id: ids.miembroB, organizacionId: ids.organizacionB, usuarioId: ids.usuarioB, rol: RolOrganizacion.AUDITOR_ORGANIZACION },
       { id: ids.miembroMultiA, organizacionId: ids.organizacionA, usuarioId: ids.usuarioMulti, rol: RolOrganizacion.ADMIN_ORGANIZACION },
       { id: ids.miembroMultiB, organizacionId: ids.organizacionB, usuarioId: ids.usuarioMulti, rol: RolOrganizacion.AUDITOR_ORGANIZACION },
+      { id: ids.miembroAdminA, organizacionId: ids.organizacionA, usuarioId: ids.usuarioAdminA, rol: RolOrganizacion.ADMIN_ORGANIZACION },
     ] });
     await prisma.accesoEmpresa.createMany({ data: [
       { id: ids.accesoA, organizacionEmpresaId: ids.relacionA, organizacionMiembroId: ids.miembroA, organizacionId: ids.organizacionA, empresaId: ids.empresa, rol: Rol.TECNICO },
       { id: ids.accesoB, organizacionEmpresaId: ids.relacionB, organizacionMiembroId: ids.miembroB, organizacionId: ids.organizacionB, empresaId: ids.empresa, rol: Rol.TECNICO },
       { id: ids.accesoMultiA, organizacionEmpresaId: ids.relacionA, organizacionMiembroId: ids.miembroMultiA, organizacionId: ids.organizacionA, empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA },
       { id: ids.accesoMultiB, organizacionEmpresaId: ids.relacionB, organizacionMiembroId: ids.miembroMultiB, organizacionId: ids.organizacionB, empresaId: ids.empresa, rol: Rol.TECNICO },
+      { id: ids.accesoAdminA, organizacionEmpresaId: ids.relacionA, organizacionMiembroId: ids.miembroAdminA, organizacionId: ids.organizacionA, empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA },
     ] });
     await prisma.accesoEstablecimiento.createMany({ data: [
       { accesoEmpresaId: ids.accesoA, establecimientoId: ids.establecimientoA, empresaId: ids.empresa },
@@ -109,6 +121,24 @@ async function main() {
     assert.equal(contextA.rol, Rol.ADMIN_EMPRESA, 'el rol debe ser el del acceso A');
     assert.equal(contextB.rol, Rol.TECNICO, 'el rol debe ser el del acceso B, no Usuario.rol');
 
+    const sharedInspection = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector compartido B' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB);
+    const sharedFinding = await findings.create({ inspeccionId: sharedInspection.id, titulo: 'Historial compartido', descripcion: 'Historial que debe conservarse al revocar A', nivelRiesgo: NivelRiesgo.BAJO, ubicacionTexto: 'Sector B' }, ids.empresa, ids.relacionB, ids.usuarioMulti, ids.accesoMultiB);
+
+    const scopedBefore = await users.findOne(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA);
+    assert.equal(scopedBefore.rol, Rol.ADMIN_EMPRESA);
+    assert.equal(scopedBefore.activo, true);
+    await users.deactivate(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA);
+    assert.equal((await prisma.usuario.findUniqueOrThrow({ where: { id: ids.usuarioMulti } })).activo, true, 'desactivar en A no debe tocar la identidad global');
+    await assert.rejects(tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionA), /acceso activo/i);
+    assert.equal((await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionB)).rol, Rol.TECNICO, 'B debe continuar operativo');
+    assert.equal((await users.findAll(ids.empresa, { activo: false }, ids.organizacionA, ids.relacionA)).find((user) => user.id === ids.usuarioMulti)?.activo, false);
+    await users.activate(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA);
+    await users.update(ids.usuarioMulti, { rol: Rol.SUPERVISOR }, ids.empresa, ids.organizacionA, ids.relacionA);
+    assert.equal((await prisma.accesoEmpresa.findUniqueOrThrow({ where: { id: ids.accesoMultiA } })).rol, Rol.SUPERVISOR, 'el cambio de rol debe quedar en A');
+    assert.equal((await prisma.accesoEmpresa.findUniqueOrThrow({ where: { id: ids.accesoMultiB } })).rol, Rol.TECNICO, 'el cambio de rol en A no debe afectar B');
+    await assert.rejects(users.update(ids.usuarioMulti, { nombre: 'Identidad alterada' }, ids.empresa, ids.organizacionA, ids.relacionA), /identidad global/i);
+    await assert.rejects(users.adminChangePassword(ids.usuarioMulti, ids.empresa, { newPassword: 'AnotherPassword123!' }, ids.organizacionA, ids.relacionA), /bloqueado|recuperación segura/i);
+    await assert.rejects(users.remove(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA), /no se permite eliminar/i);
     const inspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establecimientoA, sector: 'Sector A' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA);
     const inspectionB = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector B' }, ids.usuarioB, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoB);
     assert.equal(inspectionA.estado, EstadoInspeccion.EN_PROGRESO);
@@ -127,6 +157,14 @@ async function main() {
     await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Establecimiento no autorizado' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB), 'el técnico no debe usar otro establecimiento');
     await mustReject(tenancy.getEstablishmentScope(ids.accesoA, ids.empresa, ids.relacionB), 'no debe poder combinar acceso y relación manipulados');
 
+    await administration.revokeAccess(ids.organizacionA, ids.usuarioAdminA, ids.relacionA, ids.accesoMultiA);
+    await assert.rejects(tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionA), /acceso activo/i, 'revocar el acceso A debe tener efecto inmediato');
+    await assert.doesNotReject(tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionB));
+    await assert.doesNotReject(findings.findOne(sharedFinding.id, ids.empresa, ids.relacionB, ids.usuarioMulti, ids.accesoMultiB), 'el historial de B debe conservarse');
+    assert.equal(await prisma.inspeccion.count({ where: { id: sharedInspection.id } }), 1);
+    assert.equal(await prisma.hallazgo.count({ where: { id: sharedFinding.id } }), 1);
+    assert.equal(await prisma.usuario.count({ where: { id: ids.usuarioMulti } }), 1, 'la identidad compartida no debe eliminarse');
+
     const oldTokenPayload = { sub: ids.usuarioMulti, email: 'pr28-multi@seh.test', empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA, organizacionEmpresaId: ids.relacionA };
     const validatedTokenUser = await jwtStrategy.validate(oldTokenPayload);
     assert.equal(validatedTokenUser.id, ids.usuarioMulti);
@@ -142,7 +180,7 @@ async function main() {
     assert.equal((await jwtStrategy.validate(oldTokenPayload)).id, ids.usuarioMulti, 'la validación básica del JWT no debe reactivar el acceso revocado');
 
     await prisma.organizacionEmpresa.update({ where: { id: ids.relacionA }, data: { estado: EstadoRelacionEmpresa.ACTIVA } });
-    const reactivated = await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionA);
+    const reactivated = await tenancy.resolveForUser(ids.usuarioAdminA, ids.empresa, ids.relacionA);
     assert.equal(reactivated.rol, Rol.ADMIN_EMPRESA, 'la relación reactivada debe recuperar su rol contextual');
 
     console.log('PR28 PostgreSQL integration passed: consultora isolation, contextual roles, suspension/reactivation, revoked contexts, establishment scope, manipulated IDs, and historical preservation');

@@ -10,8 +10,6 @@ export interface CreateUsuarioDto {
 }
 
 export interface UpdateUsuarioDto {
-  nombre?: string;
-  apellido?: string;
   rol?: Rol;
   activo?: boolean;
 }
@@ -39,10 +37,6 @@ export const usuariosApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/usuarios/${id}`);
-  },
-
-  changePassword: async (id: string, newPassword: string): Promise<void> => {
-    await apiClient.patch(`/usuarios/${id}/password`, { newPassword });
   },
 
   getTecnicos: async (): Promise<Usuario[]> => {

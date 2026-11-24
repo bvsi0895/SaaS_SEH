@@ -17,12 +17,55 @@ export class UsuariosService {
   constructor(private prisma: PrismaService) {}
 
   private withContextualRole(user: any) {
-    const contextualRole = user.membresiasOrganizacion
+    const contextualAccess = user.membresiasOrganizacion
       ?.flatMap((membership: any) => membership.accesosEmpresa || [])
-      .map((access: any) => access.rol)
-      .find(Boolean);
+      .find((access: any) => access.rol);
     const { membresiasOrganizacion: _scopedMemberships, ...result } = user;
-    return { ...result, rol: contextualRole || user.rol };
+    return {
+      ...result,
+      rol: contextualAccess?.rol || user.rol,
+      ...(contextualAccess?.activo !== undefined ? { activo: contextualAccess.activo } : {}),
+    };
+  }
+
+  private async findScopedAccess(
+    id: string,
+    empresaId: string | undefined,
+    organizacionId: string | undefined,
+    organizacionEmpresaId: string | undefined,
+  ) {
+    if (!empresaId || !organizacionId || !organizacionEmpresaId) {
+      throw new ForbiddenException('La administración de usuarios requiere un contexto de empresa activo');
+    }
+
+    const access = await this.prisma.accesoEmpresa.findFirst({
+      where: {
+        empresaId,
+        organizacionId,
+        organizacionEmpresaId,
+        organizacionMiembro: { usuarioId: id, activa: true },
+        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+      },
+      select: { id: true, rol: true, activo: true, organizacionMiembroId: true },
+    });
+    if (!access) throw new NotFoundException('Acceso del usuario no encontrado');
+    return access;
+  }
+
+  private async readIdentity(id: string) {
+    return this.prisma.usuario.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        nombre: true,
+        apellido: true,
+        rol: true,
+        activo: true,
+        updatedAt: true,
+        empresaId: true,
+      },
+    });
   }
 
   /**
@@ -39,7 +82,7 @@ export class UsuariosService {
                 some: {
                   organizacionEmpresaId,
                   empresaId,
-                  activo: true,
+                  ...(filters?.activo !== undefined ? { activo: filters.activo } : {}),
                   organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
                   ...(filters?.rol && { rol: filters.rol }),
                 },
@@ -55,7 +98,7 @@ export class UsuariosService {
         empresaId,
         ...scopedMembership,
         ...(!organizacionEmpresaId && filters?.rol && { rol: filters.rol }),
-        ...(filters?.activo !== undefined && { activo: filters.activo }),
+        ...(!organizacionEmpresaId && filters?.activo !== undefined && { activo: filters.activo }),
       },
       select: {
         id: true,
@@ -72,8 +115,8 @@ export class UsuariosService {
             where: { organizacionId, activa: true },
             select: {
               accesosEmpresa: {
-                where: { organizacionEmpresaId, empresaId, activo: true },
-                select: { rol: true },
+                where: { organizacionEmpresaId, empresaId },
+                select: { rol: true, activo: true },
               },
             },
           },
@@ -119,7 +162,7 @@ export class UsuariosService {
           select: {
             accesosEmpresa: {
               where: { organizacionEmpresaId, empresaId, activo: true },
-              select: { rol: true },
+              select: { rol: true, activo: true },
             },
           },
         },
@@ -182,7 +225,7 @@ export class UsuariosService {
           select: {
             accesosEmpresa: {
               where: { organizacionEmpresaId, empresaId, activo: true },
-              select: { rol: true },
+              select: { rol: true, activo: true },
             },
           },
         },
@@ -242,7 +285,7 @@ export class UsuariosService {
             select: {
               accesosEmpresa: {
                 where: { organizacionEmpresaId, empresaId, activo: true },
-                select: { rol: true },
+                select: { rol: true, activo: true },
               },
             },
           },
@@ -362,40 +405,35 @@ export class UsuariosService {
    * Actualizar usuario
    */
   async update(id: string, updateUsuarioDto: UpdateUsuarioDto, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
-    // Verificar que existe
-    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
+    const { rol, activo, nombre, apellido } = updateUsuarioDto;
 
-    // El rol operativo vive en AccesoEmpresa. Nunca debe cambiarse el rol
-    // global cuando se administra a un usuario desde una relación concreta.
-    const { rol, ...accountData } = updateUsuarioDto;
-    if (rol && organizacionId && organizacionEmpresaId) {
-      const access = await this.prisma.accesoEmpresa.findFirst({
-        where: {
-          organizacionId,
-          organizacionEmpresaId,
-          empresaId,
-          organizacionMiembro: { usuarioId: id },
-        },
-        select: { id: true },
-      });
-      if (!access) throw new NotFoundException('Acceso del usuario no encontrado');
-      await this.prisma.accesoEmpresa.update({ where: { id: access.id }, data: { rol } });
+    if (organizacionId && organizacionEmpresaId) {
+      if (nombre !== undefined || apellido !== undefined) {
+        throw new ForbiddenException('El nombre y apellido son identidad global; deben modificarse mediante el perfil del usuario');
+      }
+      const access = await this.findScopedAccess(id, empresaId, organizacionId, organizacionEmpresaId);
+      if (rol !== undefined || activo !== undefined) {
+        await this.prisma.accesoEmpresa.update({
+          where: { id: access.id },
+          data: {
+            ...(rol !== undefined ? { rol } : {}),
+            ...(activo !== undefined ? { activo } : {}),
+          },
+        });
+      }
+      const identity = await this.readIdentity(id);
+      return { ...identity, rol: rol ?? access.rol, activo: activo ?? access.activo };
     }
 
-    // Actualizar
     return this.prisma.usuario.update({
       where: { id },
-      data: accountData,
-      select: {
-        id: true,
-        email: true,
-        nombre: true,
-        apellido: true,
-        rol: true,
-        activo: true,
-        updatedAt: true,
-        empresaId: true,
+      data: {
+        ...(nombre !== undefined ? { nombre } : {}),
+        ...(apellido !== undefined ? { apellido } : {}),
+        ...(rol !== undefined ? { rol } : {}),
+        ...(activo !== undefined ? { activo } : {}),
       },
+      select: { id: true, email: true, nombre: true, apellido: true, rol: true, activo: true, updatedAt: true, empresaId: true },
     });
   }
 
@@ -430,64 +468,40 @@ export class UsuariosService {
   }
 
   async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto, organizacionId?: string, organizacionEmpresaId?: string) {
-    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.usuario.update({
-      where: { id },
-      data: { password: hashedPassword, refreshToken: null },
-    });
-    return { message: 'Contraseña actualizada exitosamente' };
+    void id;
+    void empresaId;
+    void dto;
+    void organizacionId;
+    void organizacionEmpresaId;
+    throw new ForbiddenException('El cambio administrativo de contraseña global está bloqueado; el usuario debe usar recuperación segura');
   }
 
   /**
    * Desactivar usuario (soft delete)
    */
   async deactivate(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
-    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
-
-    return this.prisma.usuario.update({
-      where: { id },
-      data: { activo: false },
-      select: {
-        id: true,
-        email: true,
-        nombre: true,
-        apellido: true,
-        activo: true,
-      },
-    });
+    const access = await this.findScopedAccess(id, empresaId, organizacionId, organizacionEmpresaId);
+    await this.prisma.accesoEmpresa.update({ where: { id: access.id }, data: { activo: false } });
+    const identity = await this.readIdentity(id);
+    return { ...identity, rol: access.rol, activo: false };
   }
 
   /**
    * Reactivar usuario
    */
   async activate(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
-    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
-
-    return this.prisma.usuario.update({
-      where: { id },
-      data: { activo: true },
-      select: {
-        id: true,
-        email: true,
-        nombre: true,
-        apellido: true,
-        activo: true,
-      },
-    });
+    const access = await this.findScopedAccess(id, empresaId, organizacionId, organizacionEmpresaId);
+    await this.prisma.accesoEmpresa.update({ where: { id: access.id }, data: { activo: true } });
+    const identity = await this.readIdentity(id);
+    return { ...identity, rol: access.rol, activo: true };
   }
 
   /**
    * Eliminar usuario permanentemente
    */
   async remove(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
-    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
-
-    await this.prisma.usuario.delete({
-      where: { id },
-    });
-
-    return { message: 'Usuario eliminado exitosamente' };
+    await this.findScopedAccess(id, empresaId, organizacionId, organizacionEmpresaId);
+    throw new ForbiddenException('No se permite eliminar identidades desde una consultora; revoque el acceso contextual');
   }
 }
 
