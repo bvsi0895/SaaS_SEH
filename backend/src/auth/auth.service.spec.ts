@@ -1,4 +1,5 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 
@@ -14,7 +15,7 @@ describe('AuthService', () => {
       update: jest.fn(),
     },
   };
-  const jwtService = { signAsync: jest.fn() };
+  const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
   const configService = { get: jest.fn() };
   let service: AuthService;
 
@@ -67,6 +68,7 @@ describe('AuthService', () => {
       nombre: 'Técnico',
       apellido: 'Demo',
       rol: 'TECNICO',
+      tokenVersion: 4,
       activo: true,
       empresaId: 'empresa-1',
       empresa: { id: 'empresa-1', nombre: 'Demo', activa: true },
@@ -85,5 +87,66 @@ describe('AuthService', () => {
     expect(prisma.usuario.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'user-1' } }),
     );
+    expect(jwtService.signAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ sub: 'user-1', tokenVersion: 4, tokenType: 'access' }),
+      expect.objectContaining({ secret: 'test-secret', expiresIn: '1h' }),
+    );
+    expect(jwtService.signAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ sub: 'user-1', tokenVersion: 4, tokenType: 'refresh' }),
+      expect.objectContaining({ secret: 'test-refresh-secret', expiresIn: '30d' }),
+    );
+  });
+
+  it('verifies and rotates a valid refresh token using its version', async () => {
+    const usuario = {
+      id: 'user-1',
+      email: 'tecnico@demo.local',
+      password: 'hashed-password',
+      nombre: 'Técnico',
+      apellido: 'Demo',
+      rol: 'TECNICO',
+      tokenVersion: 4,
+      empresaId: 'empresa-1',
+      refreshToken: createHash('sha256').update('refresh-token', 'utf8').digest('hex'),
+    };
+    prisma.usuario.findUnique.mockResolvedValue(usuario);
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-1',
+      email: usuario.email,
+      empresaId: usuario.empresaId,
+      rol: usuario.rol,
+      tokenVersion: 4,
+      tokenType: 'refresh',
+      jti: 'refresh-jti',
+    });
+
+    const response = await service.refreshTokens('refresh-token');
+
+    expect(jwtService.verifyAsync).toHaveBeenCalledWith('refresh-token', { secret: 'test-refresh-secret' });
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+    expect(response).toEqual({ accessToken: 'access-token', refreshToken: 'refresh-token' });
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { refreshToken: createHash('sha256').update('refresh-token', 'utf8').digest('hex') },
+    });
+  });
+
+  it('rejects refresh tokens with an invalid signature or version', async () => {
+    jwtService.verifyAsync.mockRejectedValue(new Error('invalid signature'));
+
+    await expect(service.refreshTokens('invalid-token')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
+
+    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-1', tokenVersion: 3, tokenType: 'refresh' });
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 'user-1',
+      tokenVersion: 4,
+      refreshToken: createHash('sha256').update('current-token', 'utf8').digest('hex'),
+    });
+
+    await expect(service.refreshTokens('old-version-token')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 });

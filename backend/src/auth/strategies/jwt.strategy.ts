@@ -9,6 +9,9 @@ export interface JwtPayload {
   email: string;
   empresaId: string;
   rol: string;
+  tokenVersion: number;
+  tokenType: 'access' | 'refresh';
+  jti: string;
   organizacionEmpresaId?: string;
 }
 
@@ -30,6 +33,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    if (payload.tokenType !== 'access' || !payload.jti) {
+      throw new UnauthorizedException('Tipo de token inválido');
+    }
+
     // Buscar usuario en la base de datos
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: payload.sub },
@@ -46,6 +53,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!usuario) {
       throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    if (payload.tokenVersion !== usuario.tokenVersion) {
+      throw new UnauthorizedException('Token invalidado; vuelva a iniciar sesión');
     }
 
     if (!usuario.activo) {

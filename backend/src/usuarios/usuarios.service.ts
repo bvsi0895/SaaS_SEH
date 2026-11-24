@@ -441,27 +441,30 @@ export class UsuariosService {
    * Cambiar contraseña
    */
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id: userId },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      const usuario = await tx.usuario.findUnique({
+        where: { id: userId },
+      });
 
-    if (!usuario) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
+      if (!usuario) {
+        throw new NotFoundException('Usuario no encontrado');
+      }
 
-    // Verificar contraseña actual
-    const isValid = await bcrypt.compare(changePasswordDto.currentPassword, usuario.password);
-    if (!isValid) {
-      throw new BadRequestException('La contraseña actual es incorrecta');
-    }
+      const isValid = await bcrypt.compare(changePasswordDto.currentPassword, usuario.password);
+      if (!isValid) {
+        throw new BadRequestException('La contraseña actual es incorrecta');
+      }
 
-    // Hash de la nueva contraseña
-    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
+      const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
 
-    // Actualizar
-    await this.prisma.usuario.update({
-      where: { id: userId },
-      data: { password: hashedPassword, refreshToken: null },
+      await tx.usuario.update({
+        where: { id: userId },
+        data: {
+          password: hashedPassword,
+          tokenVersion: { increment: 1 },
+          refreshToken: null,
+        },
+      });
     });
 
     return { message: 'Contraseña actualizada exitosamente' };

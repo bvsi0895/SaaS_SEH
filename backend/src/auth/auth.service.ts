@@ -7,7 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto, AuthResponseDto } from './dto';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -81,7 +81,7 @@ export class AuthService {
       where: { id: usuario.id },
       data: {
         ultimoAcceso: new Date(),
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
+        refreshToken: this.hashRefreshToken(tokens.refreshToken),
       },
     });
 
@@ -177,7 +177,7 @@ export class AuthService {
     await this.prisma.usuario.update({
       where: { id: usuario.id },
       data: {
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
+        refreshToken: this.hashRefreshToken(tokens.refreshToken),
       },
     });
 
@@ -198,19 +198,32 @@ export class AuthService {
   /**
    * Refrescar token de acceso
    */
-  async refreshTokens(userId: string, refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id: userId },
-    });
-
-    if (!usuario || !usuario.refreshToken) {
-      throw new UnauthorizedException('Acceso denegado');
+  async refreshTokens(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    let payload: JwtPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET') || this.configService.get<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Token de refresco inválido o expirado');
     }
 
-    const refreshTokenMatches = await bcrypt.compare(refreshToken, usuario.refreshToken);
+    if (payload.tokenType !== 'refresh' || !payload.jti || !payload.sub || typeof payload.tokenVersion !== 'number') {
+      throw new UnauthorizedException('Token de refresco inválido');
+    }
+
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!usuario || !usuario.refreshToken || usuario.tokenVersion !== payload.tokenVersion) {
+      throw new UnauthorizedException('Token de refresco revocado');
+    }
+
+    const refreshTokenMatches = await this.matchesRefreshToken(refreshToken, usuario.refreshToken);
 
     if (!refreshTokenMatches) {
-      throw new UnauthorizedException('Acceso denegado');
+      throw new UnauthorizedException('Token de refresco inválido');
     }
 
     const tokens = await this.generateTokens(usuario);
@@ -218,7 +231,7 @@ export class AuthService {
     await this.prisma.usuario.update({
       where: { id: usuario.id },
       data: {
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
+        refreshToken: this.hashRefreshToken(tokens.refreshToken),
       },
     });
 
@@ -237,28 +250,44 @@ export class AuthService {
     });
   }
 
+  private hashRefreshToken(refreshToken: string): string {
+    return createHash('sha256').update(refreshToken, 'utf8').digest('hex');
+  }
+
+  private async matchesRefreshToken(refreshToken: string, storedHash: string): Promise<boolean> {
+    if (storedHash.startsWith('$2')) {
+      // Compatibility with hashes created before full-token hashing was introduced.
+      return bcrypt.compare(refreshToken, storedHash);
+    }
+
+    const presentedHash = Buffer.from(this.hashRefreshToken(refreshToken), 'utf8');
+    const persistedHash = Buffer.from(storedHash, 'utf8');
+    return presentedHash.length === persistedHash.length && timingSafeEqual(presentedHash, persistedHash);
+  }
+
   /**
    * Generar access token y refresh token
    */
   private async generateTokens(
-    usuario: { id: string; email: string; empresaId: string; rol: string },
+    usuario: { id: string; email: string; empresaId: string; rol: string; tokenVersion: number },
     resolvedContext?: Awaited<ReturnType<TenancyService['resolveForUser']>>,
   ) {
     const context = resolvedContext || await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
-    const payload: JwtPayload = {
+    const payload = {
       sub: usuario.id,
       email: usuario.email,
       empresaId: usuario.empresaId,
       rol: context.rol ?? usuario.rol,
+      tokenVersion: usuario.tokenVersion,
       organizacionEmpresaId: context.organizacionEmpresaId,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync({ ...payload, tokenType: 'access' as const, jti: randomUUID() }, {
         secret: this.configService.get<string>('JWT_SECRET'),
         expiresIn: this.configService.get<string>('JWT_EXPIRATION') || '7d',
       }),
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync({ ...payload, tokenType: 'refresh' as const, jti: randomUUID() }, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET') || this.configService.get<string>('JWT_SECRET'),
         expiresIn: '30d',
       }),

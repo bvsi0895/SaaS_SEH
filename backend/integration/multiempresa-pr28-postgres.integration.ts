@@ -165,7 +165,7 @@ async function main() {
     assert.equal(await prisma.hallazgo.count({ where: { id: sharedFinding.id } }), 1);
     assert.equal(await prisma.usuario.count({ where: { id: ids.usuarioMulti } }), 1, 'la identidad compartida no debe eliminarse');
 
-    const oldTokenPayload = { sub: ids.usuarioMulti, email: 'pr28-multi@seh.test', empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA, organizacionEmpresaId: ids.relacionA };
+    const oldTokenPayload = { sub: ids.usuarioMulti, email: 'pr28-multi@seh.test', empresaId: ids.empresa, rol: Rol.ADMIN_EMPRESA, tokenVersion: 0, tokenType: 'access' as const, jti: 'pr28-legacy-access-token', organizacionEmpresaId: ids.relacionA };
     const validatedTokenUser = await jwtStrategy.validate(oldTokenPayload);
     assert.equal(validatedTokenUser.id, ids.usuarioMulti);
 
