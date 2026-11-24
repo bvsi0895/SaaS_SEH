@@ -7,10 +7,12 @@ SEH. La revisión se realizó sólo sobre `D:\Proyectos\SEH`, rama
 `feature/demo-online`, commit `850ce46`. No se accedió a Oracle Cloud, no se
 modificaron servidores y no se ejecutó ningún despliegue.
 
-La configuración actual usa PostgreSQL 16, backend NestJS, frontend Nginx y
-volúmenes Docker persistentes. PostgreSQL y backend no publican puertos al
-host; web se enlaza a `127.0.0.1:8080` para que un proxy HTTPS existente pueda
-servir el dominio.
+La configuración de `feature/demo-deployment` usa PostgreSQL 16, backend
+NestJS, frontend Nginx y volúmenes Docker persistentes. En InterServer,
+`seh-caddy` publica 80/443 desde la red `host` y conserva sus certificados;
+`seh-web` publica sólo `127.0.0.1:8080`, mientras PostgreSQL y backend no
+publican puertos. El Caddy de Compose está en el perfil opcional
+`bundled-caddy` y no se activa junto al proxy existente.
 
 ## Recomendación ejecutiva
 
@@ -77,26 +79,29 @@ compartir el almacenamiento de evidencias con otros sistemas.
 
 ## Convivencia con un proxy existente
 
-La configuración entregada presupone que Caddy o Nginx corre en el host y que
-el bloque de dominio apunta a `127.0.0.1:8080`, como en
-`deploy/Caddyfile.example`. Esto evita ocupar los puertos 80/443 del proxy
-existente.
+La configuración entregada contempla el Caddy existente mediante
+`127.0.0.1:8080`. El archivo `deploy/Caddyfile.example` corresponde únicamente
+al perfil `bundled-caddy` de una instalación nueva y apunta a `seh-web:80`. No
+se debe activar ese perfil en InterServer: así no se duplica `seh-caddy` ni se
+altera su volumen de certificados.
 
 Procedimiento seguro:
 
-1. Confirmar qué proceso posee 80/443 y cómo se administra actualmente.
+1. Confirmar qué proceso posee 80/443 y cómo se administra actualmente; en la
+   demo es `seh-caddy`.
 2. Respaldar la configuración del proxy existente antes de editarla.
 3. Agregar un bloque independiente para el subdominio de demo; no modificar
    bloques de otros proyectos.
 4. Ejecutar la validación nativa (`caddy validate` o equivalente).
 5. Recargar de forma atómica, nunca reiniciar a ciegas el proxy compartido.
 6. Verificar TLS, `/api/health`, login y descarga PDF.
-7. Para retirar SEH, eliminar sólo su bloque y detener sólo su Compose.
+7. Para retirar SEH, eliminar sólo su bloque y detener sólo los servicios
+   `seh-backend`/`seh-web`; no detener ni eliminar `seh-caddy` o su volumen TLS.
 
-Si el proxy existente corre dentro de otro contenedor, `127.0.0.1:8080` apunta
-a ese contenedor y no al host. En ese caso hay que elegir, antes del despliegue,
-una red Docker compartida explícita o un endpoint del host; no se debe cambiar
-la red del proxy existente sin autorización.
+En InterServer el proxy existente corre en red `host`, por lo que debe seguir
+usando `127.0.0.1:8080`. Verificar ese endpoint con una consulta de sólo
+lectura antes de actualizar; no recrear el proxy ni cambiar sus volúmenes sin
+autorización.
 
 ## Procedimiento previsto para una VM nueva
 
@@ -157,7 +162,7 @@ mayor carga.
 |---|---|---|
 | Competencia por RAM/CPU | Lentitud o reinicios | Margen libre sostenido; no usar swap como reserva normal. |
 | Disco compartido | Falta de espacio o corrupción operativa | Cuota, alertas y backup externo; separar volumen de evidencias. |
-| Puertos/proxy compartidos | Interrupción de otros sistemas | SEH sólo en loopback 8080; no tocar 80/443 sin procedimiento. |
+| Puertos/proxy compartidos | Interrupción de otros sistemas | Caddy de SEH requiere 80/443 libres; no iniciar dos terminadores sin procedimiento. |
 | Docker compartido | Error de proyecto o nombres | Verificar contenedores, volúmenes y `container_name` antes de iniciar. |
 | Logs mezclados | Exposición de datos o diagnóstico ambiguo | Rotación, nombres únicos y no registrar secretos. |
 | Fallo de la VM | Caída simultánea | VPS independiente o aceptación formal del riesgo y backups externos. |

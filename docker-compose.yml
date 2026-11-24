@@ -35,10 +35,11 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: postgresql://${POSTGRES_USER:-seh_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-seh_demo}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-30d}
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       STORAGE_TYPE: local
       UPLOAD_DIR: ./uploads
       WEBP_QUALITY: ${WEBP_QUALITY:-82}
@@ -57,6 +58,8 @@ services:
       start_period: 40s
     networks:
       - seh-network
+    expose:
+      - "3000"
     volumes:
       - seh_uploads:/app/uploads
     mem_limit: 512m
@@ -72,21 +75,47 @@ services:
       context: .
       dockerfile: web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL is required}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: seh-web
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - seh-network
+    expose:
+      - "80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
     mem_limit: 256m
+
+  # Terminación TLS y único punto de entrada público.
+  caddy:
+    profiles:
+      - bundled-caddy
+    image: caddy:2.8-alpine
+    container_name: seh-caddy
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - seh-network
+    mem_limit: 128m
     logging:
       driver: json-file
       options:
@@ -111,6 +140,10 @@ volumes:
   postgres_data:
     driver: local
   seh_uploads:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local
 
 networks:

@@ -26,24 +26,28 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Swagger / OpenAPI documentation
-  const config = new DocumentBuilder()
-    .setTitle('SEH API')
-    .setDescription('API del Sistema de Seguridad e Higiene')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('auth', 'Autenticación y autorización')
-    .addTag('usuarios', 'Gestión de usuarios')
-    .addTag('empresas', 'Gestión de empresas')
-    .addTag('checklists', 'Gestión de checklists')
-    .addTag('inspecciones', 'Gestión de inspecciones')
-    .addTag('hallazgos', 'Gestión de hallazgos')
-    .addTag('acciones-correctivas', 'Gestión de acciones correctivas')
-    .addTag('dashboard', 'Métricas y reportes')
-    .build();
+  // Swagger queda opt-in en producción para no publicar el inventario de rutas.
+  const enableSwagger = process.env.ENABLE_SWAGGER === 'true'
+    || (process.env.NODE_ENV !== 'production' && process.env.ENABLE_SWAGGER !== 'false');
+  if (enableSwagger) {
+    const config = new DocumentBuilder()
+      .setTitle('SEH API')
+      .setDescription('API del Sistema de Seguridad e Higiene')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('auth', 'Autenticación y autorización')
+      .addTag('usuarios', 'Gestión de usuarios')
+      .addTag('empresas', 'Gestión de empresas')
+      .addTag('checklists', 'Gestión de checklists')
+      .addTag('inspecciones', 'Gestión de inspecciones')
+      .addTag('hallazgos', 'Gestión de hallazgos')
+      .addTag('acciones-correctivas', 'Acciones correctivas')
+      .addTag('dashboard', 'Métricas y reportes')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   // Puerto desde variable de entorno
   const port = process.env.PORT || 3000;
