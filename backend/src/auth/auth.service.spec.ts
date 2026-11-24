@@ -149,4 +149,16 @@ describe('AuthService', () => {
     await expect(service.refreshTokens('old-version-token')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(bcrypt.compare).not.toHaveBeenCalled();
   });
+
+  it('increments tokenVersion and clears the refresh token atomically on logout', async () => {
+    await service.logout('user-1');
+
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        tokenVersion: { increment: 1 },
+        refreshToken: null,
+      },
+    });
+  });
 });
