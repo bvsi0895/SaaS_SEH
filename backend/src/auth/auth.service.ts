@@ -239,12 +239,16 @@ export class AuthService {
   }
 
   /**
-   * Cerrar sesión (invalidar refresh token)
+   * Cerrar sesión e invalidar todas las sesiones del usuario.
+   *
+   * La actualización única es atómica: cualquier access token o refresh
+   * token emitido con la versión anterior queda revocado inmediatamente.
    */
   async logout(userId: string): Promise<void> {
     await this.prisma.usuario.update({
       where: { id: userId },
       data: {
+        tokenVersion: { increment: 1 },
         refreshToken: null,
       },
     });
