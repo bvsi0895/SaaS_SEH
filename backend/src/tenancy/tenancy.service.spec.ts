@@ -26,6 +26,7 @@ describe('TenancyService', () => {
           empresaId: 'empresa-compartida',
           organizacionEmpresaId: 'vinculo-consultora-a',
           organizacionMiembroId: 'miembro-a',
+          rol: 'TECNICO',
         });
       }
       return Promise.resolve(null);
@@ -38,6 +39,7 @@ describe('TenancyService', () => {
     );
 
     expect(context.organizacionId).toBe('org-a');
+    expect(context.rol).toBe('TECNICO');
     await expect(
       service.resolveForUser('usuario-a', 'empresa-compartida', 'vinculo-consultora-b'),
     ).rejects.toBeInstanceOf(ForbiddenException);

@@ -69,6 +69,8 @@ jobs:
         run: pnpm --filter seh-backend exec ts-node --transpile-only integration/technician-permissions-postgres.integration.ts
       - name: Run PostgreSQL dashboard integration
         run: pnpm --filter seh-backend exec ts-node --transpile-only integration/dashboard-postgres.integration.ts
+      - name: Run PR #28 multi-company isolation integration
+        run: pnpm --filter seh-backend run test:multitenant:pr28
 
   migration-preservation:
     runs-on: ubuntu-latest

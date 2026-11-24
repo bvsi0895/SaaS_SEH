@@ -13,11 +13,13 @@ describe('UsuariosService.changePassword', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
   let service: UsuariosService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => unknown) => callback(prisma));
     service = new UsuariosService(prisma as never);
   });
 
@@ -36,8 +38,9 @@ describe('UsuariosService.changePassword', () => {
     expect(bcrypt.hash).toHaveBeenCalledWith('NewPassword123!', 10);
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { password: 'new-hash', refreshToken: null },
+      data: { password: 'new-hash', tokenVersion: { increment: 1 }, refreshToken: null },
     });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(response).toEqual({ message: 'Contraseña actualizada exitosamente' });
     expect(JSON.stringify(response)).not.toContain('Password');
   });

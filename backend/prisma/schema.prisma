@@ -126,6 +126,7 @@ model Usuario {
   apellido     String
   rol          Rol       @default(TECNICO)
   activo       Boolean   @default(true)
+  tokenVersion Int       @default(0)
   ultimoAcceso DateTime?
   refreshToken String? // Para JWT refresh
   createdAt    DateTime  @default(now())

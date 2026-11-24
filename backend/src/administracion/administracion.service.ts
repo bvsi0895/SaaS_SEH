@@ -155,14 +155,15 @@ export class AdministracionService {
     return this.prisma.organizacion.update({ where: { id: organizacionId }, data: dto });
   }
 
-  async listMembers(organizacionId: string, usuarioId: string) {
+  async listMembers(organizacionId: string, usuarioId: string, organizacionEmpresaId?: string) {
     await this.assertAdmin(organizacionId, usuarioId);
-    return this.prisma.organizacionMiembro.findMany({
+    const members = await this.prisma.organizacionMiembro.findMany({
       where: { organizacionId },
       select: {
         id: true, rol: true, activa: true, usuarioId: true,
         usuario: { select: { id: true, email: true, nombre: true, apellido: true, rol: true, activo: true } },
         accesosEmpresa: {
+          ...(organizacionEmpresaId ? { where: { organizacionEmpresaId } } : {}),
           select: {
             id: true, rol: true, activo: true, empresaId: true,
             organizacionEmpresa: { select: { id: true, empresa: { select: { nombre: true } }, estado: true } },
@@ -170,6 +171,13 @@ export class AdministracionService {
         },
       },
       orderBy: [{ activa: 'desc' }, { usuario: { nombre: 'asc' } }],
+    });
+    if (!organizacionEmpresaId) return members;
+    return members.map((member) => {
+      const contextualAccess = member.accesosEmpresa[0];
+      return contextualAccess
+        ? { ...member, usuario: { ...member.usuario, rol: contextualAccess.rol, activo: contextualAccess.activo } }
+        : member;
     });
   }
 
@@ -308,9 +316,8 @@ export class AdministracionService {
   async assignAccess(organizacionId: string, usuarioId: string, relationId: string, dto: AssignAccessDto) {
     await this.assertAdmin(organizacionId, usuarioId);
     const relation = await this.getRelation(organizacionId, relationId);
-    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true }, select: { id: true, usuario: { select: { rol: true } } } });
+    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true }, select: { id: true } });
     if (!member) throw new NotFoundException('Membresía no encontrada');
-    if (dto.rol === Rol.TECNICO && member.usuario.rol !== Rol.TECNICO) throw new BadRequestException('La asignación TECNICO requiere un usuario técnico');
     const establishmentIds = Array.from(new Set(dto.establecimientoIds || []));
     if (dto.rol === Rol.TECNICO && establishmentIds.length > 0) {
       const establishments = await this.prisma.establecimiento.findMany({ where: { id: { in: establishmentIds }, empresaId: relation.empresaId, activo: true }, select: { id: true } });

@@ -8,6 +8,8 @@ export interface TenantContext {
   empresaId: string;
   organizacionMiembroId: string;
   accesoEmpresaId: string;
+  /** Rol operativo del acceso activo; nunca el rol legacy de Usuario. */
+  rol?: Rol;
   organizacionNombre?: string;
   empresaNombre?: string;
 }
@@ -23,13 +25,16 @@ export class TenancyService {
         organizacionMiembro: { usuarioId, activa: true, organizacion: { activa: true } },
         organizacionEmpresa: {
           estado: EstadoRelacionEmpresa.ACTIVA,
+          empresa: { activa: true },
           ...(requestedOrganizacionEmpresaId ? { id: requestedOrganizacionEmpresaId } : { empresaId: legacyEmpresaId }),
         },
       },
       select: {
         id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
+        rol: true,
         organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
       },
+      orderBy: { organizacionEmpresaId: 'asc' },
     });
 
     if (!access) throw new ForbiddenException('No existe un acceso activo al contexto solicitado');
@@ -39,6 +44,7 @@ export class TenancyService {
       empresaId: access.empresaId,
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
+      rol: access.rol,
       organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
       empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     };
@@ -49,10 +55,11 @@ export class TenancyService {
       where: {
         activo: true,
         organizacionMiembro: { usuarioId, activa: true, organizacion: { activa: true } },
-        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA, empresa: { activa: true } },
       },
       select: {
         id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
+        rol: true,
         organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
       },
       orderBy: { organizacionEmpresaId: 'asc' },
@@ -63,6 +70,7 @@ export class TenancyService {
       empresaId: access.empresaId,
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
+      rol: access.rol,
       organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
       empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     }));
@@ -93,7 +101,7 @@ export class TenancyService {
         empresaId,
         ...(organizacionEmpresaId ? { organizacionEmpresaId } : {}),
         activo: true,
-        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+        organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA, empresa: { activa: true } },
       },
       select: { rol: true, establecimientos: { select: { establecimientoId: true, establecimiento: { select: { empresaId: true, activo: true } } } } },
     });

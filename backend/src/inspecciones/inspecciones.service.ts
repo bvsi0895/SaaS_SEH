@@ -62,31 +62,45 @@ export class InspeccionesService {
   }
 
   private async assertAuthorizedAssignee(usuarioId: string, empresaId: string, organizacionEmpresaId?: string, establecimientoId?: string) {
-    const usuario = await this.prisma.usuario.findFirst({
-      where: {
-        id: usuarioId,
-        empresaId,
-        rol: Rol.TECNICO,
-        activo: true,
-        ...(organizacionEmpresaId && {
-          membresiasOrganizacion: {
-            some: {
-              activa: true,
-              accesosEmpresa: {
-                some: {
-                  empresaId,
-                  organizacionEmpresaId,
-                  activo: true,
-                  organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
-                  ...(establecimientoId && { establecimientos: { some: { establecimientoId } } }),
-                },
+    const where = {
+      id: usuarioId,
+      empresaId,
+      activo: true,
+      ...(organizacionEmpresaId && {
+        membresiasOrganizacion: {
+          some: {
+            activa: true,
+            accesosEmpresa: {
+              some: {
+                empresaId,
+                organizacionEmpresaId,
+                activo: true,
+                organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                rol: Rol.TECNICO,
+                  ...(establecimientoId && {
+                    establecimientos: {
+                      some: {
+                        establecimientoId,
+                        establecimiento: { empresaId, activo: true },
+                      },
+                    },
+                  }),
               },
             },
           },
-        }),
-      },
+        },
+      }),
+    };
+    // El filtro global conserva compatibilidad con registros legacy, pero la
+    // autorización real la determina el acceso operativo de la relación. Si
+    // el usuario tiene rol global distinto, se reintenta sólo con ese acceso.
+    let usuario = await this.prisma.usuario.findFirst({
+      where: { ...where, rol: Rol.TECNICO },
       select: { id: true },
     });
+    if (!usuario && organizacionEmpresaId) {
+      usuario = await this.prisma.usuario.findFirst({ where, select: { id: true } });
+    }
     if (!usuario) throw new ForbiddenException('El responsable no está autorizado para esta empresa y organización');
   }
 
@@ -107,7 +121,9 @@ export class InspeccionesService {
   }
 
   private assertCanAccess(inspeccion: any, usuarioId?: string, currentUserRole?: Rol) {
-    if (this.isTechnician(currentUserRole) || usuarioId) {
+    // Las operaciones de respuesta se limitan al actor cuando el controlador
+    // lo proporciona. El rol sigue siendo contextual; no se consulta Usuario.rol.
+    if (usuarioId) {
       const assignedId = inspeccion.asignadoAId ?? inspeccion.usuarioId;
       if (assignedId !== usuarioId) throw new NotFoundException('Inspección no encontrada');
     }

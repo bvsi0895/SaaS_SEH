@@ -30,7 +30,8 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Usuario no autenticado');
     }
 
-    // Verificar si el usuario tiene alguno de los roles requeridos
+    // `JwtAuthGuard` resuelve `user.rol` desde AccesoEmpresa para el contexto
+    // solicitado. Usuario.rol es sólo un campo legacy y no debe autorizar.
     const hasRole = requiredRoles.some((role) => user.rol === role);
 
     if (!hasRole) {

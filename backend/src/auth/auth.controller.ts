@@ -100,16 +100,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Token de refresco inválido' })
   async refreshTokens(@Body() body: RefreshTokenDto) {
-    // Decodificar el refresh token para obtener el userId
-    try {
-      const decoded = this.authService['jwtService'].decode(body.refreshToken) as any;
-      if (!decoded?.sub) {
-        throw new Error('Token inválido');
-      }
-      return this.authService.refreshTokens(decoded.sub, body.refreshToken);
-    } catch {
-      throw new Error('Token inválido');
-    }
+    return this.authService.refreshTokens(body.refreshToken);
   }
 
   @UseGuards(JwtAuthGuard)
