@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { EstadoRelacionEmpresa, PrismaClient, Rol, RolOrganizacion } from '@prisma/client';
+import { PrismaClient, Rol, RolOrganizacion, TipoOrganizacion } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const base = process.env.SEH_E2E_BASE_URL || 'http://localhost:3000/api';
@@ -25,20 +25,25 @@ const authHeaders = (token: string, contextId?: string): HeadersInit => ({
 
 async function main() {
   const ids = {
+    empresa: randomUUID(),
+    organizacion: randomUUID(),
+    relacion: randomUUID(),
     miembro: randomUUID(),
     usuario: randomUUID(),
     acceso: randomUUID(),
   };
   const email = `logout-revocation-${ids.usuario}@seh.test`;
-  let empresaId = '';
 
   try {
-    const context = await prisma.organizacionEmpresa.findFirst({
-      where: { estado: EstadoRelacionEmpresa.ACTIVA, empresa: { activa: true } },
-      select: { id: true, organizacionId: true, empresaId: true },
+    await prisma.empresa.create({
+      data: { id: ids.empresa, nombre: 'Logout token revocation fixture', cuit: `LTR-${ids.empresa}` },
     });
-    if (!context) throw new Error('Se requiere un contexto activo de desarrollo');
-    empresaId = context.empresaId;
+    await prisma.organizacion.create({
+      data: { id: ids.organizacion, nombre: 'Logout token revocation organization', tipo: TipoOrganizacion.CONSULTORA },
+    });
+    await prisma.organizacionEmpresa.create({
+      data: { id: ids.relacion, organizacionId: ids.organizacion, empresaId: ids.empresa },
+    });
 
     await prisma.usuario.create({
       data: {
@@ -48,13 +53,13 @@ async function main() {
         nombre: 'Logout',
         apellido: 'Revocation',
         rol: Rol.TECNICO,
-        empresaId,
+        empresaId: ids.empresa,
       },
     });
     await prisma.organizacionMiembro.create({
       data: {
         id: ids.miembro,
-        organizacionId: context.organizacionId,
+        organizacionId: ids.organizacion,
         usuarioId: ids.usuario,
         rol: RolOrganizacion.AUDITOR_ORGANIZACION,
       },
@@ -62,10 +67,10 @@ async function main() {
     await prisma.accesoEmpresa.create({
       data: {
         id: ids.acceso,
-        organizacionEmpresaId: context.id,
+        organizacionEmpresaId: ids.relacion,
         organizacionMiembroId: ids.miembro,
-        organizacionId: context.organizacionId,
-        empresaId,
+        organizacionId: ids.organizacion,
+        empresaId: ids.empresa,
         rol: Rol.TECNICO,
       },
     });
@@ -103,6 +108,9 @@ async function main() {
     await prisma.accesoEmpresa.deleteMany({ where: { id: ids.acceso } });
     await prisma.organizacionMiembro.deleteMany({ where: { id: ids.miembro } });
     await prisma.usuario.deleteMany({ where: { id: ids.usuario } });
+    await prisma.organizacionEmpresa.deleteMany({ where: { id: ids.relacion } });
+    await prisma.organizacion.deleteMany({ where: { id: ids.organizacion } });
+    await prisma.empresa.deleteMany({ where: { id: ids.empresa } });
     await prisma.$disconnect();
   }
 }
