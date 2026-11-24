@@ -8,11 +8,10 @@ SEH. La revisión se realizó sólo sobre `D:\Proyectos\SEH`, rama
 modificaron servidores y no se ejecutó ningún despliegue.
 
 La configuración de `feature/demo-deployment` usa PostgreSQL 16, backend
-NestJS, frontend Nginx, Caddy y volúmenes Docker persistentes. PostgreSQL,
-backend y web no publican puertos al host; Caddy es el único servicio que
-publica 80/443. Si se decide reutilizar un proxy HTTPS existente, debe
-seguirse un procedimiento de coexistencia explícito y no iniciar Caddy en los
-mismos puertos.
+NestJS, frontend Nginx y volúmenes Docker persistentes. En el VPS informado,
+`seh-caddy` ya publica 80/443 y conserva sus certificados; PostgreSQL, backend
+y web no publican puertos públicos. El Caddy de Compose está en el perfil
+opcional `bundled-caddy` y no se activa junto al proxy existente.
 
 ## Recomendación ejecutiva
 
@@ -79,27 +78,29 @@ compartir el almacenamiento de evidencias con otros sistemas.
 
 ## Convivencia con un proxy existente
 
-La configuración entregada incluye Caddy dentro del Compose y presupone que
-80/443 están disponibles para ese servicio. `deploy/Caddyfile.example` apunta
-internamente a `web:80`. Si Caddy o Nginx ya corre en el host, no se debe
-iniciar el Caddy del Compose sin remapear puertos y validar previamente la
-red; el proxy existente debe apuntar al endpoint elegido de forma explícita.
+La configuración entregada puede usar el Caddy existente. El bloque
+`deploy/Caddyfile.example` apunta a `seh-web:80`, por lo que `seh-caddy` debe
+estar conectado a la misma red Docker que el Compose de SEH. No se debe activar
+`bundled-caddy` en ese VPS: así no se duplica `seh-caddy` ni se altera su
+volumen de certificados.
 
 Procedimiento seguro:
 
-1. Confirmar qué proceso posee 80/443 y cómo se administra actualmente.
+1. Confirmar qué proceso posee 80/443 y cómo se administra actualmente; en la
+   demo es `seh-caddy`.
 2. Respaldar la configuración del proxy existente antes de editarla.
 3. Agregar un bloque independiente para el subdominio de demo; no modificar
    bloques de otros proyectos.
 4. Ejecutar la validación nativa (`caddy validate` o equivalente).
 5. Recargar de forma atómica, nunca reiniciar a ciegas el proxy compartido.
 6. Verificar TLS, `/api/health`, login y descarga PDF.
-7. Para retirar SEH, eliminar sólo su bloque y detener sólo su Compose.
+7. Para retirar SEH, eliminar sólo su bloque y detener sólo los servicios
+   `seh-backend`/`seh-web`; no detener ni eliminar `seh-caddy` o su volumen TLS.
 
-Si el proxy existente corre dentro de otro contenedor, `127.0.0.1:8080` apunta
-a ese contenedor y no al host. En ese caso hay que elegir, antes del despliegue,
-una red Docker compartida explícita o un endpoint del host; no se debe cambiar
-la red del proxy existente sin autorización.
+Si el proxy existente corre dentro de otro contenedor, debe resolver
+`seh-web:80` mediante una red Docker compartida. Verificar la red con una
+consulta de sólo lectura antes de actualizar; no recrear el proxy ni cambiar
+sus volúmenes sin autorización.
 
 ## Procedimiento previsto para una VM nueva
 

@@ -24,9 +24,9 @@ deben reutilizar en producción ni publicar en documentación comercial.
 ## Compose reproducible
 
 La preparación actual de la demo pública está documentada en
-[`docs/DEMO_DEPLOYMENT.md`](DEMO_DEPLOYMENT.md). Esta rama usa Caddy como
-servicio Compose para terminar HTTPS; no requiere publicar directamente el
-puerto de Nginx ni exponer PostgreSQL.
+[`docs/DEMO_DEPLOYMENT.md`](DEMO_DEPLOYMENT.md). En el VPS de demo se conserva
+el Caddy existente; el Caddy de Compose queda sólo como perfil opcional para
+instalaciones nuevas y no debe ejecutarse junto con `seh-caddy`.
 
 1. Copiar `deploy/demo.env.example` a `.env` fuera del control de versiones.
 2. Reemplazar todos los valores `REEMPLAZAR_*` con secretos generados.

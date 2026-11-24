@@ -9,5 +9,5 @@
   }
 
   # Caddy terminates HTTPS; Nginx serves the SPA and proxies /api internally.
-  reverse_proxy web:80
+  reverse_proxy seh-web:80
 }
