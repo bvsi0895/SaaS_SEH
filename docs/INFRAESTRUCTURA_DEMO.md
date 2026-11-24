@@ -8,10 +8,11 @@ SEH. La revisión se realizó sólo sobre `D:\Proyectos\SEH`, rama
 modificaron servidores y no se ejecutó ningún despliegue.
 
 La configuración de `feature/demo-deployment` usa PostgreSQL 16, backend
-NestJS, frontend Nginx y volúmenes Docker persistentes. En el VPS informado,
-`seh-caddy` ya publica 80/443 y conserva sus certificados; PostgreSQL, backend
-y web no publican puertos públicos. El Caddy de Compose está en el perfil
-opcional `bundled-caddy` y no se activa junto al proxy existente.
+NestJS, frontend Nginx y volúmenes Docker persistentes. En InterServer,
+`seh-caddy` publica 80/443 desde la red `host` y conserva sus certificados;
+`seh-web` publica sólo `127.0.0.1:8080`, mientras PostgreSQL y backend no
+publican puertos. El Caddy de Compose está en el perfil opcional
+`bundled-caddy` y no se activa junto al proxy existente.
 
 ## Recomendación ejecutiva
 
@@ -78,11 +79,11 @@ compartir el almacenamiento de evidencias con otros sistemas.
 
 ## Convivencia con un proxy existente
 
-La configuración entregada puede usar el Caddy existente. El bloque
-`deploy/Caddyfile.example` apunta a `seh-web:80`, por lo que `seh-caddy` debe
-estar conectado a la misma red Docker que el Compose de SEH. No se debe activar
-`bundled-caddy` en ese VPS: así no se duplica `seh-caddy` ni se altera su
-volumen de certificados.
+La configuración entregada contempla el Caddy existente mediante
+`127.0.0.1:8080`. El archivo `deploy/Caddyfile.example` corresponde únicamente
+al perfil `bundled-caddy` de una instalación nueva y apunta a `seh-web:80`. No
+se debe activar ese perfil en InterServer: así no se duplica `seh-caddy` ni se
+altera su volumen de certificados.
 
 Procedimiento seguro:
 
@@ -97,10 +98,10 @@ Procedimiento seguro:
 7. Para retirar SEH, eliminar sólo su bloque y detener sólo los servicios
    `seh-backend`/`seh-web`; no detener ni eliminar `seh-caddy` o su volumen TLS.
 
-Si el proxy existente corre dentro de otro contenedor, debe resolver
-`seh-web:80` mediante una red Docker compartida. Verificar la red con una
-consulta de sólo lectura antes de actualizar; no recrear el proxy ni cambiar
-sus volúmenes sin autorización.
+En InterServer el proxy existente corre en red `host`, por lo que debe seguir
+usando `127.0.0.1:8080`. Verificar ese endpoint con una consulta de sólo
+lectura antes de actualizar; no recrear el proxy ni cambiar sus volúmenes sin
+autorización.
 
 ## Procedimiento previsto para una VM nueva
 

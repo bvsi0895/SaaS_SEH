@@ -24,7 +24,8 @@ test('demo Compose keeps PostgreSQL private and routes public traffic through Ca
   assert.match(compose, /HTTPS_PORT:-443/);
   assert.doesNotMatch(serviceBlock('postgres'), /\n\s+ports:/);
   assert.doesNotMatch(serviceBlock('backend'), /\n\s+ports:/);
-  assert.doesNotMatch(serviceBlock('web'), /\n\s+ports:/);
+  assert.match(serviceBlock('web'), /127\.0\.0\.1:\$\{WEB_HOST_PORT:-8080\}:80/);
+  assert.doesNotMatch(serviceBlock('web'), /(?:^|\n)\s+- "(?:\$\{|0\.0\.0\.0|\[::\])/);
   assert.match(serviceBlock('web'), /http:\/\/127\.0\.0\.1\/health/);
 });
 

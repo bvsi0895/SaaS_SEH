@@ -6,11 +6,11 @@ Esta guía corresponde a `feature/demo-deployment`, basada en
 `feature/demo-online` después de los merges de PR #28 y PR #29. Prepara un
 Compose reproducible, pero no ejecuta despliegues ni modifica servidores.
 
-El único punto de entrada público es el Caddy existente del VPS. Caddy termina
-HTTPS y reenvía al contenedor `seh-web`; Nginx sirve la SPA y reenvía `/api`
-al backend dentro de la red Docker. PostgreSQL no publica ningún puerto al
-host. El Caddy incluido en Compose queda en el perfil opcional
-`bundled-caddy` y no debe activarse cuando ya existe `seh-caddy`.
+La configuración soporta dos modalidades. En el VPS actual, `seh-caddy` usa la
+red `host` y termina HTTPS hacia `127.0.0.1:8080`; Compose publica únicamente
+Nginx en ese loopback. En una instalación nueva, el perfil opcional
+`bundled-caddy` termina HTTPS y reenvía internamente a `seh-web:80`.
+PostgreSQL y backend no publican puertos al host.
 
 ## Requisitos del VPS
 
@@ -54,17 +54,26 @@ escalar.
    docker compose --env-file .env ps
    ```
 
-En el VPS de demo usar el proyecto Compose con nombre `seh`, conservar los
-contenedores `seh-caddy`, `seh-postgres`, `seh-backend` y `seh-web`, y no activar
-`COMPOSE_PROFILES=bundled-caddy`. El servicio Caddy opcional sólo sirve para una
-instalación nueva sin proxy TLS existente:
+En InterServer usar el proyecto Compose con nombre `seh`, conservar los
+contenedores `seh-caddy`, `seh-postgres`, `seh-backend` y `seh-web`, y no
+activar `bundled-caddy`. La configuración Caddy existente en
+`/opt/seh-secrets/Caddyfile` debe conservar `127.0.0.1:8080`; no reemplazarla
+por `deploy/Caddyfile.example` ni tocar `seh_caddy_data`:
+
+```bash
+unset COMPOSE_PROFILES
+docker compose --env-file .env up -d --build postgres backend web
+```
+
+El servicio Caddy opcional sólo sirve para una instalación nueva sin proxy TLS
+existente:
 
 ```bash
 COMPOSE_PROFILES=bundled-caddy docker compose --env-file .env up -d --build
 ```
 
-No ejecutar ese perfil en el VPS que ya tiene `seh-caddy`: evita el conflicto
-de nombre y conserva el contenedor y volumen de certificados existentes.
+No ejecutar ese perfil en InterServer: evita el conflicto de nombre y conserva
+el contenedor y volumen de certificados existentes.
 
 El backend ejecuta `prisma migrate deploy` al arrancar. No usar
 `prisma migrate reset` en la demo.
@@ -142,8 +151,8 @@ backup. Los scripts no imprimen secretos ni eliminan volúmenes Docker.
 ## Riesgos pendientes
 
 - La demo usa almacenamiento local de un solo nodo para fotografías.
-- El Caddy existente debe estar conectado a la red Docker donde resuelve
-  `seh-web:80`; verificarlo antes de actualizar, sin reiniciarlo ni recrearlo.
+- En InterServer, Caddy debe seguir accediendo a `127.0.0.1:8080`; no necesita
+  compartir `seh_seh-network` con Nginx.
 - Los backups son responsabilidad operativa; deben verificarse con una
   restauración periódica.
 - `JWT_EXPIRATION=15m` reduce la ventana de access tokens, mientras refresh
