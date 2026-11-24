@@ -38,6 +38,7 @@ export interface ContextoAutorizado {
   empresaId: string;
   organizacionMiembroId: string;
   accesoEmpresaId: string;
+  rol: Rol;
   organizacionNombre?: string;
   empresaNombre?: string;
 }

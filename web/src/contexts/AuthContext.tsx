@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../api/auth';
 import type { Usuario, LoginCredentials, RegisterData, ContextoAutorizado } from '../types';
+import { syncUserWithContext } from './contextRole';
 
 interface AuthContextType {
   user: Usuario | null;
@@ -25,14 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeContextId, setActiveContextId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const loadContexts = useCallback(async () => {
+  const loadContexts = useCallback(async (userToSync: Usuario | null = null) => {
     const available = await authApi.getContexts();
     const saved = localStorage.getItem('activeOrganizacionEmpresaId');
     const selected = available.some((context) => context.organizacionEmpresaId === saved)
       ? saved
       : available[0]?.organizacionEmpresaId || null;
+    const selectedContext = available.find((context) => context.organizacionEmpresaId === selected);
     setContextos(available);
     setActiveContextId(selected);
+    if (userToSync) setUser(syncUserWithContext(userToSync, selectedContext));
     if (selected) localStorage.setItem('activeOrganizacionEmpresaId', selected);
     else localStorage.removeItem('activeOrganizacionEmpresaId');
   }, []);
@@ -46,8 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const userData = await authApi.getProfile();
-      setUser(userData);
-      await loadContexts();
+      await loadContexts(userData);
     } catch {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
@@ -67,16 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(credentials);
     localStorage.setItem('accessToken', response.accessToken);
     localStorage.setItem('refreshToken', response.refreshToken);
-    setUser(response.usuario);
-    await loadContexts();
+    await loadContexts(response.usuario);
   };
 
   const register = async (data: RegisterData) => {
     const response = await authApi.register(data);
     localStorage.setItem('accessToken', response.accessToken);
     localStorage.setItem('refreshToken', response.refreshToken);
-    setUser(response.usuario);
-    await loadContexts();
+    await loadContexts(response.usuario);
   };
 
   const logout = async () => {
@@ -102,10 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!contextos.some((context) => context.organizacionEmpresaId === contextId)) {
       throw new Error('Contexto no autorizado');
     }
+    const selectedContext = contextos.find((context) => context.organizacionEmpresaId === contextId);
     localStorage.setItem('activeOrganizacionEmpresaId', contextId);
     setActiveContextId(contextId);
+    setUser((currentUser) => syncUserWithContext(currentUser, selectedContext));
     queryClient.clear();
-    await loadContexts();
+    await loadContexts(user);
   };
 
   return (
