@@ -125,6 +125,7 @@ async function main() {
     await prisma.$transaction([
       prisma.inspeccion.deleteMany({ where: { id: { in: inspectionIds } } }),
       prisma.checklist.deleteMany({ where: { id: { in: checklistIds } } }),
+      prisma.accesoEstablecimiento.deleteMany({ where: { establecimientoId: { in: [ids.establishmentA, ids.establishmentB] } } }),
       prisma.establecimiento.deleteMany({ where: { id: { in: [ids.establishmentA, ids.establishmentB] } } }),
       prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accessA, ids.accessB] } } }),
       prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.memberA, ids.memberB] } } }),

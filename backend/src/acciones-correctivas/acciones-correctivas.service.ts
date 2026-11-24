@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccionCorrectivaDto, UpdateAccionCorrectivaDto, CerrarAccionDto } from './dto';
-import { EstadoAccion } from '@prisma/client';
+import { EstadoAccion, EstadoRelacionEmpresa, Rol } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
 import { HallazgosService } from '../hallazgos/hallazgos.service';
 
@@ -163,7 +163,30 @@ export class AccionesCorrectivasService {
             membresiasOrganizacion: {
               some: {
                 activa: true,
-                accesosEmpresa: { some: { organizacionEmpresaId, activo: true } },
+                accesosEmpresa: {
+                  some: {
+                    organizacionEmpresaId,
+                    empresaId,
+                    activo: true,
+                    organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                    ...(hallazgo.inspeccion.establecimientoId
+                      ? {
+                          OR: [
+                            { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } },
+                            {
+                              rol: Rol.TECNICO,
+                              establecimientos: {
+                                some: {
+                                  establecimientoId: hallazgo.inspeccion.establecimientoId,
+                                  establecimiento: { empresaId, activo: true },
+                                },
+                              },
+                            },
+                          ],
+                        }
+                      : { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } }),
+                  },
+                },
               },
             },
           }),

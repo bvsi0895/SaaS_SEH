@@ -22,6 +22,7 @@
     "prisma:backfill-multitenant": "ts-node prisma/backfill-multitenant.ts",
     "test:multitenant:isolation": "ts-node prisma/verify-multitenant-isolation.ts",
     "test:multitenant:e2e": "ts-node prisma/verify-multitenant-e2e.ts",
+    "test:multitenant:pr28": "ts-node --transpile-only integration/multiempresa-pr28-postgres.integration.ts",
     "test:administracion:e2e": "ts-node prisma/verify-admin-e2e.ts",
     "test:revocacion:e2e": "ts-node prisma/verify-revocation-e2e.ts",
     "test:informes:e2e": "ts-node prisma/verify-informes-e2e.ts",

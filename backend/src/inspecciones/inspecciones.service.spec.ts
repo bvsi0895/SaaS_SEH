@@ -152,6 +152,25 @@ describe('InspeccionesService respuestas', () => {
     }));
   });
 
+  it('allows a contextual technician access even when the legacy user role differs', async () => {
+    prisma.checklist.findUnique.mockResolvedValue({
+      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', activo: true,
+      items: [{ id: 'checklist-item-1' }],
+    });
+    prisma.usuario.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'technician-2' });
+    prisma.inspeccion.create.mockResolvedValue({ id: 'inspection-1', estado: EstadoInspeccion.PENDIENTE });
+
+    await service.create(
+      { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2' },
+      'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR,
+    );
+
+    expect(prisma.usuario.findFirst).toHaveBeenCalledTimes(2);
+    expect(prisma.inspeccion.create).toHaveBeenCalled();
+  });
+
   it('does not let a technician assign an inspection to another user', async () => {
     prisma.checklist.findUnique.mockResolvedValue({
       id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', activo: true,

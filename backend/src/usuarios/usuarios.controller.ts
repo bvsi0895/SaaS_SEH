@@ -42,10 +42,13 @@ export class UsuariosController {
   async findAll(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId?: string,
     @Query('rol') rol?: Rol,
     @Query('activo') activo?: boolean,
   ) {
-    return this.usuariosService.findAll(empresaId, { rol, activo }, organizacionId);
+    return organizacionEmpresaId
+      ? this.usuariosService.findAll(empresaId, { rol, activo }, organizacionId, organizacionEmpresaId)
+      : this.usuariosService.findAll(empresaId, { rol, activo }, organizacionId);
   }
 
   @Get('tecnicos')
@@ -78,8 +81,9 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.findOne(id, empresaId, organizacionId);
+    return this.usuariosService.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
   }
 
   @Post()
@@ -107,8 +111,9 @@ export class UsuariosController {
     @Body() updateUsuarioDto: UpdateUsuarioDto,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.update(id, updateUsuarioDto, empresaId, organizacionId);
+    return this.usuariosService.update(id, updateUsuarioDto, empresaId, organizacionId, organizacionEmpresaId);
   }
 
   @Patch('me/password')
@@ -129,9 +134,10 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @Body() dto: AdminChangePasswordDto,
   ) {
-    return this.usuariosService.adminChangePassword(id, empresaId, dto, organizacionId);
+    return this.usuariosService.adminChangePassword(id, empresaId, dto, organizacionId, organizacionEmpresaId);
   }
 
   @Patch(':id/deactivate')
@@ -142,8 +148,9 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.deactivate(id, empresaId, organizacionId);
+    return this.usuariosService.deactivate(id, empresaId, organizacionId, organizacionEmpresaId);
   }
 
   @Patch(':id/activate')
@@ -154,8 +161,9 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.activate(id, empresaId, organizacionId);
+    return this.usuariosService.activate(id, empresaId, organizacionId, organizacionEmpresaId);
   }
 
   @Delete(':id')
@@ -167,8 +175,9 @@ export class UsuariosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
   ) {
-    return this.usuariosService.remove(id, empresaId, organizacionId);
+    return this.usuariosService.remove(id, empresaId, organizacionId, organizacionEmpresaId);
   }
 }
 

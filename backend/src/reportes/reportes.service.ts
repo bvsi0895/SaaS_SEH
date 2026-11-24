@@ -122,7 +122,14 @@ export class ReportesService {
   /**
    * Generar PDF de una inspección
    */
-  async generarPDFInspeccion(inspeccionId: string, empresaId?: string, organizacionEmpresaId?: string, usuarioId?: string, rol?: Rol): Promise<Buffer> {
+  async generarPDFInspeccion(
+    inspeccionId: string,
+    empresaId?: string,
+    organizacionEmpresaId?: string,
+    usuarioId?: string,
+    rol?: Rol,
+    accesoEmpresaId?: string,
+  ): Promise<Buffer> {
     const inspeccion = await this.prisma.inspeccion.findUnique({
       where: { id: inspeccionId },
       include: {
@@ -179,6 +186,12 @@ export class ReportesService {
     }
     if (rol === Rol.TECNICO && inspeccion.asignadoAId !== usuarioId) {
       throw new NotFoundException('Inspección no encontrada');
+    }
+    if (rol === Rol.TECNICO && empresaId && organizacionEmpresaId && accesoEmpresaId) {
+      const allowed = await this.tenancy?.getEstablishmentScope(accesoEmpresaId, empresaId, organizacionEmpresaId);
+      if (!inspeccion.establecimientoId || (allowed !== undefined && !allowed.includes(inspeccion.establecimientoId))) {
+        throw new NotFoundException('Inspección no encontrada');
+      }
     }
 
     const organization = inspeccion.organizacionEmpresa?.organizacion;

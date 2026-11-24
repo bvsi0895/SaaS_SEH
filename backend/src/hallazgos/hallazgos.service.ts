@@ -383,7 +383,6 @@ export class HallazgosService {
         id: responsableId,
         empresaId,
         activo: true,
-        rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
         membresiasOrganizacion: {
           some: {
             activa: true,
@@ -393,6 +392,7 @@ export class HallazgosService {
                 organizacionEmpresaId,
                 activo: true,
                 organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
                 ...(establecimientoId && {
                   OR: [
                     { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } },

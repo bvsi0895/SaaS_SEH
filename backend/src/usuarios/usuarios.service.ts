@@ -16,15 +16,45 @@ import { randomUUID } from 'crypto';
 export class UsuariosService {
   constructor(private prisma: PrismaService) {}
 
+  private withContextualRole(user: any) {
+    const contextualRole = user.membresiasOrganizacion
+      ?.flatMap((membership: any) => membership.accesosEmpresa || [])
+      .map((access: any) => access.rol)
+      .find(Boolean);
+    const { membresiasOrganizacion: _scopedMemberships, ...result } = user;
+    return { ...result, rol: contextualRole || user.rol };
+  }
+
   /**
    * Obtener todos los usuarios de una empresa
    */
-  async findAll(empresaId: string, filters?: { rol?: Rol; activo?: boolean }, organizacionId?: string) {
-    return this.prisma.usuario.findMany({
+  async findAll(empresaId: string, filters?: { rol?: Rol; activo?: boolean }, organizacionId?: string, organizacionEmpresaId?: string) {
+    const scopedMembership = organizacionId && organizacionEmpresaId
+      ? {
+          membresiasOrganizacion: {
+            some: {
+              organizacionId,
+              activa: true,
+              accesosEmpresa: {
+                some: {
+                  organizacionEmpresaId,
+                  empresaId,
+                  activo: true,
+                  organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                  ...(filters?.rol && { rol: filters.rol }),
+                },
+              },
+            },
+          },
+        }
+      : organizacionId
+        ? { membresiasOrganizacion: { some: { organizacionId, activa: true } } }
+        : {};
+    const users = await this.prisma.usuario.findMany({
       where: {
         empresaId,
-        ...(organizacionId && { membresiasOrganizacion: { some: { organizacionId, activa: true } } }),
-        ...(filters?.rol && { rol: filters.rol }),
+        ...scopedMembership,
+        ...(!organizacionEmpresaId && filters?.rol && { rol: filters.rol }),
         ...(filters?.activo !== undefined && { activo: filters.activo }),
       },
       select: {
@@ -37,16 +67,27 @@ export class UsuariosService {
         ultimoAcceso: true,
         createdAt: true,
         empresaId: true,
+        ...(organizacionId && organizacionEmpresaId && {
+          membresiasOrganizacion: {
+            where: { organizacionId, activa: true },
+            select: {
+              accesosEmpresa: {
+                where: { organizacionEmpresaId, empresaId, activo: true },
+                select: { rol: true },
+              },
+            },
+          },
+        }),
       },
       orderBy: { nombre: 'asc' },
     });
+    return users.map((user: any) => this.withContextualRole(user));
   }
 
   async findAuthorizedTechnicians(empresaId: string, organizacionEmpresaId: string) {
-    return this.prisma.usuario.findMany({
+    const users = await this.prisma.usuario.findMany({
       where: {
         empresaId,
-        rol: Rol.TECNICO,
         activo: true,
         membresiasOrganizacion: {
           some: {
@@ -57,6 +98,7 @@ export class UsuariosService {
                 organizacionEmpresaId,
                 activo: true,
                 organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                rol: Rol.TECNICO,
               },
             },
           },
@@ -72,9 +114,19 @@ export class UsuariosService {
         ultimoAcceso: true,
         createdAt: true,
         empresaId: true,
+        membresiasOrganizacion: {
+          where: { activa: true },
+          select: {
+            accesosEmpresa: {
+              where: { organizacionEmpresaId, empresaId, activo: true },
+              select: { rol: true },
+            },
+          },
+        },
       },
       orderBy: { nombre: 'asc' },
     });
+    return users.map((user: any) => this.withContextualRole(user));
   }
 
   async findResolutionResponsibles(
@@ -82,11 +134,10 @@ export class UsuariosService {
     organizacionEmpresaId: string,
     establecimientoId?: string,
   ) {
-    return this.prisma.usuario.findMany({
+    const users = await this.prisma.usuario.findMany({
       where: {
         empresaId,
         activo: true,
-        rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
         membresiasOrganizacion: {
           some: {
             activa: true,
@@ -96,6 +147,7 @@ export class UsuariosService {
                 organizacionEmpresaId,
                 activo: true,
                 organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.TECNICO] },
                 ...(establecimientoId && {
                   OR: [
                     { rol: { in: [Rol.ADMIN_EMPRESA, Rol.SUPERVISOR] } },
@@ -125,20 +177,47 @@ export class UsuariosService {
         ultimoAcceso: true,
         createdAt: true,
         empresaId: true,
+        membresiasOrganizacion: {
+          where: { activa: true },
+          select: {
+            accesosEmpresa: {
+              where: { organizacionEmpresaId, empresaId, activo: true },
+              select: { rol: true },
+            },
+          },
+        },
       },
       orderBy: [{ nombre: 'asc' }, { apellido: 'asc' }],
     });
+    return users.map((user: any) => this.withContextualRole(user));
   }
 
   /**
    * Obtener un usuario por ID
    */
-  async findOne(id: string, empresaId?: string, organizacionId?: string) {
+  async findOne(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
     const usuario = await this.prisma.usuario.findUnique({
       where: {
         id,
         ...(empresaId && { empresaId }),
-        ...(organizacionId && { membresiasOrganizacion: { some: { organizacionId, activa: true } } }),
+        ...(organizacionId && organizacionEmpresaId
+          ? {
+              membresiasOrganizacion: {
+                some: {
+                  organizacionId,
+                  activa: true,
+                  accesosEmpresa: {
+                    some: {
+                      organizacionEmpresaId,
+                      empresaId,
+                      activo: true,
+                      organizacionEmpresa: { estado: EstadoRelacionEmpresa.ACTIVA },
+                    },
+                  },
+                },
+              },
+            }
+          : organizacionId && { membresiasOrganizacion: { some: { organizacionId, activa: true } } }),
       },
       select: {
         id: true,
@@ -157,6 +236,17 @@ export class UsuariosService {
             nombre: true,
           },
         },
+        ...(organizacionId && organizacionEmpresaId && {
+          membresiasOrganizacion: {
+            where: { organizacionId, activa: true },
+            select: {
+              accesosEmpresa: {
+                where: { organizacionEmpresaId, empresaId, activo: true },
+                select: { rol: true },
+              },
+            },
+          },
+        }),
       },
     });
 
@@ -164,7 +254,7 @@ export class UsuariosService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    return usuario;
+    return this.withContextualRole(usuario);
   }
 
   /**
@@ -271,14 +361,31 @@ export class UsuariosService {
   /**
    * Actualizar usuario
    */
-  async update(id: string, updateUsuarioDto: UpdateUsuarioDto, empresaId?: string, organizacionId?: string) {
+  async update(id: string, updateUsuarioDto: UpdateUsuarioDto, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
     // Verificar que existe
-    const usuario = await this.findOne(id, empresaId, organizacionId);
+    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
+
+    // El rol operativo vive en AccesoEmpresa. Nunca debe cambiarse el rol
+    // global cuando se administra a un usuario desde una relación concreta.
+    const { rol, ...accountData } = updateUsuarioDto;
+    if (rol && organizacionId && organizacionEmpresaId) {
+      const access = await this.prisma.accesoEmpresa.findFirst({
+        where: {
+          organizacionId,
+          organizacionEmpresaId,
+          empresaId,
+          organizacionMiembro: { usuarioId: id },
+        },
+        select: { id: true },
+      });
+      if (!access) throw new NotFoundException('Acceso del usuario no encontrado');
+      await this.prisma.accesoEmpresa.update({ where: { id: access.id }, data: { rol } });
+    }
 
     // Actualizar
     return this.prisma.usuario.update({
       where: { id },
-      data: updateUsuarioDto,
+      data: accountData,
       select: {
         id: true,
         email: true,
@@ -322,8 +429,8 @@ export class UsuariosService {
     return { message: 'Contraseña actualizada exitosamente' };
   }
 
-  async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto, organizacionId?: string) {
-    await this.findOne(id, empresaId, organizacionId);
+  async adminChangePassword(id: string, empresaId: string, dto: AdminChangePasswordDto, organizacionId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.usuario.update({
       where: { id },
@@ -335,8 +442,8 @@ export class UsuariosService {
   /**
    * Desactivar usuario (soft delete)
    */
-  async deactivate(id: string, empresaId?: string, organizacionId?: string) {
-    await this.findOne(id, empresaId, organizacionId);
+  async deactivate(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
 
     return this.prisma.usuario.update({
       where: { id },
@@ -354,8 +461,8 @@ export class UsuariosService {
   /**
    * Reactivar usuario
    */
-  async activate(id: string, empresaId?: string, organizacionId?: string) {
-    await this.findOne(id, empresaId, organizacionId);
+  async activate(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
 
     return this.prisma.usuario.update({
       where: { id },
@@ -373,8 +480,8 @@ export class UsuariosService {
   /**
    * Eliminar usuario permanentemente
    */
-  async remove(id: string, empresaId?: string, organizacionId?: string) {
-    await this.findOne(id, empresaId, organizacionId);
+  async remove(id: string, empresaId?: string, organizacionId?: string, organizacionEmpresaId?: string) {
+    await this.findOne(id, empresaId, organizacionId, organizacionEmpresaId);
 
     await this.prisma.usuario.delete({
       where: { id },

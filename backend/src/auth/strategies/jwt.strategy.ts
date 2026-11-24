@@ -3,7 +3,6 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TenancyService } from '../../tenancy/tenancy.service';
 
 export interface JwtPayload {
   sub: string; // userId
@@ -22,7 +21,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
-    private tenancy: TenancyService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -58,13 +56,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Empresa desactivada');
     }
 
-    // Retornar usuario sin password
+    // Retornar usuario sin password. El contexto operativo se resuelve en
+    // JwtAuthGuard, después de leer X-Organizacion-Empresa-Id. No se debe
+    // bloquear aquí por el vínculo que quedó embebido en un JWT antiguo:
+    // revocar una consultora no revoca el resto de accesos del usuario.
     const { password, refreshToken, ...result } = usuario;
-    const context = await this.tenancy.resolveForUser(
-      usuario.id,
-      usuario.empresaId,
-      payload.organizacionEmpresaId,
-    );
-    return { ...result, ...context };
+    return result;
   }
 }

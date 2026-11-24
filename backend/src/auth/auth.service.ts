@@ -73,7 +73,8 @@ export class AuthService {
     }
 
     // Generar tokens
-    const tokens = await this.generateTokens(usuario);
+    const context = await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
+    const tokens = await this.generateTokens(usuario, context);
 
     // Actualizar último acceso y guardar refresh token
     await this.prisma.usuario.update({
@@ -91,7 +92,7 @@ export class AuthService {
         email: usuario.email,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
-        rol: usuario.rol,
+        rol: context.rol ?? usuario.rol,
         empresaId: usuario.empresaId,
         activo: usuario.activo,
       },
@@ -169,7 +170,8 @@ export class AuthService {
     });
 
     // Generar tokens
-    const tokens = await this.generateTokens(usuario);
+    const context = await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
+    const tokens = await this.generateTokens(usuario, context);
 
     // Guardar refresh token
     await this.prisma.usuario.update({
@@ -186,7 +188,7 @@ export class AuthService {
         email: usuario.email,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
-        rol: usuario.rol,
+        rol: context.rol ?? usuario.rol,
         empresaId: usuario.empresaId,
         activo: usuario.activo,
       },
@@ -238,13 +240,16 @@ export class AuthService {
   /**
    * Generar access token y refresh token
    */
-  private async generateTokens(usuario: { id: string; email: string; empresaId: string; rol: string }) {
-    const context = await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
+  private async generateTokens(
+    usuario: { id: string; email: string; empresaId: string; rol: string },
+    resolvedContext?: Awaited<ReturnType<TenancyService['resolveForUser']>>,
+  ) {
+    const context = resolvedContext || await this.tenancy.resolveForUser(usuario.id, usuario.empresaId);
     const payload: JwtPayload = {
       sub: usuario.id,
       email: usuario.email,
       empresaId: usuario.empresaId,
-      rol: usuario.rol,
+      rol: context.rol ?? usuario.rol,
       organizacionEmpresaId: context.organizacionEmpresaId,
     };
 

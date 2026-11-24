@@ -308,9 +308,8 @@ export class AdministracionService {
   async assignAccess(organizacionId: string, usuarioId: string, relationId: string, dto: AssignAccessDto) {
     await this.assertAdmin(organizacionId, usuarioId);
     const relation = await this.getRelation(organizacionId, relationId);
-    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true }, select: { id: true, usuario: { select: { rol: true } } } });
+    const member = await this.prisma.organizacionMiembro.findFirst({ where: { id: dto.organizacionMiembroId, organizacionId, activa: true }, select: { id: true } });
     if (!member) throw new NotFoundException('Membresía no encontrada');
-    if (dto.rol === Rol.TECNICO && member.usuario.rol !== Rol.TECNICO) throw new BadRequestException('La asignación TECNICO requiere un usuario técnico');
     const establishmentIds = Array.from(new Set(dto.establecimientoIds || []));
     if (dto.rol === Rol.TECNICO && establishmentIds.length > 0) {
       const establishments = await this.prisma.establecimiento.findMany({ where: { id: { in: establishmentIds }, empresaId: relation.empresaId, activo: true }, select: { id: true } });
