@@ -237,7 +237,7 @@ jobs:
             echo "La migración debía rechazar la propiedad ambigua"
             exit 1
           fi
-          checklist_count="$(psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --tuples-only --no-align --command="SELECT count(*) FROM checklists WHERE id = '00000000-0000-0000-0000-000000000806';")"
+          checklist_count="$(psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --tuples-only --no-align --command="SELECT count(*) FROM checklists WHERE id = '00000000-0000-4000-8000-000000000806';")"
           if [[ "$checklist_count" != "1" ]]; then
             echo "La reversión transaccional no preservó el checklist legacy"
             exit 1
