@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -11,6 +11,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useAuth } from '../../contexts/AuthContext';
 import EstablishmentSelector from '../../components/common/EstablishmentSelector';
 import { getQueryScope, invalidateInspectionQueries } from '../../queryKeys';
+import { isUuidV4 } from '../../utils/uuid';
 
 export default function NuevaInspeccionPage() {
   const navigate = useNavigate();
@@ -31,7 +32,21 @@ export default function NuevaInspeccionPage() {
     queryFn: usuariosApi.getTecnicos,
     enabled: !isTechnician,
   });
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateInspeccionDto>();
+  const { register, handleSubmit, resetField, formState: { errors } } = useForm<CreateInspeccionDto>();
+
+  useEffect(() => {
+    resetField('checklistId');
+    resetField('asignadoAId');
+    setEstablecimientoId('');
+    setError(null);
+  }, [activeContextId, resetField]);
+
+  const validChecklists = (checklists ?? []).filter((checklist) => isUuidV4(checklist.id));
+  const checklistHelperText = errors.checklistId?.message || (
+    checklists && validChecklists.length === 0
+      ? 'No hay checklists válidos disponibles en el contexto activo'
+      : undefined
+  );
 
   const createMutation = useMutation({
     mutationFn: inspeccionesApi.create,
@@ -49,9 +64,15 @@ export default function NuevaInspeccionPage() {
   const onSubmit = (data: CreateInspeccionDto) => {
     setError(null);
     const { fechaProgramada, asignadoAId, ...requiredFields } = data;
+    const selectedChecklist = validChecklists.find((checklist) => checklist.id === data.checklistId?.trim());
     const normalizedAssignee = asignadoAId?.trim();
+    if (!selectedChecklist) {
+      setError('Seleccioná un checklist válido del contexto activo');
+      return;
+    }
     const payload: CreateInspeccionDto = {
       ...requiredFields,
+      checklistId: selectedChecklist.id,
       establecimientoId,
       ...(fechaProgramada?.trim()
         ? { fechaProgramada: new Date(`${fechaProgramada}T00:00:00.000Z`).toISOString() }
@@ -76,8 +97,11 @@ export default function NuevaInspeccionPage() {
               <Grid item xs={12}><Typography variant="h6" gutterBottom>Datos de la inspección</Typography></Grid>
               <Grid item xs={12} md={6}><EstablishmentSelector value={establecimientoId} onChange={setEstablecimientoId} /></Grid>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth select label="Checklist" error={!!errors.checklistId} helperText={errors.checklistId?.message} disabled={checklistsLoading} {...register('checklistId', { required: 'Selecciona un checklist' })}>
-                  {checklists?.map((checklist) => <MenuItem key={checklist.id} value={checklist.id}>{checklist.nombre} ({checklist.tipo})</MenuItem>)}
+                <TextField fullWidth select label="Checklist" error={!!errors.checklistId} helperText={checklistHelperText} disabled={checklistsLoading || !activeContextId || validChecklists.length === 0} {...register('checklistId', {
+                  required: 'Selecciona un checklist',
+                  validate: (value) => validChecklists.some((checklist) => checklist.id === value) || 'Seleccioná un checklist válido del contexto activo',
+                })}>
+                  {validChecklists.map((checklist) => <MenuItem key={checklist.id} value={checklist.id}>{checklist.nombre} ({checklist.tipo})</MenuItem>)}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={6}>

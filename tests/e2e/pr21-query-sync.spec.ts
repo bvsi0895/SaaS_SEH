@@ -2,6 +2,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 const CONTEXT_A = 'context-a';
 const CONTEXT_B = 'context-b';
+const CHECKLIST_A = '00000000-0000-4000-8000-000000000201';
+const CHECKLIST_B = '00000000-0000-4000-8000-000000000202';
 
 function makeState(initialInspectionStatus = 'EN_PROGRESO') {
   return {
@@ -14,6 +16,7 @@ function makeState(initialInspectionStatus = 'EN_PROGRESO') {
       findings: 0,
       actions: 0,
     },
+    createdPayloads: [] as Array<{ contextId: string; body: Record<string, unknown> }>,
   };
 }
 
@@ -29,13 +32,13 @@ function inspection(state: ReturnType<typeof makeState>) {
     usuarioId: 'user-1',
     creadoPorId: 'user-1',
     asignadoAId: 'user-1',
-    checklistId: 'checklist-1',
+    checklistId: CHECKLIST_A,
     establecimientoId: 'est-a',
     establecimiento: { id: 'est-a', nombre: 'Planta Norte', codigo: 'N-01' },
     creadoPor: { id: 'user-1', nombre: 'Admin', apellido: 'E2E' },
     asignadoA: { id: 'user-1', nombre: 'Admin', apellido: 'E2E' },
-    checklist: { id: 'checklist-1', nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', createdAt: '', updatedAt: '' },
-    items: [{ id: 'item-1', cumplimiento: 'CUMPLE', observacion: '', inspeccionId: 'inspection-1', checklistItemId: 'check-item-1', checklistItem: { id: 'check-item-1', descripcion: 'Orden y limpieza', orden: 1, obligatorio: true, checklistId: 'checklist-1' } }],
+    checklist: { id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', createdAt: '', updatedAt: '' },
+    items: [{ id: 'item-1', cumplimiento: 'CUMPLE', observacion: '', inspeccionId: 'inspection-1', checklistItemId: 'check-item-1', checklistItem: { id: 'check-item-1', descripcion: 'Orden y limpieza', orden: 1, obligatorio: true, checklistId: CHECKLIST_A } }],
     hallazgos: state.finding ? [state.finding] : [],
     createdAt: '2026-11-20T12:00:00.000Z',
     updatedAt: '2026-11-20T12:00:00.000Z',
@@ -89,7 +92,13 @@ async function installMocks(page: Page, initialInspectionStatus = 'EN_PROGRESO')
       return;
     }
     if (url.pathname.endsWith('/checklists')) {
-      await json([{ id: 'checklist-1', nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', items: [], createdAt: '', updatedAt: '' }]);
+      const isContextB = contextId === CONTEXT_B;
+      await json(isContextB
+        ? [
+          { id: 'demo-online-checklist-sur', nombre: 'Checklist legacy no utilizable', tipo: 'GENERAL', activo: true, empresaId: 'company-b', items: [], createdAt: '', updatedAt: '' },
+          { id: CHECKLIST_B, nombre: 'Checklist Sur', tipo: 'GENERAL', activo: true, empresaId: 'company-b', items: [], createdAt: '', updatedAt: '' },
+        ]
+        : [{ id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', items: [], createdAt: '', updatedAt: '' }]);
       return;
     }
     if (url.pathname.endsWith('/usuarios/tecnicos')) {
@@ -111,6 +120,7 @@ async function installMocks(page: Page, initialInspectionStatus = 'EN_PROGRESO')
       return;
     }
     if (url.pathname === '/api/inspecciones' && method === 'POST') {
+      state.createdPayloads.push({ contextId, body: request.postDataJSON() as Record<string, unknown> });
       state.inspectionStatus = 'PENDIENTE';
       await json(inspection(state));
       return;
@@ -191,6 +201,44 @@ test.describe('PR #21 sincronización de consultas', () => {
     await dashboardRefreshCount(page, state);
     expect(state.refreshes.dashboard).toBeGreaterThan(dashboardBefore);
     expect(state.refreshes.inspections).toBeGreaterThan(0);
+  });
+
+  test('reinicia selecciones dependientes y crea con el checklist del contexto activo', async ({ page }) => {
+    const state = await installMocks(page);
+    await page.goto('/inspecciones/nueva');
+
+    await page.getByLabel('Establecimiento').click();
+    await page.getByRole('option', { name: 'Planta Norte' }).click();
+    await page.getByLabel('Checklist').click();
+    await page.getByRole('option', { name: /Checklist General/ }).click();
+    await page.getByLabel('Sector / área').fill('Sector conservado');
+
+    await page.getByLabel('Contexto activo').click();
+    await page.getByRole('option', { name: /Consultora B.*Empresa B/ }).click();
+    await expect(page.locator('#establishment-filter')).toHaveText('');
+    await expect(page.getByRole('combobox', { name: 'Checklist' })).toHaveText('');
+    await expect(page.getByLabel('Sector / área')).toHaveValue('Sector conservado');
+
+    await page.getByLabel('Establecimiento').click();
+    await page.getByRole('option', { name: 'Planta Sur' }).click();
+    await page.getByLabel('Checklist').click();
+    await expect(page.getByRole('option', { name: /Checklist legacy no utilizable/ })).toHaveCount(0);
+    await page.getByRole('option', { name: /Checklist Sur/ }).click();
+    await page.getByRole('button', { name: 'Crear y asignar' }).click();
+
+    expect(state.createdPayloads).toHaveLength(1);
+    expect(state.createdPayloads[0]).toMatchObject({
+      contextId: CONTEXT_B,
+      body: { checklistId: CHECKLIST_B, establecimientoId: 'est-b', sector: 'Sector conservado' },
+    });
+
+    await page.getByRole('button', { name: 'Dashboard' }).click();
+    await page.getByLabel('Contexto activo').click();
+    await page.getByRole('option', { name: /Consultora A.*Empresa A/ }).click();
+    await page.getByRole('button', { name: 'Inspecciones' }).click();
+    await page.getByRole('button', { name: 'Nueva inspección' }).click();
+    await expect(page.locator('#establishment-filter')).toHaveText('');
+    await expect(page.getByRole('combobox', { name: 'Checklist' })).toHaveText('');
   });
 
   test('inicia una inspección y refresca su detalle y el dashboard', async ({ page }) => {
