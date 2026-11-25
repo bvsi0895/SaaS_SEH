@@ -152,6 +152,7 @@ async function main() {
     await mustReject(findings.findOne(findingB.id, ids.empresa, ids.relacionA, ids.usuarioA, ids.accesoA), 'A no debe abrir hallazgos de B');
     await mustReject(inspections.findOne(inspectionA.id, ids.empresa, ids.relacionB, ids.usuarioB, Rol.TECNICO, ids.accesoB), 'B no debe abrir inspecciones de A');
     await mustReject(findings.findOne(findingA.id, ids.empresa, ids.relacionB, ids.usuarioB, ids.accesoB), 'B no debe abrir hallazgos de A');
+    await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Checklist no autorizado' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA), 'A no debe crear inspecciones con el checklist de B');
     assert.deepEqual((await inspections.findAll(ids.empresa, undefined, ids.relacionA, Rol.ADMIN_EMPRESA, ids.usuarioMulti, ids.accesoMultiA)).map((item) => item.id), [inspectionA.id]);
 
     await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Establecimiento no autorizado' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB), 'el técnico no debe usar otro establecimiento');

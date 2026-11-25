@@ -83,10 +83,10 @@ async function main() {
 
   // 3. Crear checklists con items
   const checklistSeguridad = await prisma.checklist.upsert({
-    where: { id: 'checklist-seguridad-general' },
+    where: { id: '00000000-0000-4000-8000-000000000111' },
     update: {},
     create: {
-      id: 'checklist-seguridad-general',
+      id: '00000000-0000-4000-8000-000000000111',
       nombre: 'Inspección de Seguridad General',
       descripcion: 'Checklist para verificar condiciones generales de seguridad en el área de trabajo',
       tipo: TipoChecklist.GENERAL,
@@ -111,10 +111,10 @@ async function main() {
   console.log('✅ Checklist de seguridad creado:', checklistSeguridad.nombre);
 
   const checklistHigiene = await prisma.checklist.upsert({
-    where: { id: 'checklist-higiene-industrial' },
+    where: { id: '00000000-0000-4000-8000-000000000112' },
     update: {},
     create: {
-      id: 'checklist-higiene-industrial',
+      id: '00000000-0000-4000-8000-000000000112',
       nombre: 'Inspección de Higiene Industrial',
       descripcion: 'Verificación de condiciones de higiene en áreas productivas',
       tipo: TipoChecklist.ORDEN_LIMPIEZA,
@@ -137,10 +137,10 @@ async function main() {
   console.log('✅ Checklist de higiene creado:', checklistHigiene.nombre);
 
   const checklistEPP = await prisma.checklist.upsert({
-    where: { id: 'checklist-epp' },
+    where: { id: '00000000-0000-4000-8000-000000000113' },
     update: {},
     create: {
-      id: 'checklist-epp',
+      id: '00000000-0000-4000-8000-000000000113',
       nombre: 'Control de Elementos de Protección Personal',
       descripcion: 'Verificación del uso y estado de EPP',
       tipo: TipoChecklist.EPP,
