@@ -6,11 +6,39 @@ ALTER TABLE "checklists" ADD COLUMN "organizacionId" TEXT;
 
 DO $$
 BEGIN
+  -- Un vínculo contextual que apunta a otra empresa no puede ser una fuente
+  -- confiable de propiedad. Detenerse evita asignar la biblioteca a una
+  -- consultora equivocada por una inconsistencia legacy.
+  IF EXISTS (
+    SELECT 1
+    FROM "checklists" AS checklist
+    JOIN "organizacion_empresas" AS relation
+      ON relation."id" = checklist."organizacionEmpresaId"
+    WHERE relation."empresaId" <> checklist."empresaId"
+  ) THEN
+    RAISE EXCEPTION 'No se puede migrar un checklist cuyo vínculo legacy apunta a otra empresa';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "checklists" AS checklist
+    JOIN "organizacion_empresas" AS relation
+      ON relation."id" = checklist."organizacionEmpresaId"
+    JOIN "organizaciones" AS organization
+      ON organization."id" = relation."organizacionId"
+    WHERE organization."tipo" <> 'CONSULTORA'
+  ) THEN
+    RAISE EXCEPTION 'No se puede migrar un checklist cuya relación legacy no pertenece a una consultora';
+  END IF;
+
   -- Caso determinista: el vínculo contextual ya identifica la organización.
   UPDATE "checklists" AS checklist
   SET "organizacionId" = relation."organizacionId"
   FROM "organizacion_empresas" AS relation
-  WHERE checklist."organizacionEmpresaId" = relation."id";
+  JOIN "organizaciones" AS organization
+    ON organization."id" = relation."organizacionId"
+  WHERE checklist."organizacionEmpresaId" = relation."id"
+    AND organization."tipo" = 'CONSULTORA';
 
   -- Caso legacy sin vínculo contextual: sólo aceptar una única organización
   -- asociada a la empresa. Si hay cero o varias, queda NULL y se aborta.
@@ -21,10 +49,13 @@ BEGIN
     FROM "checklists" AS checklist
     JOIN "organizacion_empresas" AS relation
       ON relation."empresaId" = checklist."empresaId"
+    JOIN "organizaciones" AS organization
+      ON organization."id" = relation."organizacionId"
     WHERE checklist."organizacionId" IS NULL
       AND checklist."organizacionEmpresaId" IS NULL
     GROUP BY checklist."id"
     HAVING COUNT(DISTINCT relation."organizacionId") = 1
+      AND bool_and(organization."tipo" = 'CONSULTORA')
   ) AS candidate
   WHERE checklist."id" = candidate."id";
 

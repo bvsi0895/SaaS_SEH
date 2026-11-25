@@ -12,6 +12,7 @@ test('comparte la biblioteca entre empresas de una consultora y la separa entre 
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    if (!url.pathname.startsWith('/api/')) return route.continue();
     const contextId = request.headers()['x-organizacion-empresa-id'] || CONTEXT_A;
     const json = (body: unknown) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -51,6 +52,8 @@ test('comparte la biblioteca entre empresas de una consultora y la separa entre 
   await page.getByRole('button', { name: 'Crear y asignar' }).click();
   await expect.poll(() => payloads.length).toBe(1);
   expect(payloads[0]).toMatchObject({ contextId: CONTEXT_A2, body: { checklistId: CHECKLIST_A, establecimientoId: `est-${CONTEXT_A2}`, sector: 'Sector A' } });
+  await expect(page).toHaveURL(/\/inspecciones\/inspection-32$/);
+  await page.goto('/inspecciones/nueva');
 
   await page.getByLabel('Contexto activo').click();
   await page.getByRole('option', { name: /Consultora B.*Empresa B/ }).click();
@@ -59,7 +62,7 @@ test('comparte la biblioteca entre empresas de una consultora y la separa entre 
   await expect(page.getByRole('option', { name: /Checklist biblioteca A/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.getByLabel('Contexto activo').click();
-  await page.getByRole('option', { name: /Consultora A.*Empresa A/ }).click();
+  await page.getByRole('option', { name: 'Consultora A · Empresa A', exact: true }).click();
   await page.getByLabel('Contexto activo').click();
   await page.getByRole('option', { name: /Consultora B.*Empresa B/ }).click();
   await page.getByLabel('Checklist').click();

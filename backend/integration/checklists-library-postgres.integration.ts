@@ -37,6 +37,8 @@ const ids = {
   accessAB: '00000000-0000-4000-8000-000000003017',
   accessAShared: '00000000-0000-4000-8000-000000003018',
   accessBShared: '00000000-0000-4000-8000-000000003019',
+  accessSupervisorAA: '00000000-0000-4000-8000-000000003027',
+  accessSupervisorAB: '00000000-0000-4000-8000-000000003028',
   establishmentA: '00000000-0000-4000-8000-000000003020',
   establishmentB: '00000000-0000-4000-8000-000000003021',
   establishmentShared: '00000000-0000-4000-8000-000000003022',
@@ -50,7 +52,7 @@ async function cleanup() {
   await prisma.inspeccion.deleteMany({ where: { empresaId: { in: [ids.companyA, ids.companyB, ids.sharedCompany] } } });
   await prisma.checklist.deleteMany({ where: { id: { in: [ids.checklistA, ids.checklistB] } } });
   await prisma.accesoEstablecimiento.deleteMany({ where: { accesoEmpresaId: { in: [ids.accessAA, ids.accessAB, ids.accessAShared, ids.accessBShared] } } });
-  await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accessAA, ids.accessAB, ids.accessAShared, ids.accessBShared] } } });
+  await prisma.accesoEmpresa.deleteMany({ where: { id: { in: [ids.accessAA, ids.accessAB, ids.accessAShared, ids.accessBShared, ids.accessSupervisorAA, ids.accessSupervisorAB] } } });
   await prisma.organizacionMiembro.deleteMany({ where: { id: { in: [ids.memberAdminA, ids.memberTechA, ids.memberTechB] } } });
   await prisma.usuario.deleteMany({ where: { id: { in: [ids.adminA, ids.techA, ids.techB] } } });
   await prisma.establecimiento.deleteMany({ where: { id: { in: [ids.establishmentA, ids.establishmentB, ids.establishmentShared] } } });
@@ -97,6 +99,8 @@ async function main() {
       { id: ids.accessAB, organizacionEmpresaId: ids.relationAB, organizacionMiembroId: ids.memberTechA, organizacionId: ids.orgA, empresaId: ids.companyB, rol: Rol.TECNICO },
       { id: ids.accessAShared, organizacionEmpresaId: ids.relationAShared, organizacionMiembroId: ids.memberTechA, organizacionId: ids.orgA, empresaId: ids.sharedCompany, rol: Rol.TECNICO },
       { id: ids.accessBShared, organizacionEmpresaId: ids.relationBShared, organizacionMiembroId: ids.memberTechB, organizacionId: ids.orgB, empresaId: ids.sharedCompany, rol: Rol.TECNICO },
+      { id: ids.accessSupervisorAA, organizacionEmpresaId: ids.relationAA, organizacionMiembroId: ids.memberAdminA, organizacionId: ids.orgA, empresaId: ids.companyA, rol: Rol.SUPERVISOR },
+      { id: ids.accessSupervisorAB, organizacionEmpresaId: ids.relationAB, organizacionMiembroId: ids.memberAdminA, organizacionId: ids.orgA, empresaId: ids.companyB, rol: Rol.SUPERVISOR },
     ] });
     await prisma.accesoEstablecimiento.createMany({ data: [
       { accesoEmpresaId: ids.accessAA, establecimientoId: ids.establishmentA, empresaId: ids.companyA },
@@ -119,6 +123,10 @@ async function main() {
     const inspectionB = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establishmentB, sector: 'B' }, ids.techA, ids.companyB, ids.relationAB, Rol.TECNICO, ids.accessAB, ids.orgA);
     assert.equal(inspectionA.checklistId, ids.checklistA);
     assert.equal(inspectionB.checklistId, ids.checklistA);
+    const supervisorInspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establishmentA, sector: 'Supervisor A' }, ids.adminA, ids.companyA, ids.relationAA, Rol.SUPERVISOR, ids.accessSupervisorAA, ids.orgA);
+    const supervisorInspectionB = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establishmentB, sector: 'Supervisor B' }, ids.adminA, ids.companyB, ids.relationAB, Rol.SUPERVISOR, ids.accessSupervisorAB, ids.orgA);
+    assert.equal(supervisorInspectionA.checklistId, ids.checklistA, 'un supervisor debe usar la biblioteca de su consultora en A');
+    assert.equal(supervisorInspectionB.checklistId, ids.checklistA, 'un supervisor debe usar la biblioteca de su consultora en B');
     await assert.rejects(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establishmentA, sector: 'cruzado' }, ids.techA, ids.companyA, ids.relationAA, Rol.TECNICO, ids.accessAA, ids.orgA), /No tiene acceso/);
 
     const sharedA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establishmentShared, sector: 'compartido A' }, ids.techA, ids.sharedCompany, ids.relationAShared, Rol.TECNICO, ids.accessAShared, ids.orgA);

@@ -178,3 +178,73 @@ jobs:
           pnpm --filter seh-backend exec prisma migrate deploy
           pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-inspection-delegation-migration.ts
           pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-legacy-checklist-migration.ts
+
+  migration-ambiguous-ownership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seh_pr32_ambiguous
+          POSTGRES_PASSWORD: seh_pr32_ambiguous_password
+          POSTGRES_DB: seh_pr32_ambiguous
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd="pg_isready -U seh_pr32_ambiguous -d seh_pr32_ambiguous"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DATABASE_URL: postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter seh-backend exec prisma generate
+      - name: Apply migrations before checklist library
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/seh-pr32-ambiguous-migrations
+          mv backend/prisma/migrations/20261125120000_migrate_legacy_checklist_ids /tmp/seh-pr32-ambiguous-migrations/
+          mv backend/prisma/migrations/20261125150000_checklists_library_by_organization /tmp/seh-pr32-ambiguous-migrations/
+          pnpm --filter seh-backend exec prisma migrate deploy
+          mv /tmp/seh-pr32-ambiguous-migrations/20261125150000_checklists_library_by_organization backend/prisma/migrations/
+      - name: Seed ambiguous ownership fixture
+        run: psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --file=backend/integration/ambiguous-checklist-ownership-seed.sql
+      - name: Reject ambiguous checklist ownership atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --set ON_ERROR_STOP=1 --single-transaction --file=backend/prisma/migrations/20261125150000_checklists_library_by_organization/migration.sql
+          status=$?
+          set -e
+          if [[ "$status" -eq 0 ]]; then
+            echo "La migración debía rechazar la propiedad ambigua"
+            exit 1
+          fi
+          checklist_count="$(psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --tuples-only --no-align --command="SELECT count(*) FROM checklists WHERE id = '00000000-0000-0000-0000-000000000806';")"
+          if [[ "$checklist_count" != "1" ]]; then
+            echo "La reversión transaccional no preservó el checklist legacy"
+            exit 1
+          fi
+          organization_column_count="$(psql "postgresql://seh_pr32_ambiguous:seh_pr32_ambiguous_password@localhost:5434/seh_pr32_ambiguous" --tuples-only --no-align --command="SELECT count(*) FROM information_schema.columns WHERE table_name = 'checklists' AND column_name = 'organizacionId';")"
+          if [[ "$organization_column_count" != "0" ]]; then
+            echo "La migración dejó cambios parciales después de detectar la ambigüedad"
+            exit 1
+          fi
+          echo "La migración rechazó correctamente la propiedad ambigua (status $status)"
