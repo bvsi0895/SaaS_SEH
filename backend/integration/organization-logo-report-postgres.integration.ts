@@ -79,7 +79,7 @@ async function main() {
     const storedB = await administration.uploadLogo(ids.organizacionB, ids.adminB, { buffer: logo, originalname: 'logo-b.jpg', mimetype: 'image/jpeg' });
     assert.notEqual(storedA.logoUrl, storedB.logoUrl);
 
-    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Logo report checklist', empresaId: ids.empresa, organizacionEmpresaId: ids.contextoA, items: { create: { id: ids.checklistItem, descripcion: 'Item de evidencia', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Logo report checklist', organizacionId: ids.organizacionA, items: { create: { id: ids.checklistItem, descripcion: 'Item de evidencia', orden: 1 } } } });
     await prisma.inspeccion.create({ data: {
       id: ids.inspeccion, sector: 'Producción', estado: EstadoInspeccion.EN_PROGRESO, fechaHoraInicio: new Date('2026-11-19T12:00:00Z'), empresaId: ids.empresa, organizacionEmpresaId: ids.contextoA, checklistId: ids.checklist, creadoPorId: ids.adminA, asignadoAId: ids.adminA, usuarioId: ids.adminA, items: { create: { checklistItemId: ids.checklistItem } },
     } });

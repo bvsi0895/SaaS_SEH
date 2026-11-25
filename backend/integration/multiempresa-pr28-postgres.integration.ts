@@ -113,15 +113,15 @@ async function main() {
       { accesoEmpresaId: ids.accesoB, establecimientoId: ids.establecimientoB, empresaId: ids.empresa },
       { accesoEmpresaId: ids.accesoMultiB, establecimientoId: ids.establecimientoB, empresaId: ids.empresa },
     ] });
-    await prisma.checklist.create({ data: { id: ids.checklistA, nombre: 'PR28 checklist A', tipo: TipoChecklist.GENERAL, empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, items: { create: { id: ids.checklistItemA, descripcion: 'Item A', orden: 1 } } } });
-    await prisma.checklist.create({ data: { id: ids.checklistB, nombre: 'PR28 checklist B', tipo: TipoChecklist.GENERAL, empresaId: ids.empresa, organizacionEmpresaId: ids.relacionB, items: { create: { id: ids.checklistItemB, descripcion: 'Item B', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklistA, nombre: 'PR28 checklist A', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionA, items: { create: { id: ids.checklistItemA, descripcion: 'Item A', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklistB, nombre: 'PR28 checklist B', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionB, items: { create: { id: ids.checklistItemB, descripcion: 'Item B', orden: 1 } } } });
 
     const contextA = await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionA);
     const contextB = await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionB);
     assert.equal(contextA.rol, Rol.ADMIN_EMPRESA, 'el rol debe ser el del acceso A');
     assert.equal(contextB.rol, Rol.TECNICO, 'el rol debe ser el del acceso B, no Usuario.rol');
 
-    const sharedInspection = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector compartido B' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB);
+    const sharedInspection = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector compartido B' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB, ids.organizacionB);
     const sharedFinding = await findings.create({ inspeccionId: sharedInspection.id, titulo: 'Historial compartido', descripcion: 'Historial que debe conservarse al revocar A', nivelRiesgo: NivelRiesgo.BAJO, ubicacionTexto: 'Sector B' }, ids.empresa, ids.relacionB, ids.usuarioMulti, ids.accesoMultiB);
 
     const scopedBefore = await users.findOne(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA);
@@ -139,8 +139,8 @@ async function main() {
     await assert.rejects(users.update(ids.usuarioMulti, { nombre: 'Identidad alterada' }, ids.empresa, ids.organizacionA, ids.relacionA), /identidad global/i);
     await assert.rejects(users.adminChangePassword(ids.usuarioMulti, ids.empresa, { newPassword: 'AnotherPassword123!' }, ids.organizacionA, ids.relacionA), /bloqueado|recuperación segura/i);
     await assert.rejects(users.remove(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA), /no se permite eliminar/i);
-    const inspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establecimientoA, sector: 'Sector A' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA);
-    const inspectionB = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector B' }, ids.usuarioB, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoB);
+    const inspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establecimientoA, sector: 'Sector A' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA, ids.organizacionA);
+    const inspectionB = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector B' }, ids.usuarioB, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoB, ids.organizacionB);
     assert.equal(inspectionA.estado, EstadoInspeccion.EN_PROGRESO);
     assert.equal(inspectionB.estado, EstadoInspeccion.EN_PROGRESO);
 

@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { EstadoRelacionEmpresa, Rol } from '@prisma/client';
+import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface TenantContext {
@@ -10,6 +10,8 @@ export interface TenantContext {
   accesoEmpresaId: string;
   /** Rol operativo del acceso activo; nunca el rol legacy de Usuario. */
   rol?: Rol;
+  /** Rol dentro de la consultora, usado por la biblioteca de checklists. */
+  rolOrganizacion?: RolOrganizacion;
   organizacionNombre?: string;
   empresaNombre?: string;
 }
@@ -32,6 +34,7 @@ export class TenancyService {
       select: {
         id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
         rol: true,
+        organizacionMiembro: { select: { rol: true } },
         organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
       },
       orderBy: { organizacionEmpresaId: 'asc' },
@@ -45,6 +48,7 @@ export class TenancyService {
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
       rol: access.rol,
+      rolOrganizacion: access.organizacionMiembro?.rol,
       organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
       empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     };
@@ -60,6 +64,7 @@ export class TenancyService {
       select: {
         id: true, organizacionId: true, empresaId: true, organizacionEmpresaId: true, organizacionMiembroId: true,
         rol: true,
+        organizacionMiembro: { select: { rol: true } },
         organizacionEmpresa: { select: { organizacion: { select: { nombre: true } }, empresa: { select: { nombre: true } } } },
       },
       orderBy: { organizacionEmpresaId: 'asc' },
@@ -71,6 +76,7 @@ export class TenancyService {
       organizacionMiembroId: access.organizacionMiembroId,
       accesoEmpresaId: access.id,
       rol: access.rol,
+      rolOrganizacion: access.organizacionMiembro?.rol,
       organizacionNombre: access.organizacionEmpresa?.organizacion?.nombre,
       empresaNombre: access.organizacionEmpresa?.empresa?.nombre,
     }));

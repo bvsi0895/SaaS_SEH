@@ -36,11 +36,11 @@ async function ensureEstablishment(empresaId: string, codigo: string, nombre: st
   });
 }
 
-async function ensureChecklist(id: string, relationId: string, empresaId: string, nombre: string, tipo: TipoChecklist, descriptions: string[]) {
+async function ensureChecklist(id: string, organizacionId: string, nombre: string, tipo: TipoChecklist, descriptions: string[]) {
   const checklist = await prisma.checklist.upsert({
     where: { id },
-    update: { nombre, tipo, empresaId, organizacionEmpresaId: relationId, activo: true },
-    create: { id, nombre, tipo, empresaId, organizacionEmpresaId: relationId, activo: true },
+    update: { nombre, tipo, organizacionId, activo: true },
+    create: { id, nombre, tipo, organizacionId, activo: true },
   });
   for (const [index, descripcion] of descriptions.entries()) {
     const existing = await prisma.checklistItem.findFirst({ where: { checklistId: checklist.id, orden: index + 1 } });
@@ -56,6 +56,7 @@ async function ensureInspection(id: string, relationId: string, empresaId: strin
   return prisma.inspeccion.create({
     data: {
       id, empresaId, organizacionEmpresaId: relationId, establecimientoId: establishmentId, checklistId, usuarioId,
+      creadoPorId: usuarioId, asignadoAId: usuarioId,
       sector, descripcion: title, estado: EstadoInspeccion.COMPLETADA,
       fechaHoraInicio: new Date('2026-10-15T09:00:00Z'), fechaHoraFin: new Date('2026-10-15T10:00:00Z'),
       items: { create: items.map((item, index) => ({ checklistItemId: item.id, cumplimiento: index === 1 ? CumplimientoItem.NO_CUMPLE : CumplimientoItem.CUMPLE })) },
@@ -103,8 +104,8 @@ async function main() {
   await prisma.accesoEstablecimiento.upsert({ where: { accesoEmpresaId_establecimientoId: { accesoEmpresaId: accessA.id, establecimientoId: plantA.id } }, update: {}, create: { accesoEmpresaId: accessA.id, establecimientoId: plantA.id, empresaId: companyA.id } });
   await prisma.accesoEstablecimiento.upsert({ where: { accesoEmpresaId_establecimientoId: { accesoEmpresaId: accessB.id, establecimientoId: plantB.id } }, update: {}, create: { accesoEmpresaId: accessB.id, establecimientoId: plantB.id, empresaId: companyB.id } });
 
-  const checklistA = await ensureChecklist('00000000-0000-4000-8000-000000000101', relationA.id, companyA.id, 'Checklist Demo de Seguridad', TipoChecklist.GENERAL, ['Extintores vigentes', 'Señalización visible', 'Rutas despejadas']);
-  const checklistB = await ensureChecklist('00000000-0000-4000-8000-000000000102', relationB.id, companyB.id, 'Checklist Demo de Logística', TipoChecklist.MAQUINARIA, ['Protecciones de máquinas', 'Orden del sector', 'EPP disponible']);
+  const checklistA = await ensureChecklist('00000000-0000-4000-8000-000000000101', organizacion.id, 'Checklist Demo de Seguridad', TipoChecklist.GENERAL, ['Extintores vigentes', 'Señalización visible', 'Rutas despejadas']);
+  const checklistB = await ensureChecklist('00000000-0000-4000-8000-000000000102', organizacion.id, 'Checklist Demo de Logística', TipoChecklist.MAQUINARIA, ['Protecciones de máquinas', 'Orden del sector', 'EPP disponible']);
   const inspectionA = await ensureInspection('demo-online-inspeccion-norte', relationA.id, companyA.id, plantA.id, checklistA.id, technicianA.id, 'Producción', 'Inspección demo de planta norte');
   const inspectionB = await ensureInspection('demo-online-inspeccion-sur', relationB.id, companyB.id, plantB.id, checklistB.id, technicianB.id, 'Carga', 'Inspección demo de centro sur');
   const findingA = await prisma.hallazgo.upsert({ where: { id: 'demo-online-hallazgo-norte' }, update: {}, create: { id: 'demo-online-hallazgo-norte', titulo: 'Señalización demo pendiente', descripcion: 'Hallazgo ficticio para la demostración.', nivelRiesgo: NivelRiesgo.MEDIO, ubicacionTexto: 'Sector producción', inspeccionId: inspectionA.id } });

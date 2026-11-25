@@ -122,10 +122,6 @@ async function main() {
       accessesCreated += 1;
     }
 
-    await prisma.checklist.updateMany({
-      where: { empresaId: empresa.id, organizacionEmpresaId: null },
-      data: { organizacionEmpresaId: link.id },
-    });
     await prisma.inspeccion.updateMany({
       where: { empresaId: empresa.id, organizacionEmpresaId: null },
       data: { organizacionEmpresaId: link.id, establecimientoId: establishmentId },
@@ -137,7 +133,7 @@ async function main() {
   }
 
   const [checklists, inspecciones, acciones] = await Promise.all([
-    prisma.checklist.count({ where: { organizacionEmpresaId: { not: null } } }),
+    prisma.checklist.count(),
     prisma.inspeccion.count({ where: { organizacionEmpresaId: { not: null } } }),
     prisma.accionCorrectiva.count({ where: { organizacionEmpresaId: { not: null } } }),
   ]);

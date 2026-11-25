@@ -43,7 +43,7 @@ export default function ChecklistDetailPage() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
-  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
+  const canManageChecklists = user?.rolOrganizacion === 'OWNER' || user?.rolOrganizacion === 'ADMIN_ORGANIZACION';
 
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editItemDialogOpen, setEditItemDialogOpen] = useState(false);

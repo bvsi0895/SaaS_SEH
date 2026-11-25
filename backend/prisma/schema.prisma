@@ -109,7 +109,6 @@ model Empresa {
 
   // Relaciones
   usuarios            Usuario[]
-  checklists          Checklist[]
   inspecciones        Inspeccion[]
   accionesCorrectivas AccionCorrectiva[]
   organizaciones      OrganizacionEmpresa[]
@@ -164,17 +163,16 @@ model Checklist {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  // Relación con empresa
-  empresaId             String
-  empresa               Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  organizacionEmpresaId String?
-  organizacionEmpresa   OrganizacionEmpresa? @relation(fields: [organizacionEmpresaId], references: [id])
+  // Biblioteca privada de la consultora. Las empresas cliente sólo son el
+  // contexto operativo de una inspección, no la propiedad del checklist.
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   // Relaciones
   items        ChecklistItem[]
   inspecciones Inspeccion[]
 
-  @@index([empresaId])
+  @@index([organizacionId])
   @@index([tipo])
   @@map("checklists")
 }
@@ -416,6 +414,7 @@ model Organizacion {
   activa        Boolean               @default(true)
   miembros      OrganizacionMiembro[]
   empresas      OrganizacionEmpresa[]
+  checklists    Checklist[]
   creadaEn      DateTime              @default(now())
   actualizadaEn DateTime              @updatedAt
 
@@ -449,7 +448,6 @@ model OrganizacionEmpresa {
   organizacion        Organizacion          @relation(fields: [organizacionId], references: [id])
   empresa             Empresa               @relation(fields: [empresaId], references: [id])
   accesos             AccesoEmpresa[]
-  checklists          Checklist[]
   inspecciones        Inspeccion[]
   accionesCorrectivas AccionCorrectiva[]
 

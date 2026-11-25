@@ -132,8 +132,9 @@ export class InspeccionesController {
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
     @CurrentUser('rol') currentUserRole: Rol,
     @CurrentUser('accesoEmpresaId') accesoEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId, organizacionEmpresaId, currentUserRole, accesoEmpresaId);
+    return this.inspeccionesService.create(createInspeccionDto, usuarioId, empresaId, organizacionEmpresaId, currentUserRole, accesoEmpresaId, organizacionId);
   }
 
   @Post(':id/iniciar')

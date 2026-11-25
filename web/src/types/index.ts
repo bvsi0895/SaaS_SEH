@@ -30,6 +30,7 @@ export interface Usuario {
   updatedAt: string;
   organizacionId?: string;
   organizacionEmpresaId?: string;
+  rolOrganizacion?: RolOrganizacion;
 }
 
 export interface ContextoAutorizado {
@@ -39,6 +40,7 @@ export interface ContextoAutorizado {
   organizacionMiembroId: string;
   accesoEmpresaId: string;
   rol: Rol;
+  rolOrganizacion?: RolOrganizacion;
   organizacionNombre?: string;
   empresaNombre?: string;
 }
@@ -126,7 +128,7 @@ export interface Checklist {
   descripcion?: string;
   tipo: TipoChecklist;
   activo: boolean;
-  empresaId: string;
+  organizacionId: string;
   items?: ChecklistItem[];
   createdAt: string;
   updatedAt: string;

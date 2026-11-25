@@ -28,8 +28,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Rol, TipoChecklist } from '@prisma/client';
+import { TipoChecklist } from '@prisma/client';
 
 @ApiTags('checklists')
 @ApiBearerAuth()
@@ -39,17 +38,16 @@ export class ChecklistsController {
   constructor(private readonly checklistsService: ChecklistsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar checklists de la empresa' })
+  @ApiOperation({ summary: 'Listar biblioteca de checklists de la consultora' })
   @ApiQuery({ name: 'tipo', enum: TipoChecklist, required: false })
   @ApiQuery({ name: 'activo', type: Boolean, required: false })
   @ApiResponse({ status: 200, description: 'Lista de checklists' })
   async findAll(
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
     @Query('tipo') tipo?: TipoChecklist,
     @Query('activo') activo?: boolean,
   ) {
-    return this.checklistsService.findAll(empresaId, { tipo, activo }, organizacionEmpresaId);
+    return this.checklistsService.findAll(organizacionId, { tipo, activo });
   }
 
   @Get(':id')
@@ -58,122 +56,112 @@ export class ChecklistsController {
   @ApiResponse({ status: 404, description: 'Checklist no encontrado' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.checklistsService.findOne(id, empresaId, organizacionEmpresaId);
+    return this.checklistsService.findOne(id, organizacionId);
   }
 
   @Post()
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Crear nuevo checklist' })
   @ApiResponse({ status: 201, description: 'Checklist creado' })
   async create(
     @Body() createChecklistDto: CreateChecklistDto,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.create(empresaId, createChecklistDto, organizacionEmpresaId);
+    return this.checklistsService.create(organizacionId, usuarioId, createChecklistDto);
   }
 
   @Put(':id')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Actualizar checklist' })
   @ApiResponse({ status: 200, description: 'Checklist actualizado' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateChecklistDto: UpdateChecklistDto,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.update(id, updateChecklistDto, empresaId, organizacionEmpresaId);
+    return this.checklistsService.update(id, updateChecklistDto, organizacionId, usuarioId);
   }
 
   @Post(':id/items')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Agregar item a checklist' })
   @ApiResponse({ status: 201, description: 'Item agregado' })
   async addItem(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() createItemDto: CreateChecklistItemDto,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.addItem(id, createItemDto, empresaId, organizacionEmpresaId);
+    return this.checklistsService.addItem(id, createItemDto, organizacionId, usuarioId);
   }
 
   @Put('items/:itemId')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Actualizar item de checklist' })
   @ApiResponse({ status: 200, description: 'Item actualizado' })
   async updateItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() updateItemDto: UpdateChecklistItemDto,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.updateItem(itemId, updateItemDto, empresaId, organizacionEmpresaId);
+    return this.checklistsService.updateItem(itemId, updateItemDto, organizacionId, usuarioId);
   }
 
   @Delete('items/:itemId')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Eliminar item de checklist' })
   @ApiResponse({ status: 200, description: 'Item eliminado' })
   @ApiResponse({ status: 400, description: 'Item ya usado en inspecciones' })
   async removeItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.removeItem(itemId, empresaId, organizacionEmpresaId);
+    return this.checklistsService.removeItem(itemId, organizacionId, usuarioId);
   }
 
   @Post(':id/duplicate')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Duplicar checklist' })
   @ApiResponse({ status: 201, description: 'Checklist duplicado' })
   async duplicate(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.duplicate(id, empresaId, organizacionEmpresaId);
+    return this.checklistsService.duplicate(id, organizacionId, usuarioId);
   }
 
   @Patch(':id/deactivate')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Desactivar checklist' })
   @ApiResponse({ status: 200, description: 'Checklist desactivado' })
   async deactivate(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.deactivate(id, empresaId, organizacionEmpresaId);
+    return this.checklistsService.deactivate(id, organizacionId, usuarioId);
   }
 
   @Patch(':id/activate')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Reactivar checklist' })
   @ApiResponse({ status: 200, description: 'Checklist reactivado' })
   async activate(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.activate(id, empresaId, organizacionEmpresaId);
+    return this.checklistsService.activate(id, organizacionId, usuarioId);
   }
 
   @Patch(':id/reorder')
-  @Roles(Rol.ADMIN_EMPRESA)
   @ApiOperation({ summary: 'Reordenar items del checklist' })
   @ApiResponse({ status: 200, description: 'Items reordenados' })
   async reorderItems(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() itemOrders: { id: string; orden: number }[],
-    @CurrentUser('empresaId') empresaId: string,
-    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
   ) {
-    return this.checklistsService.reorderItems(id, itemOrders, empresaId, organizacionEmpresaId);
+    return this.checklistsService.reorderItems(id, itemOrders, organizacionId, usuarioId);
   }
 }

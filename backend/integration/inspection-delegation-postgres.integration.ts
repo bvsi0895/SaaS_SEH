@@ -79,14 +79,14 @@ async function main() {
       { accesoEmpresaId: ids.contextAccessA, establecimientoId: ids.establecimiento, empresaId: ids.empresa },
       { accesoEmpresaId: ids.contextAccessB, establecimientoId: ids.establecimiento, empresaId: ids.empresa },
     ] });
-    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Delegation checklist', empresaId: ids.empresa, organizacionEmpresaId: ids.contexto, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Delegation checklist', organizacionId: ids.organizacion, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
 
-    const adminDelegated = await service.create({ checklistId: ids.checklist, sector: 'Admin sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoA }, ids.admin, ids.empresa, ids.contexto, Rol.ADMIN_EMPRESA, ids.contextAccessAdmin);
+    const adminDelegated = await service.create({ checklistId: ids.checklist, sector: 'Admin sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoA }, ids.admin, ids.empresa, ids.contexto, Rol.ADMIN_EMPRESA, ids.contextAccessAdmin, ids.organizacion);
     assert.equal(adminDelegated.estado, EstadoInspeccion.PENDIENTE, 'admin delegation must remain pending');
     assert.equal(adminDelegated.fechaHoraInicio, null, 'pending delegation must not have a real start date');
-    const supervisorDelegated = await service.create({ checklistId: ids.checklist, sector: 'Supervisor sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoB }, ids.supervisor, ids.empresa, ids.contexto, Rol.SUPERVISOR, ids.contextAccessSupervisor);
+    const supervisorDelegated = await service.create({ checklistId: ids.checklist, sector: 'Supervisor sector', establecimientoId: ids.establecimiento, asignadoAId: ids.tecnicoB }, ids.supervisor, ids.empresa, ids.contexto, Rol.SUPERVISOR, ids.contextAccessSupervisor, ids.organizacion);
     assert.equal(supervisorDelegated.estado, EstadoInspeccion.PENDIENTE, 'supervisor delegation must remain pending');
-    const technicianOwn = await service.create({ checklistId: ids.checklist, sector: 'Own sector', establecimientoId: ids.establecimiento }, ids.tecnicoA, ids.empresa, ids.contexto, Rol.TECNICO, ids.contextAccessA);
+    const technicianOwn = await service.create({ checklistId: ids.checklist, sector: 'Own sector', establecimientoId: ids.establecimiento }, ids.tecnicoA, ids.empresa, ids.contexto, Rol.TECNICO, ids.contextAccessA, ids.organizacion);
     assert.equal(technicianOwn.asignadoAId, ids.tecnicoA);
     assert.equal(technicianOwn.estado, EstadoInspeccion.EN_PROGRESO);
 

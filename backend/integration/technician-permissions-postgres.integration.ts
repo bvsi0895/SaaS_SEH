@@ -88,7 +88,7 @@ async function main() {
       { id: ids.accesoB, organizacionEmpresaId: ids.relacionB, organizacionMiembroId: ids.membresiaB, organizacionId: ids.organizacionB, empresaId: ids.empresa, rol: Rol.TECNICO },
     ] });
     await prisma.accesoEstablecimiento.create({ data: { accesoEmpresaId: ids.accesoA, establecimientoId: ids.establecimiento, empresaId: ids.empresa } });
-    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Permissions checklist', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Permissions checklist', organizacionId: ids.organizacionA, items: { create: { id: ids.checklistItem, descripcion: 'Item', orden: 1 } } } });
     await prisma.inspeccion.createMany({ data: [
       { id: ids.inspeccionA, sector: 'A', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, establecimientoId: ids.establecimiento, checklistId: ids.checklist, usuarioId: ids.usuarioA, creadoPorId: ids.usuarioA, asignadoAId: ids.usuarioA, estado: EstadoInspeccion.EN_PROGRESO },
       { id: ids.inspeccionB, sector: 'B', empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, establecimientoId: ids.establecimiento, checklistId: ids.checklist, usuarioId: ids.usuarioB, creadoPorId: ids.usuarioB, asignadoAId: ids.usuarioB, estado: EstadoInspeccion.EN_PROGRESO },

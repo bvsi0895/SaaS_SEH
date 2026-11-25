@@ -17,9 +17,9 @@ test('backend scopes technicians and protects assigned actions/findings', async 
   assert.match(inspections, /asignadoAId: currentUserRole === Rol\.TECNICO \? currentUserId/);
   assert.match(actions, /currentUserRole === Rol\.TECNICO \? currentUserId : undefined/);
   assert.match(findings, /accionesCorrectivas: \{ some: \{ responsableId: usuarioId \} \}/);
-  assert.match(checklists, /@Roles\(Rol\.ADMIN_EMPRESA\)/);
-  assert.match(checklistPage, /canManageChecklists = user\?\.rol === 'ADMIN_EMPRESA'/);
-  assert.match(checklistDetail, /canManageChecklists = user\?\.rol === 'ADMIN_EMPRESA'/);
+  assert.match(checklists, /@CurrentUser\('organizacionId'\) organizacionId/);
+  assert.match(checklistPage, /canManageChecklists = user\?\.rolOrganizacion === 'OWNER' \|\| user\?\.rolOrganizacion === 'ADMIN_ORGANIZACION'/);
+  assert.match(checklistDetail, /canManageChecklists = user\?\.rolOrganizacion === 'OWNER' \|\| user\?\.rolOrganizacion === 'ADMIN_ORGANIZACION'/);
 });
 
 test('frontend uses technician endpoints and valid overdue filters', async () => {

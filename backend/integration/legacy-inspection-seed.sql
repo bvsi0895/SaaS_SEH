@@ -3,6 +3,12 @@
 INSERT INTO "empresas" ("id", "nombre", "updatedAt")
 VALUES ('00000000-0000-0000-0000-000000000601', 'Legacy migration company', CURRENT_TIMESTAMP);
 
+INSERT INTO "organizaciones" ("id", "nombre", "tipo", "actualizadaEn")
+VALUES ('00000000-0000-0000-0000-000000000609', 'Legacy migration consultancy', 'CONSULTORA', CURRENT_TIMESTAMP);
+
+INSERT INTO "organizacion_empresas" ("id", "organizacionId", "empresaId", "actualizadaEn")
+VALUES ('00000000-0000-0000-0000-000000000610', '00000000-0000-0000-0000-000000000609', '00000000-0000-0000-0000-000000000601', CURRENT_TIMESTAMP);
+
 INSERT INTO "usuarios" ("id", "email", "password", "nombre", "apellido", "rol", "empresaId", "updatedAt")
 VALUES ('00000000-0000-0000-0000-000000000602', 'legacy-tech@seh.test', 'fixture', 'Legacy', 'Technician', 'TECNICO', '00000000-0000-0000-0000-000000000601', CURRENT_TIMESTAMP);
 
