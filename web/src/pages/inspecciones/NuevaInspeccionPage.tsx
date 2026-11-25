@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { Box, Card, CardContent, TextField, Button, MenuItem, Grid, Typography, Alert } from '@mui/material';
 import { checklistsApi } from '../../api/checklists';
 import { inspeccionesApi, CreateInspeccionDto } from '../../api/inspecciones';
@@ -32,7 +32,9 @@ export default function NuevaInspeccionPage() {
     queryFn: usuariosApi.getTecnicos,
     enabled: !isTechnician,
   });
-  const { register, handleSubmit, resetField, formState: { errors } } = useForm<CreateInspeccionDto>();
+  const { control, register, handleSubmit, resetField, formState: { errors } } = useForm<CreateInspeccionDto>({
+    defaultValues: { checklistId: '', asignadoAId: '' },
+  });
 
   useEffect(() => {
     resetField('checklistId');
@@ -97,12 +99,28 @@ export default function NuevaInspeccionPage() {
               <Grid item xs={12}><Typography variant="h6" gutterBottom>Datos de la inspección</Typography></Grid>
               <Grid item xs={12} md={6}><EstablishmentSelector value={establecimientoId} onChange={setEstablecimientoId} /></Grid>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth select label="Checklist" error={!!errors.checklistId} helperText={checklistHelperText} disabled={checklistsLoading || !activeContextId || validChecklists.length === 0} {...register('checklistId', {
-                  required: 'Selecciona un checklist',
-                  validate: (value) => validChecklists.some((checklist) => checklist.id === value) || 'Seleccioná un checklist válido del contexto activo',
-                })}>
-                  {validChecklists.map((checklist) => <MenuItem key={checklist.id} value={checklist.id}>{checklist.nombre} ({checklist.tipo})</MenuItem>)}
-                </TextField>
+                <Controller
+                  name="checklistId"
+                  control={control}
+                  rules={{
+                    required: 'Selecciona un checklist',
+                    validate: (value) => validChecklists.some((checklist) => checklist.id === value) || 'Seleccioná un checklist válido del contexto activo',
+                  }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      value={field.value ?? ''}
+                      fullWidth
+                      select
+                      label="Checklist"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message || checklistHelperText}
+                      disabled={checklistsLoading || !activeContextId || validChecklists.length === 0}
+                    >
+                      {validChecklists.map((checklist) => <MenuItem key={checklist.id} value={checklist.id}>{checklist.nombre} ({checklist.tipo})</MenuItem>)}
+                    </TextField>
+                  )}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Sector / área" error={!!errors.sector} helperText={errors.sector?.message} {...register('sector', { required: 'El sector es requerido', minLength: { value: 3, message: 'El sector debe tener al menos 3 caracteres' } })} />
@@ -112,10 +130,24 @@ export default function NuevaInspeccionPage() {
               </Grid>
               {!isTechnician && <>
                 <Grid item xs={12} md={6}>
-                  <TextField fullWidth select label="Técnico responsable (opcional)" disabled={tecnicosLoading} helperText={tecnicosLoading ? 'Cargando técnicos autorizados...' : 'Si no seleccionas uno, se asignará al creador'} {...register('asignadoAId')}>
-                    <MenuItem value="">Asignarme a mí mismo</MenuItem>
-                    {tecnicos.filter((tecnico) => tecnico.activo).map((tecnico) => <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>)}
-                  </TextField>
+                  <Controller
+                    name="asignadoAId"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        value={field.value ?? ''}
+                        fullWidth
+                        select
+                        label="Técnico responsable (opcional)"
+                        disabled={tecnicosLoading}
+                        helperText={tecnicosLoading ? 'Cargando técnicos autorizados...' : 'Si no seleccionas uno, se asignará al creador'}
+                      >
+                        <MenuItem value="">Asignarme a mí mismo</MenuItem>
+                        {tecnicos.filter((tecnico) => tecnico.activo).map((tecnico) => <MenuItem key={tecnico.id} value={tecnico.id}>{tecnico.nombre} {tecnico.apellido}</MenuItem>)}
+                      </TextField>
+                    )}
+                  />
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField fullWidth type="date" label="Fecha programada (opcional)" InputLabelProps={{ shrink: true }} {...register('fechaProgramada')} />

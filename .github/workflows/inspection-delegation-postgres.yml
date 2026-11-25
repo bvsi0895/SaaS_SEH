@@ -158,6 +158,7 @@ jobs:
           mv backend/prisma/migrations/20261117090000_add_pending_inspection_status /tmp/seh-pr12-new-migrations/
           mv backend/prisma/migrations/20261117100000_inspection_delegation /tmp/seh-pr12-new-migrations/
           mv backend/prisma/migrations/20261117110000_pending_inspection_start_date /tmp/seh-pr12-new-migrations/
+          mv backend/prisma/migrations/20261125120000_migrate_legacy_checklist_ids /tmp/seh-pr12-new-migrations/
           pnpm --filter seh-backend exec prisma migrate deploy
           mv /tmp/seh-pr12-new-migrations/20261117090000_add_pending_inspection_status backend/prisma/migrations/
           mv /tmp/seh-pr12-new-migrations/20261117100000_inspection_delegation backend/prisma/migrations/
@@ -167,4 +168,8 @@ jobs:
       - name: Apply delegation migrations and verify preservation
         run: |
           pnpm --filter seh-backend exec prisma migrate deploy
+          psql "postgresql://seh_pr12_migration:seh_pr12_migration_password@localhost:5433/seh_pr12_migration" --file=backend/integration/legacy-checklist-migration-seed.sql
+          mv /tmp/seh-pr12-new-migrations/20261125120000_migrate_legacy_checklist_ids backend/prisma/migrations/
+          pnpm --filter seh-backend exec prisma migrate deploy
           pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-inspection-delegation-migration.ts
+          pnpm --filter seh-backend exec ts-node --transpile-only integration/verify-legacy-checklist-migration.ts

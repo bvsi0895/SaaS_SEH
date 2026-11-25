@@ -9,6 +9,8 @@ test('new inspection form resets context-dependent selections and preserves the 
 
   assert.match(source, /useEffect\(\(\) => \{[\s\S]*resetField\('checklistId'\)[\s\S]*resetField\('asignadoAId'\)[\s\S]*setEstablecimientoId\(''\)/);
   assert.match(source, /\}, \[activeContextId, resetField\]\);/);
+  assert.match(source, /Controller[\s\S]*name="checklistId"[\s\S]*value=\{field\.value \?\? ''\}/);
+  assert.match(source, /Controller[\s\S]*name="asignadoAId"[\s\S]*value=\{field\.value \?\? ''\}/);
   assert.match(source, /const validChecklists = \(checklists \?\? \[\]\)\.filter\(\(checklist\) => isUuidV4\(checklist\.id\)\)/);
   assert.match(source, /selectedChecklist = validChecklists\.find/);
   assert.match(source, /checklistId: selectedChecklist\.id/);
@@ -29,6 +31,7 @@ test('demo seeds and the data repair migration use UUID v4 checklist identifiers
   assert.match(migration, /'demo-online-checklist-norte' THEN '00000000-0000-4000-8000-000000000101'/);
   assert.match(migration, /'demo-online-checklist-sur' THEN '00000000-0000-4000-8000-000000000102'/);
   assert.match(migration, /'checklist-epp' THEN '00000000-0000-4000-8000-000000000113'/);
+  assert.match(migration, /RAISE EXCEPTION 'Colisión de checklist legacy/);
   assert.match(uuid, /4\[0-9a-f\]\{3\}-\[89ab\]/i);
 });
 

@@ -211,13 +211,26 @@ test.describe('PR #21 sincronización de consultas', () => {
     await page.getByRole('option', { name: 'Planta Norte' }).click();
     await page.getByLabel('Checklist').click();
     await page.getByRole('option', { name: /Checklist General/ }).click();
+    await page.getByLabel('Técnico responsable (opcional)').click();
+    await page.getByRole('option', { name: /Admin E2E/ }).click();
     await page.getByLabel('Sector / área').fill('Sector conservado');
 
     await page.getByLabel('Contexto activo').click();
     await page.getByRole('option', { name: /Consultora B.*Empresa B/ }).click();
     await expect(page.locator('#establishment-filter')).toHaveText('');
     await expect(page.getByRole('combobox', { name: 'Checklist' })).toHaveText('');
+    await expect(page.getByRole('combobox', { name: 'Técnico responsable (opcional)' })).toHaveText('Asignarme a mí mismo');
     await expect(page.getByLabel('Sector / área')).toHaveValue('Sector conservado');
+
+    await page.getByLabel('Contexto activo').click();
+    await page.getByRole('option', { name: /Consultora A.*Empresa A/ }).click();
+    await expect(page.locator('#establishment-filter')).toHaveText('');
+    await expect(page.getByRole('combobox', { name: 'Checklist' })).toHaveText('');
+    await expect(page.getByRole('combobox', { name: 'Técnico responsable (opcional)' })).toHaveText('Asignarme a mí mismo');
+
+    await page.getByLabel('Contexto activo').click();
+    await page.getByRole('option', { name: /Consultora B.*Empresa B/ }).click();
+    await expect(page.getByRole('combobox', { name: 'Checklist' })).toHaveText('');
 
     await page.getByLabel('Establecimiento').click();
     await page.getByRole('option', { name: 'Planta Sur' }).click();
