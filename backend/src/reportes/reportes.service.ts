@@ -57,11 +57,11 @@ export class ReportesService {
   }
 
   private async loadReportPhotos(
-    inspections: Array<{ sector: string; establecimiento?: { nombre: string } | null; hallazgos: Array<{ id: string; titulo: string; createdAt: Date; fotosUrls: string | null }> }>,
+    inspections: Array<{ sector: string; establecimiento?: { nombre: string } | null; hallazgos: Array<{ id: string; titulo: string; descripcion: string; createdAt: Date; fotosUrls: string | null }> }>,
     empresaId: string,
     organizacionEmpresaId: string,
-  ): Promise<{ fotos: Array<{ buffer: Buffer; nombre: string }>; incidencias: number }> {
-    const fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }> = [];
+  ): Promise<{ fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; descripcion?: string | null; hallazgoId?: string; hallazgoTitulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }>; incidencias: number }> {
+    const fotos: Array<{ buffer: Buffer; nombre: string; titulo?: string; descripcion?: string | null; hallazgoId?: string; hallazgoTitulo?: string; sector?: string | null; establecimiento?: string | null; fecha?: Date }> = [];
     let incidencias = 0;
     let totalBytes = 0;
     const maxPhotos = 12;
@@ -85,6 +85,9 @@ export class ReportesService {
               buffer,
               nombre: 'evidencia fotográfica',
               titulo: hallazgo.titulo,
+              descripcion: hallazgo.descripcion,
+              hallazgoId: hallazgo.id,
+              hallazgoTitulo: hallazgo.titulo,
               sector: inspection.sector,
               establecimiento: inspection.establecimiento?.nombre,
               fecha: hallazgo.createdAt,
@@ -309,8 +312,10 @@ export class ReportesService {
             select: {
               id: true,
               titulo: true,
+              descripcion: true,
               nivelRiesgo: true,
               estado: true,
+              ubicacionTexto: true,
               fechaResolucion: true,
               descripcionSolucion: true,
               responsableResolucionTexto: true,
@@ -343,8 +348,10 @@ export class ReportesService {
     });
     const hallazgos = inspections.flatMap((inspection) => inspection.hallazgos.map((hallazgo) => ({
       titulo: hallazgo.titulo,
+      descripcion: hallazgo.descripcion,
       nivel: hallazgo.nivelRiesgo,
       estado: hallazgo.estado,
+      ubicacion: hallazgo.ubicacionTexto,
       fechaResolucion: hallazgo.fechaResolucion,
       descripcionSolucion: hallazgo.descripcionSolucion,
       responsableResolucion: hallazgo.responsableResolucion
@@ -364,6 +371,7 @@ export class ReportesService {
       empresa: relation.empresa,
       establecimientos: establishments,
       periodo: { desde: params.fechaDesde, hasta: params.fechaHasta },
+      fechaCorte: params.fechaHasta,
       responsable: primaryResponsible,
       inspecciones: inspections.map((inspection) => ({
         fecha: inspection.fechaHoraInicio!,
@@ -555,4 +563,5 @@ export class ReportesService {
     };
   }
 }
+
 
