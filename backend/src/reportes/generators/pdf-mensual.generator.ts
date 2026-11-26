@@ -368,13 +368,21 @@ export class PDFMensualGenerator {
     ];
     this.drawTableHeader(doc, columns);
     actions.forEach((action, index) => {
-      const values = [this.actionState(action.estado), action.descripcion, this.date(action.fechaCompromiso), action.establecimiento || 'Sin establecimiento'];
-      const height = Math.max(...values.map((value, columnIndex) => this.measure(doc, value, columns[columnIndex].width - 12, 8.2, columnIndex === 1))) + 12;
-      if (doc.y + height > this.bottom) {
-        this.continueTable(doc, data, 'ACCIONES CORRECTIVAS');
-        this.drawTableHeader(doc, columns);
-      }
-      this.drawTableRow(doc, columns, values, index % 2 === 0, height, [false, false, false, false]);
+      const descriptionFragments = this.splitTextByHeight(doc, action.descripcion, columns[1].width - 12, 8.2, 560);
+      descriptionFragments.forEach((description, fragmentIndex) => {
+        const values = [
+          fragmentIndex === 0 ? this.actionState(action.estado) : '',
+          description,
+          fragmentIndex === 0 ? this.date(action.fechaCompromiso) : '',
+          fragmentIndex === 0 ? (action.establecimiento || 'Sin establecimiento') : '',
+        ];
+        const height = Math.max(...values.map((value, columnIndex) => this.measure(doc, value, columns[columnIndex].width - 12, 8.2, columnIndex === 1))) + 12;
+        if (doc.y + height > this.bottom) {
+          this.continueTable(doc, data, 'ACCIONES CORRECTIVAS');
+          this.drawTableHeader(doc, columns);
+        }
+        this.drawTableRow(doc, columns, values, index % 2 === 0, height, [false, false, false, false]);
+      });
     });
     doc.moveDown(0.7);
   }
@@ -402,6 +410,48 @@ export class PDFMensualGenerator {
       x += columns[index].width;
     });
     doc.y = y + height;
+  }
+
+  private splitTextByHeight(doc: PdfDocument, value: string, width: number, fontSize: number, maxHeight: number): string[] {
+    const words = this.display(value).trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [''];
+    const fragments: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (this.measure(doc, candidate, width, fontSize, false) <= maxHeight) {
+        current = candidate;
+        continue;
+      }
+      if (current) fragments.push(current);
+      const pieces = this.splitTokenByHeight(doc, word, width, fontSize, maxHeight);
+      fragments.push(...pieces.slice(0, -1));
+      current = pieces[pieces.length - 1];
+    }
+    if (current) fragments.push(current);
+    return fragments;
+  }
+
+  private splitTokenByHeight(doc: PdfDocument, token: string, width: number, fontSize: number, maxHeight: number): string[] {
+    const pieces: string[] = [];
+    let remaining = token;
+    while (remaining.length > 0) {
+      let low = 1;
+      let high = remaining.length;
+      let best = 1;
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        if (this.measure(doc, remaining.slice(0, middle), width, fontSize, false) <= maxHeight) {
+          best = middle;
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
+      }
+      pieces.push(remaining.slice(0, best));
+      remaining = remaining.slice(best);
+    }
+    return pieces;
   }
 
   private drawFinding(doc: PdfDocument, finding: ReporteMensualData['hallazgos'][number], index: number, data: ReporteMensualData) {

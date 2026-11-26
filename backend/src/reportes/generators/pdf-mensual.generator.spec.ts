@@ -136,5 +136,20 @@ describe('PDFMensualGenerator', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pages).toBeGreaterThan(1);
   });
+
+  it('fragmenta una acción correctiva que supera la altura de una página', async () => {
+    const data = baseData();
+    data.acciones = [{
+      descripcion: Array.from({ length: 150 }, () => 'Plan correctivo de mantenimiento.').join(' '),
+      estado: 'PENDIENTE',
+      fechaCompromiso: new Date('2026-02-01'),
+      establecimiento: 'Planta Norte',
+    }];
+
+    const pdf = await new PDFMensualGenerator().generate(data);
+    const pages = (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(pages).toBeGreaterThan(2);
+  });
 });
 
