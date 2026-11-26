@@ -25,3 +25,15 @@ test('PR #33 proyecta la información necesaria para hallazgos y fotografías re
   assert.match(generator, /Página \$\{index \+ 1\} de \$\{range\.count\}/);
 });
 
+test('PR #33 calcula los totales desde los datos y rechaza inconsistencias', async () => {
+  const [service, generator] = await Promise.all([
+    read('backend/src/reportes/reportes.service.ts'),
+    read('backend/src/reportes/generators/pdf-mensual.generator.ts'),
+  ]);
+  assert.match(service, /hallazgos: inspection\.hallazgos\.length/);
+  assert.match(service, /const hallazgos = inspections\.flatMap/);
+  assert.match(generator, /value: data\.hallazgos\.length/);
+  assert.match(generator, /assertConsistentCounts/);
+  assert.match(generator, /inspectionFindings !== data\.hallazgos\.length/);
+});
+

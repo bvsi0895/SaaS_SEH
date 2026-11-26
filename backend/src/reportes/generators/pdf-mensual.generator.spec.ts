@@ -117,6 +117,14 @@ describe('PDFMensualGenerator', () => {
     const data = baseData();
     data.empresa.cuit = null;
     data.establecimientos = [];
+    data.inspecciones = [{
+      fecha: new Date('2026-01-19'),
+      establecimiento: null,
+      sector: 'Producción',
+      checklist: 'Checklist general',
+      tecnico: 'Ana Técnica',
+      hallazgos: 8,
+    }];
     data.hallazgos = Array.from({ length: 8 }, (_, index) => ({
       titulo: `Hallazgo ${index + 1}`,
       descripcion: 'Descripción extensa del hallazgo con información operativa, medidas preventivas y contexto suficiente para comprobar el ajuste de línea dentro del bloque del informe mensual.',
@@ -135,6 +143,27 @@ describe('PDFMensualGenerator', () => {
     const pages = (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pages).toBeGreaterThan(1);
+  });
+
+  it('rechaza un informe cuando el resumen de inspecciones no coincide con el detalle', async () => {
+    const data = baseData();
+    data.inspecciones = [{
+      fecha: new Date('2026-01-19'),
+      establecimiento: 'Planta Norte',
+      sector: 'Producción',
+      checklist: 'Checklist general',
+      tecnico: 'Ana Técnica',
+      hallazgos: 2,
+    }];
+    data.hallazgos = [{
+      titulo: 'Hallazgo único',
+      descripcion: 'Descripción',
+      nivel: 'MEDIO',
+      estado: 'PENDIENTE',
+      fecha: new Date('2026-01-19'),
+    }];
+
+    await expect(new PDFMensualGenerator().generate(data)).rejects.toThrow('Datos inconsistentes');
   });
 
   it('fragmenta una acción correctiva que supera la altura de una página', async () => {

@@ -71,6 +71,7 @@ export class PDFMensualGenerator {
   private readonly bottom = 748;
 
   async generate(data: ReporteMensualData): Promise<Buffer> {
+    this.assertConsistentCounts(data);
     const normalizedPhotos = await this.preparePhotos(data.fotos);
     const preparedData: ReporteMensualData = {
       ...data,
@@ -110,6 +111,13 @@ export class PDFMensualGenerator {
         reject(error);
       }
     });
+  }
+
+  private assertConsistentCounts(data: ReporteMensualData) {
+    const inspectionFindings = data.inspecciones.reduce((total, inspection) => total + inspection.hallazgos, 0);
+    if (inspectionFindings !== data.hallazgos.length) {
+      throw new Error(`Datos inconsistentes: las inspecciones informan ${inspectionFindings} hallazgo(s), pero el detalle contiene ${data.hallazgos.length}.`);
+    }
   }
 
   private async preparePhotos(photos: ReporteMensualData['fotos']) {
