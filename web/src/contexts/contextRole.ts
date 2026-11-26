@@ -17,5 +17,6 @@ export function syncUserWithContext(
     empresaId: context.empresaId,
     organizacionId: context.organizacionId,
     organizacionEmpresaId: context.organizacionEmpresaId,
+    rolOrganizacion: context.rolOrganizacion,
   };
 }

@@ -141,6 +141,7 @@ export default function NuevaInspeccionPage() {
                         select
                         label="Técnico responsable (opcional)"
                         disabled={tecnicosLoading}
+                        SelectProps={{ displayEmpty: true }}
                         helperText={tecnicosLoading ? 'Cargando técnicos autorizados...' : 'Si no seleccionas uno, se asignará al creador'}
                       >
                         <MenuItem value="">Asignarme a mí mismo</MenuItem>

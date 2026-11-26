@@ -177,13 +177,13 @@ export class InspeccionesService {
     return inspeccion;
   }
 
-  async create(dto: CreateInspeccionDto, usuarioId: string, empresaId: string, organizacionEmpresaId?: string, currentUserRole: Rol = Rol.TECNICO, accesoEmpresaId?: string) {
+  async create(dto: CreateInspeccionDto, usuarioId: string, empresaId: string, organizacionEmpresaId?: string, currentUserRole: Rol = Rol.TECNICO, accesoEmpresaId?: string, organizacionId?: string) {
     await this.assertEstablishmentAccess(dto.establecimientoId, empresaId, organizacionEmpresaId, accesoEmpresaId);
     const checklist = await this.prisma.checklist.findUnique({ where: { id: dto.checklistId }, include: { items: { orderBy: { orden: 'asc' } } } });
     if (!checklist) throw new NotFoundException('Checklist no encontrado');
     if (!checklist.activo) throw new BadRequestException('El checklist está desactivado');
-    if (checklist.empresaId !== empresaId) throw new ForbiddenException('No tiene acceso a este checklist');
-    if (organizacionEmpresaId && checklist.organizacionEmpresaId !== organizacionEmpresaId) throw new ForbiddenException('No tiene acceso a este checklist');
+    if (organizacionId && checklist.organizacionId !== organizacionId) throw new ForbiddenException('No tiene acceso a este checklist');
+    if (!organizacionId) throw new ForbiddenException('No tiene un contexto de consultora válido');
     if (checklist.items.length === 0) throw new BadRequestException('El checklist no tiene items');
 
     const asignadoAId = dto.asignadoAId || usuarioId;

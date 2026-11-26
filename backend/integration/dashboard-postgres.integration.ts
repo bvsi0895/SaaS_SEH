@@ -319,8 +319,7 @@ async function main() {
         id: ids.checklist,
         nombre: 'Dashboard checklist',
         tipo: TipoChecklist.GENERAL,
-        empresaId: ids.empresa,
-        organizacionEmpresaId: ids.relacion,
+        organizacionId: ids.organizacion,
         items: {
           create: [
             { id: ids.item1, descripcion: 'Item uno', orden: 1 },
@@ -334,7 +333,7 @@ async function main() {
       data: {
         id: ids.checklistB,
         nombre: 'Dashboard checklist B',
-        empresaId: ids.empresaB,
+        organizacionId: ids.organizacion,
         items: { create: { id: ids.itemB, descripcion: 'Item B', orden: 1 } },
       },
     });

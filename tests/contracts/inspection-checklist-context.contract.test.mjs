@@ -43,7 +43,22 @@ test('backend keeps UUID validation and organization isolation for inspection cr
   ]);
 
   assert.match(dto, /@IsUUID\('4', \{ message: 'El ID de checklist debe ser un UUID válido' \}\)/);
-  assert.match(service, /if \(checklist\.empresaId !== empresaId\) throw new ForbiddenException/);
-  assert.match(service, /checklist\.organizacionEmpresaId !== organizacionEmpresaId/);
-  assert.match(checklistService, /empresaId,[\s\S]*\.\.\.\(organizacionEmpresaId && \{ organizacionEmpresaId \}\)/);
+  assert.match(service, /if \(organizacionId && checklist\.organizacionId !== organizacionId\) throw new ForbiddenException/);
+  assert.match(service, /if \(!organizacionId\) throw new ForbiddenException/);
+  assert.match(checklistService, /where: \{ id, organizacionId \}/);
+  assert.match(checklistService, /data: \{[\s\S]*organizacionId,/);
+});
+
+test('checklist library is scoped to the authenticated consultora and preserves used item history', async () => {
+  const [service, migration, controller] = await Promise.all([
+    read('backend/src/checklists/checklists.service.ts'),
+    read('backend/prisma/migrations/20261125150000_checklists_library_by_organization/migration.sql'),
+    read('backend/src/checklists/checklists.controller.ts'),
+  ]);
+
+  assert.match(service, /organizacionMiembro/);
+  assert.match(service, /No se puede modificar el item porque ya fue usado/);
+  assert.match(migration, /HAVING COUNT\(DISTINCT relation\."organizacionId"\) = 1/);
+  assert.match(migration, /RAISE EXCEPTION 'No se puede determinar de forma segura/);
+  assert.match(controller, /@CurrentUser\('organizacionId'\) organizacionId/);
 });

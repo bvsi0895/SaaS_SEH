@@ -23,6 +23,7 @@ async function main() {
   });
   assert.equal(checklist.items.length, 1, 'el item del checklist debe conservarse');
   assert.equal(checklist.items[0].id, '00000000-0000-4000-8000-000000000703');
+  assert.equal(checklist.organizacionId, '00000000-0000-4000-8000-000000000706', 'la biblioteca debe conservar la consultora propietaria');
 
   const inspection = await prisma.inspeccion.findUniqueOrThrow({
     where: { id: '00000000-0000-4000-8000-000000000704' },

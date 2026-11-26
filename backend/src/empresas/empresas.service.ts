@@ -26,7 +26,6 @@ export class EmpresasService {
         _count: {
           select: {
             usuarios: true,
-            checklists: true,
             inspecciones: true,
           },
         },
@@ -38,14 +37,13 @@ export class EmpresasService {
   /**
    * Obtener empresa por ID
    */
-  async findOne(id: string, organizacionEmpresaId?: string) {
+  async findOne(id: string, organizacionEmpresaId?: string, organizacionId?: string) {
     const empresa = await this.prisma.empresa.findUnique({
       where: { id },
       include: {
         _count: {
           select: {
             usuarios: true,
-            checklists: true,
             inspecciones: true,
             accionesCorrectivas: true,
           },
@@ -62,7 +60,7 @@ export class EmpresasService {
         this.prisma.usuario.count({
           where: { empresaId: id, membresiasOrganizacion: { some: { organizacion: { empresas: { some: { id: organizacionEmpresaId } } }, activa: true } } },
         }),
-        this.prisma.checklist.count({ where: { empresaId: id, organizacionEmpresaId } }),
+        this.prisma.checklist.count({ where: { organizacionId: organizacionId || '__invalid_context__' } }),
         this.prisma.inspeccion.count({ where: { empresaId: id, organizacionEmpresaId } }),
         this.prisma.accionCorrectiva.count({ where: { empresaId: id, organizacionEmpresaId } }),
       ]);

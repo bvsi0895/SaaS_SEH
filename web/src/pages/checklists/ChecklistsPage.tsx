@@ -47,7 +47,7 @@ export default function ChecklistsPage() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useSnackbar();
   const { user, activeContextId } = useAuth();
-  const canManageChecklists = user?.rol === 'ADMIN_EMPRESA';
+  const canManageChecklists = user?.rolOrganizacion === 'OWNER' || user?.rolOrganizacion === 'ADMIN_ORGANIZACION';
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -134,7 +134,7 @@ export default function ChecklistsPage() {
     <Box>
       <PageHeader
         title="Checklists"
-        subtitle="Gestiona los checklists de inspeccion"
+        subtitle="Biblioteca de checklists de la consultora"
         action={canManageChecklists ? {
           label: 'Nuevo Checklist',
           onClick: () => {

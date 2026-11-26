@@ -72,10 +72,10 @@ async function main() {
         { accesoEmpresaId: ids.accessB, establecimientoId: ids.establishmentB, empresaId: empresa.id },
       ] });
       await tx.checklist.create({
-        data: { id: ids.checklistA, nombre: 'E2E Checklist A', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: ids.linkA, items: { create: [{ descripcion: 'Item A', orden: 1 }] } },
+        data: { id: ids.checklistA, nombre: 'E2E Checklist A', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionA, items: { create: [{ descripcion: 'Item A', orden: 1 }] } },
       });
       await tx.checklist.create({
-        data: { id: ids.checklistB, nombre: 'E2E Checklist B', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: ids.linkB, items: { create: [{ descripcion: 'Item B', orden: 1 }] } },
+        data: { id: ids.checklistB, nombre: 'E2E Checklist B', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionB, items: { create: [{ descripcion: 'Item B', orden: 1 }] } },
       });
     });
 

@@ -37,7 +37,7 @@ function inspection(state: ReturnType<typeof makeState>) {
     establecimiento: { id: 'est-a', nombre: 'Planta Norte', codigo: 'N-01' },
     creadoPor: { id: 'user-1', nombre: 'Admin', apellido: 'E2E' },
     asignadoA: { id: 'user-1', nombre: 'Admin', apellido: 'E2E' },
-    checklist: { id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', createdAt: '', updatedAt: '' },
+    checklist: { id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, organizacionId: 'org-a', createdAt: '', updatedAt: '' },
     items: [{ id: 'item-1', cumplimiento: 'CUMPLE', observacion: '', inspeccionId: 'inspection-1', checklistItemId: 'check-item-1', checklistItem: { id: 'check-item-1', descripcion: 'Orden y limpieza', orden: 1, obligatorio: true, checklistId: CHECKLIST_A } }],
     hallazgos: state.finding ? [state.finding] : [],
     createdAt: '2026-11-20T12:00:00.000Z',
@@ -95,10 +95,10 @@ async function installMocks(page: Page, initialInspectionStatus = 'EN_PROGRESO')
       const isContextB = contextId === CONTEXT_B;
       await json(isContextB
         ? [
-          { id: 'demo-online-checklist-sur', nombre: 'Checklist legacy no utilizable', tipo: 'GENERAL', activo: true, empresaId: 'company-b', items: [], createdAt: '', updatedAt: '' },
-          { id: CHECKLIST_B, nombre: 'Checklist Sur', tipo: 'GENERAL', activo: true, empresaId: 'company-b', items: [], createdAt: '', updatedAt: '' },
+          { id: 'demo-online-checklist-sur', nombre: 'Checklist legacy no utilizable', tipo: 'GENERAL', activo: true, organizacionId: 'org-b', items: [], createdAt: '', updatedAt: '' },
+          { id: CHECKLIST_B, nombre: 'Checklist Sur', tipo: 'GENERAL', activo: true, organizacionId: 'org-b', items: [], createdAt: '', updatedAt: '' },
         ]
-        : [{ id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, empresaId: 'company-a', items: [], createdAt: '', updatedAt: '' }]);
+        : [{ id: CHECKLIST_A, nombre: 'Checklist General', tipo: 'GENERAL', activo: true, organizacionId: 'org-a', items: [], createdAt: '', updatedAt: '' }]);
       return;
     }
     if (url.pathname.endsWith('/usuarios/tecnicos')) {

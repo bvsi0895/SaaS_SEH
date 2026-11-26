@@ -1,4 +1,4 @@
-import { PrismaClient, Rol, TipoChecklist, CumplimientoItem, NivelRiesgo, EstadoAccion, EstadoInspeccion } from '@prisma/client';
+import { PrismaClient, Rol, RolOrganizacion, TipoChecklist, CumplimientoItem, NivelRiesgo, EstadoAccion, EstadoInspeccion, TipoOrganizacion, EstadoRelacionEmpresa } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -17,6 +17,17 @@ async function main() {
     },
   });
   console.log('✅ Empresa creada:', empresa.nombre);
+
+  const organizacion = await prisma.organizacion.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000201' },
+    update: { nombre: 'Consultora Demo', tipo: TipoOrganizacion.CONSULTORA, activa: true },
+    create: { id: '00000000-0000-0000-0000-000000000201', nombre: 'Consultora Demo', tipo: TipoOrganizacion.CONSULTORA, activa: true },
+  });
+  const organizacionEmpresa = await prisma.organizacionEmpresa.upsert({
+    where: { organizacionId_empresaId: { organizacionId: organizacion.id, empresaId: empresa.id } },
+    update: { estado: EstadoRelacionEmpresa.ACTIVA },
+    create: { organizacionId: organizacion.id, empresaId: empresa.id, estado: EstadoRelacionEmpresa.ACTIVA },
+  });
 
   // 2. Crear usuarios
   const passwordHash = await bcrypt.hash('Password123!', 10);
@@ -81,6 +92,27 @@ async function main() {
   });
   console.log('✅ Técnico 2 creado:', tecnico2.email);
 
+  const members = await Promise.all([
+    [adminEmpresa, RolOrganizacion.OWNER],
+    [supervisor, RolOrganizacion.ADMIN_ORGANIZACION],
+    [tecnico1, RolOrganizacion.AUDITOR_ORGANIZACION],
+    [tecnico2, RolOrganizacion.AUDITOR_ORGANIZACION],
+  ].map(([usuario, rol]) => prisma.organizacionMiembro.upsert({
+    where: { organizacionId_usuarioId: { organizacionId: organizacion.id, usuarioId: (usuario as typeof adminEmpresa).id } },
+    update: { activa: true, rol: rol as RolOrganizacion },
+    create: { organizacionId: organizacion.id, usuarioId: (usuario as typeof adminEmpresa).id, activa: true, rol: rol as RolOrganizacion },
+  })));
+  const [adminMember, supervisorMember, tecnico1Member, tecnico2Member] = members;
+  await prisma.accesoEmpresa.createMany({
+    data: [
+      { organizacionEmpresaId: organizacionEmpresa.id, organizacionMiembroId: adminMember.id, organizacionId: organizacion.id, empresaId: empresa.id, rol: Rol.ADMIN_EMPRESA },
+      { organizacionEmpresaId: organizacionEmpresa.id, organizacionMiembroId: supervisorMember.id, organizacionId: organizacion.id, empresaId: empresa.id, rol: Rol.SUPERVISOR },
+      { organizacionEmpresaId: organizacionEmpresa.id, organizacionMiembroId: tecnico1Member.id, organizacionId: organizacion.id, empresaId: empresa.id, rol: Rol.TECNICO },
+      { organizacionEmpresaId: organizacionEmpresa.id, organizacionMiembroId: tecnico2Member.id, organizacionId: organizacion.id, empresaId: empresa.id, rol: Rol.TECNICO },
+    ],
+    skipDuplicates: true,
+  });
+
   // 3. Crear checklists con items
   const checklistSeguridad = await prisma.checklist.upsert({
     where: { id: '00000000-0000-4000-8000-000000000111' },
@@ -90,7 +122,7 @@ async function main() {
       nombre: 'Inspección de Seguridad General',
       descripcion: 'Checklist para verificar condiciones generales de seguridad en el área de trabajo',
       tipo: TipoChecklist.GENERAL,
-      empresaId: empresa.id,
+      organizacionId: organizacion.id,
       activo: true,
       items: {
         create: [
@@ -118,7 +150,7 @@ async function main() {
       nombre: 'Inspección de Higiene Industrial',
       descripcion: 'Verificación de condiciones de higiene en áreas productivas',
       tipo: TipoChecklist.ORDEN_LIMPIEZA,
-      empresaId: empresa.id,
+      organizacionId: organizacion.id,
       activo: true,
       items: {
         create: [
@@ -144,7 +176,7 @@ async function main() {
       nombre: 'Control de Elementos de Protección Personal',
       descripcion: 'Verificación del uso y estado de EPP',
       tipo: TipoChecklist.EPP,
-      empresaId: empresa.id,
+      organizacionId: organizacion.id,
       activo: true,
       items: {
         create: [
@@ -172,7 +204,10 @@ async function main() {
       fechaHoraFin: new Date('2024-01-15T10:30:00'),
       observaciones: 'Se detectaron algunos hallazgos menores que requieren atención',
       empresaId: empresa.id,
+      organizacionEmpresaId: organizacionEmpresa.id,
       usuarioId: tecnico1.id,
+      creadoPorId: tecnico1.id,
+      asignadoAId: tecnico1.id,
       checklistId: checklistSeguridad.id,
       items: {
         create: [
@@ -251,7 +286,10 @@ async function main() {
       fechaHoraFin: new Date('2024-01-18T15:15:00'),
       observaciones: 'Todas las condiciones en orden',
       empresaId: empresa.id,
+      organizacionEmpresaId: organizacionEmpresa.id,
       usuarioId: tecnico2.id,
+      creadoPorId: tecnico2.id,
+      asignadoAId: tecnico2.id,
       checklistId: checklistHigiene.id,
       items: {
         create: [
@@ -277,7 +315,10 @@ async function main() {
       estado: EstadoInspeccion.EN_PROGRESO,
       fechaHoraInicio: new Date(),
       empresaId: empresa.id,
+      organizacionEmpresaId: organizacionEmpresa.id,
       usuarioId: tecnico1.id,
+      creadoPorId: tecnico1.id,
+      asignadoAId: tecnico1.id,
       checklistId: checklistEPP.id,
       items: {
         create: [

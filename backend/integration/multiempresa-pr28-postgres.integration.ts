@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   EstadoInspeccion,
   EstadoRelacionEmpresa,
@@ -67,8 +68,11 @@ async function cleanup() {
   await prisma.empresa.deleteMany({ where: { id: ids.empresa } });
 }
 
-async function mustReject(operation: Promise<unknown>, message: string) {
-  await assert.rejects(operation, /no (existe|encontrad)|no tiene acceso|no está autorizado/i, message);
+async function mustReject(operation: Promise<unknown>, message: string, expectedMessage?: RegExp) {
+  await assert.rejects(operation, (error: unknown) => {
+    if (!(error instanceof ForbiddenException || error instanceof NotFoundException)) return false;
+    return !expectedMessage || expectedMessage.test(error.message);
+  }, message);
 }
 
 async function main() {
@@ -113,15 +117,15 @@ async function main() {
       { accesoEmpresaId: ids.accesoB, establecimientoId: ids.establecimientoB, empresaId: ids.empresa },
       { accesoEmpresaId: ids.accesoMultiB, establecimientoId: ids.establecimientoB, empresaId: ids.empresa },
     ] });
-    await prisma.checklist.create({ data: { id: ids.checklistA, nombre: 'PR28 checklist A', tipo: TipoChecklist.GENERAL, empresaId: ids.empresa, organizacionEmpresaId: ids.relacionA, items: { create: { id: ids.checklistItemA, descripcion: 'Item A', orden: 1 } } } });
-    await prisma.checklist.create({ data: { id: ids.checklistB, nombre: 'PR28 checklist B', tipo: TipoChecklist.GENERAL, empresaId: ids.empresa, organizacionEmpresaId: ids.relacionB, items: { create: { id: ids.checklistItemB, descripcion: 'Item B', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklistA, nombre: 'PR28 checklist A', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionA, items: { create: { id: ids.checklistItemA, descripcion: 'Item A', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklistB, nombre: 'PR28 checklist B', tipo: TipoChecklist.GENERAL, organizacionId: ids.organizacionB, items: { create: { id: ids.checklistItemB, descripcion: 'Item B', orden: 1 } } } });
 
     const contextA = await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionA);
     const contextB = await tenancy.resolveForUser(ids.usuarioMulti, ids.empresa, ids.relacionB);
     assert.equal(contextA.rol, Rol.ADMIN_EMPRESA, 'el rol debe ser el del acceso A');
     assert.equal(contextB.rol, Rol.TECNICO, 'el rol debe ser el del acceso B, no Usuario.rol');
 
-    const sharedInspection = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector compartido B' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB);
+    const sharedInspection = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector compartido B' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB, ids.organizacionB);
     const sharedFinding = await findings.create({ inspeccionId: sharedInspection.id, titulo: 'Historial compartido', descripcion: 'Historial que debe conservarse al revocar A', nivelRiesgo: NivelRiesgo.BAJO, ubicacionTexto: 'Sector B' }, ids.empresa, ids.relacionB, ids.usuarioMulti, ids.accesoMultiB);
 
     const scopedBefore = await users.findOne(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA);
@@ -139,8 +143,8 @@ async function main() {
     await assert.rejects(users.update(ids.usuarioMulti, { nombre: 'Identidad alterada' }, ids.empresa, ids.organizacionA, ids.relacionA), /identidad global/i);
     await assert.rejects(users.adminChangePassword(ids.usuarioMulti, ids.empresa, { newPassword: 'AnotherPassword123!' }, ids.organizacionA, ids.relacionA), /bloqueado|recuperación segura/i);
     await assert.rejects(users.remove(ids.usuarioMulti, ids.empresa, ids.organizacionA, ids.relacionA), /no se permite eliminar/i);
-    const inspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establecimientoA, sector: 'Sector A' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA);
-    const inspectionB = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector B' }, ids.usuarioB, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoB);
+    const inspectionA = await inspections.create({ checklistId: ids.checklistA, establecimientoId: ids.establecimientoA, sector: 'Sector A' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA, ids.organizacionA);
+    const inspectionB = await inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoB, sector: 'Sector B' }, ids.usuarioB, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoB, ids.organizacionB);
     assert.equal(inspectionA.estado, EstadoInspeccion.EN_PROGRESO);
     assert.equal(inspectionB.estado, EstadoInspeccion.EN_PROGRESO);
 
@@ -152,10 +156,14 @@ async function main() {
     await mustReject(findings.findOne(findingB.id, ids.empresa, ids.relacionA, ids.usuarioA, ids.accesoA), 'A no debe abrir hallazgos de B');
     await mustReject(inspections.findOne(inspectionA.id, ids.empresa, ids.relacionB, ids.usuarioB, Rol.TECNICO, ids.accesoB), 'B no debe abrir inspecciones de A');
     await mustReject(findings.findOne(findingA.id, ids.empresa, ids.relacionB, ids.usuarioB, ids.accesoB), 'B no debe abrir hallazgos de A');
-    await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Checklist no autorizado' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA), 'A no debe crear inspecciones con el checklist de B');
+    await mustReject(
+      inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Checklist no autorizado' }, ids.usuarioA, ids.empresa, ids.relacionA, Rol.TECNICO, ids.accesoA, ids.organizacionA),
+      'A no debe crear inspecciones con el checklist de B',
+      /checklist/i,
+    );
     assert.deepEqual((await inspections.findAll(ids.empresa, undefined, ids.relacionA, Rol.ADMIN_EMPRESA, ids.usuarioMulti, ids.accesoMultiA)).map((item) => item.id), [inspectionA.id]);
 
-    await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Establecimiento no autorizado' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB), 'el técnico no debe usar otro establecimiento');
+    await mustReject(inspections.create({ checklistId: ids.checklistB, establecimientoId: ids.establecimientoA, sector: 'Establecimiento no autorizado' }, ids.usuarioMulti, ids.empresa, ids.relacionB, Rol.TECNICO, ids.accesoMultiB, ids.organizacionB), 'el técnico no debe usar otro establecimiento');
     await mustReject(tenancy.getEstablishmentScope(ids.accesoA, ids.empresa, ids.relacionB), 'no debe poder combinar acceso y relación manipulados');
 
     await administration.revokeAccess(ids.organizacionA, ids.usuarioAdminA, ids.relacionA, ids.accesoMultiA);

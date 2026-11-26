@@ -60,7 +60,7 @@ async function main() {
     await prisma.accesoEmpresa.create({ data: { id: ids.acceso, organizacionEmpresaId: ids.contexto, organizacionMiembroId: ids.miembro, organizacionId: ids.organizacion, empresaId: ids.empresa, rol: Rol.TECNICO } });
     await prisma.establecimiento.create({ data: { id: ids.establecimiento, empresaId: ids.empresa, nombre: 'Checklist findings site' } });
     await prisma.accesoEstablecimiento.create({ data: { accesoEmpresaId: ids.acceso, establecimientoId: ids.establecimiento, empresaId: ids.empresa } });
-    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Checklist de hallazgos', empresaId: ids.empresa, organizacionEmpresaId: ids.contexto, items: { create: { id: ids.checklistItem, descripcion: 'Salida de emergencia despejada', orden: 1 } } } });
+    await prisma.checklist.create({ data: { id: ids.checklist, nombre: 'Checklist de hallazgos', organizacionId: ids.organizacion, items: { create: { id: ids.checklistItem, descripcion: 'Salida de emergencia despejada', orden: 1 } } } });
     await prisma.inspeccion.create({
       data: {
         id: ids.inspeccion,

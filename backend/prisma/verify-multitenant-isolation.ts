@@ -50,10 +50,10 @@ async function main() {
         },
       });
       const checklistA = await tx.checklist.create({
-        data: { id: randomUUID(), nombre: 'Checklist prueba A', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: linkA.id },
+        data: { id: randomUUID(), nombre: 'Checklist prueba A', tipo: TipoChecklist.GENERAL, organizacionId: organizationA.id, items: { create: { descripcion: 'Item A', orden: 1 } } },
       });
       const checklistB = await tx.checklist.create({
-        data: { id: randomUUID(), nombre: 'Checklist prueba B', tipo: TipoChecklist.GENERAL, empresaId: empresa.id, organizacionEmpresaId: linkB.id },
+        data: { id: randomUUID(), nombre: 'Checklist prueba B', tipo: TipoChecklist.GENERAL, organizacionId: organizationB.id, items: { create: { descripcion: 'Item B', orden: 1 } } },
       });
       await tx.inspeccion.create({
         data: { id: randomUUID(), sector: 'Sector A', empresaId: empresa.id, organizacionEmpresaId: linkA.id, usuarioId: usuarios[0].id, creadoPorId: usuarios[0].id, asignadoAId: usuarios[0].id, checklistId: checklistA.id, estado: EstadoInspeccion.EN_PROGRESO },

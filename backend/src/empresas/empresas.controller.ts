@@ -47,8 +47,9 @@ export class EmpresasController {
   async getMyEmpresa(
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.empresasService.findOne(empresaId, organizacionEmpresaId);
+    return this.empresasService.findOne(empresaId, organizacionEmpresaId, organizacionId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,12 +76,13 @@ export class EmpresasController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('empresaId') empresaId: string,
     @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
     // Solo puede ver su propia empresa
     if (id !== empresaId) {
-      return this.empresasService.findOne(empresaId, organizacionEmpresaId);
+      return this.empresasService.findOne(empresaId, organizacionEmpresaId, organizacionId);
     }
-    return this.empresasService.findOne(id, organizacionEmpresaId);
+    return this.empresasService.findOne(id, organizacionEmpresaId, organizacionId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

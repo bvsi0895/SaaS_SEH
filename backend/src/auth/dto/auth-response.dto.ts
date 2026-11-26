@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Rol } from '@prisma/client';
+import { Rol, RolOrganizacion } from '@prisma/client';
 import { IsNotEmpty, IsString } from 'class-validator';
 
 export class UsuarioResponseDto {
@@ -17,6 +17,9 @@ export class UsuarioResponseDto {
 
   @ApiProperty({ enum: Rol, example: 'TECNICO' })
   rol: Rol;
+
+  @ApiProperty({ enum: RolOrganizacion, required: false })
+  rolOrganizacion?: RolOrganizacion;
 
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   empresaId: string;

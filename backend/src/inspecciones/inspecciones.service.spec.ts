@@ -108,6 +108,7 @@ describe('InspeccionesService respuestas', () => {
       id: 'checklist-1',
       empresaId: 'company-1',
       organizacionEmpresaId: 'context-1',
+      organizacionId: 'org-1',
       activo: true,
       items: [{ id: 'checklist-item-1' }],
     });
@@ -118,6 +119,9 @@ describe('InspeccionesService respuestas', () => {
       'user-1',
       'company-1',
       'context-1',
+      Rol.TECNICO,
+      undefined,
+      'org-1',
     );
 
     expect(prisma.inspeccion.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -133,7 +137,7 @@ describe('InspeccionesService respuestas', () => {
 
   it('creates delegated inspections as pending and validates the authorized technician', async () => {
     prisma.checklist.findUnique.mockResolvedValue({
-      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', activo: true,
+      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', organizacionId: 'org-1', activo: true,
       items: [{ id: 'checklist-item-1' }],
     });
     prisma.usuario.findFirst.mockResolvedValue({ id: 'technician-2' });
@@ -141,7 +145,7 @@ describe('InspeccionesService respuestas', () => {
 
     await service.create(
       { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2', fechaProgramada: '2026-11-20T12:00:00.000Z' },
-      'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR,
+      'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR, undefined, 'org-1',
     );
 
     expect(prisma.usuario.findFirst).toHaveBeenCalledWith(expect.objectContaining({
@@ -154,7 +158,7 @@ describe('InspeccionesService respuestas', () => {
 
   it('allows a contextual technician access even when the legacy user role differs', async () => {
     prisma.checklist.findUnique.mockResolvedValue({
-      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', activo: true,
+      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', organizacionId: 'org-1', activo: true,
       items: [{ id: 'checklist-item-1' }],
     });
     prisma.usuario.findFirst
@@ -164,7 +168,7 @@ describe('InspeccionesService respuestas', () => {
 
     await service.create(
       { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2' },
-      'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR,
+      'supervisor-1', 'company-1', 'context-1', Rol.SUPERVISOR, undefined, 'org-1',
     );
 
     expect(prisma.usuario.findFirst).toHaveBeenCalledTimes(2);
@@ -173,13 +177,13 @@ describe('InspeccionesService respuestas', () => {
 
   it('does not let a technician assign an inspection to another user', async () => {
     prisma.checklist.findUnique.mockResolvedValue({
-      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', activo: true,
+      id: 'checklist-1', empresaId: 'company-1', organizacionEmpresaId: 'context-1', organizacionId: 'org-1', activo: true,
       items: [{ id: 'checklist-item-1' }],
     });
 
     await expect(service.create(
       { checklistId: 'checklist-1', sector: 'Producción', establecimientoId: 'establishment-1', asignadoAId: 'technician-2' },
-      'technician-1', 'company-1', 'context-1', Rol.TECNICO,
+      'technician-1', 'company-1', 'context-1', Rol.TECNICO, undefined, 'org-1',
     )).rejects.toThrow('Un técnico solo puede crear inspecciones propias');
     expect(prisma.inspeccion.create).not.toHaveBeenCalled();
   });
