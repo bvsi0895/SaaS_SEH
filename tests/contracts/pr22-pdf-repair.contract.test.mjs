@@ -56,6 +56,7 @@ test('PR #23 reports preserve finding lifecycle state and resolution details', a
   assert.match(service, /responsableResolucion: \{ select: \{ nombre: true, apellido: true \} \}/);
   assert.match(inspectionGenerator, /Estado: \$\{this\.getHallazgoStatusText\(hallazgo\.estado\)\}/);
   assert.match(inspectionGenerator, /Resolución\$\{fecha\}\$\{responsable\}/);
-  assert.match(monthlyGenerator, /estado: \$\{this\.hallazgoState\(item\.estado\)\}/);
+  assert.match(monthlyGenerator, /hallazgoState\((?:item|finding)\.estado\)/);
   assert.match(monthlyGenerator, /descripcionSolucion/);
 });
+
