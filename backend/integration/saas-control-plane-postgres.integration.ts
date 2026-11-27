@@ -51,11 +51,11 @@ async function main() {
     await prisma.usuario.createMany({ data: ids.users.map((id, index) => ({ id, email: `pr35-${index}@seh.test`, password: 'hash', nombre: 'PR35', apellido: `${index}`, rol: Rol.TECNICO, empresaId: ids.company })) });
     await prisma.organizacionMiembro.createMany({ data: ids.members.map((id, index) => ({ id, organizacionId: ids.organization, usuarioId: ids.users[index], rol: RolOrganizacion.AUDITOR_ORGANIZACION })) });
 
-    await assert.rejects(
-      prisma.$transaction((tx) => service.assertCapacityInTransaction(tx as never, ids.organization, 'usuarios')),
-      (error: unknown) => error instanceof ConflictException,
-      'el plan demo debe rechazar el sexto usuario',
+    const capacityError = await prisma.$transaction((tx) => service.assertCapacityInTransaction(tx as never, ids.organization, 'usuarios')).then(
+      () => null,
+      (error: unknown) => error,
     );
+    assert.ok(capacityError instanceof ConflictException, `el plan demo debe rechazar el sexto usuario: ${String((capacityError as Error)?.message || capacityError)}`);
     assert.ok((await prisma.auditoriaSuscripcionSaaS.count({ where: { organizacionId: ids.organization } })) >= 4);
     console.log('PR35 SaaS PostgreSQL integration passed: trial, expiry, suspension, reactivation, audit and user limit');
   } finally {
