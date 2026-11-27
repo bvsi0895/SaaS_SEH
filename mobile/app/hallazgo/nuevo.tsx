@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { hallazgosApi } from '../../src/api/hallazgos';
+import type { HallazgoPhoto } from '../../src/api/hallazgos';
 import Input from '../../src/components/Input';
 import Button from '../../src/components/Button';
 import Card from '../../src/components/Card';
@@ -36,14 +37,45 @@ export default function NuevoHallazgoScreen() {
   const [descripcion, setDescripcion] = useState('');
   const [ubicacionTexto, setUbicacionTexto] = useState('');
   const [nivelRiesgo, setNivelRiesgo] = useState<NivelRiesgo>('MEDIO');
-  const [foto, setFoto] = useState<string | null>(null);
+  const [foto, setFoto] = useState<HallazgoPhoto | null>(null);
+  const [hallazgoCreadoId, setHallazgoCreadoId] = useState<string | null>(null);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
   const [ubicacionGps, setUbicacionGps] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
 
-  const createMutation = useMutation({
-    mutationFn: hallazgosApi.create,
+  const photoUploadMutation = useMutation({
+    mutationFn: ({ id, photo }: { id: string; photo: HallazgoPhoto }) =>
+      hallazgosApi.uploadPhoto(id, photo),
     onSuccess: () => {
+      setPhotoUploadError(null);
       queryClient.invalidateQueries({ queryKey: ['inspeccion', inspeccionId] });
+      Alert.alert('Exito', 'Hallazgo registrado correctamente', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    },
+    onError: (error: any) => {
+      const message = error?.response?.status === 413
+        ? 'La fotografía supera el límite permitido de 5 MiB.'
+        : error?.message || error?.response?.data?.message || 'No se pudo cargar la fotografía.';
+      setPhotoUploadError(message);
+      Alert.alert(
+        'Hallazgo creado',
+        `La fotografía no se pudo cargar. ${message} Puedes reintentar sólo la carga.`,
+      );
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: Parameters<typeof hallazgosApi.create>[0]) =>
+      hallazgosApi.create(data),
+    onSuccess: (hallazgo) => {
+      setHallazgoCreadoId(hallazgo.id);
+      queryClient.invalidateQueries({ queryKey: ['inspeccion', inspeccionId] });
+      if (foto) {
+        setPhotoUploadError(null);
+        photoUploadMutation.mutate({ id: hallazgo.id, photo: foto });
+        return;
+      }
       Alert.alert('Exito', 'Hallazgo registrado correctamente', [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -51,7 +83,7 @@ export default function NuevoHallazgoScreen() {
     onError: (error: any) => {
       Alert.alert(
         'Error',
-        error.response?.data?.message || 'No se pudo registrar el hallazgo'
+        error?.response?.data?.message || error?.message || 'No se pudo registrar el hallazgo',
       );
     },
   });
@@ -70,7 +102,8 @@ export default function NuevoHallazgoScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setFoto(result.assets[0].uri);
+      setFoto({ uri: result.assets[0].uri, fileSize: result.assets[0].fileSize });
+      setPhotoUploadError(null);
     }
   };
 
@@ -88,7 +121,8 @@ export default function NuevoHallazgoScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setFoto(result.assets[0].uri);
+      setFoto({ uri: result.assets[0].uri, fileSize: result.assets[0].fileSize });
+      setPhotoUploadError(null);
     }
   };
 
@@ -113,6 +147,13 @@ export default function NuevoHallazgoScreen() {
   };
 
   const handleSubmit = () => {
+    if (hallazgoCreadoId) {
+      if (foto && !photoUploadMutation.isPending) {
+        photoUploadMutation.mutate({ id: hallazgoCreadoId, photo: foto });
+      }
+      return;
+    }
+
     if (!titulo.trim()) {
       Alert.alert('Error', 'Ingresa un titulo para el hallazgo');
       return;
@@ -130,13 +171,15 @@ export default function NuevoHallazgoScreen() {
       return;
     }
 
+    const ubicacionConGps = ubicacionGps
+      ? `${ubicacionTexto.trim()} (GPS: ${ubicacionGps})`
+      : ubicacionTexto.trim();
+
     createMutation.mutate({
       titulo: titulo.trim(),
       descripcion: descripcion.trim(),
-      ubicacionTexto: ubicacionTexto.trim(),
+      ubicacionTexto: ubicacionConGps,
       nivelRiesgo,
-      ubicacionGps: ubicacionGps || undefined,
-      fotosUrls: foto || undefined,
       inspeccionId,
     });
   };
@@ -211,7 +254,7 @@ export default function NuevoHallazgoScreen() {
       <Text style={styles.label}>Foto del hallazgo (opcional)</Text>
       {foto ? (
         <Card style={styles.fotoCard}>
-          <Image source={{ uri: foto }} style={styles.fotoPreview} />
+          <Image source={{ uri: foto.uri }} style={styles.fotoPreview} />
           <TouchableOpacity
             style={styles.fotoRemove}
             onPress={() => setFoto(null)}
@@ -240,11 +283,17 @@ export default function NuevoHallazgoScreen() {
 
       {/* Boton Guardar */}
       <Button
-        title="Registrar Hallazgo"
+        title={hallazgoCreadoId
+          ? (photoUploadMutation.isPending ? 'Cargando fotografía...' : 'Reintentar carga de fotografía')
+          : 'Registrar Hallazgo'}
         onPress={handleSubmit}
-        loading={createMutation.isPending}
+        loading={createMutation.isPending || photoUploadMutation.isPending}
+        disabled={createMutation.isPending || photoUploadMutation.isPending}
         style={styles.submitButton}
       />
+      {photoUploadError && hallazgoCreadoId && (
+        <Text style={styles.photoError}>{photoUploadError}</Text>
+      )}
     </ScrollView>
   );
 }
@@ -312,4 +361,10 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: spacing.xl,
   },
+  photoError: {
+    color: colors.error,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
 });
+

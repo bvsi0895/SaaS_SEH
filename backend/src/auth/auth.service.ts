@@ -228,7 +228,21 @@ export class AuthService {
       throw new UnauthorizedException('Token de refresco inválido');
     }
 
-    const tokens = await this.generateTokens(usuario);
+    // El contexto incluido en el refresh token no es autoridad por sí mismo:
+    // se vuelve a resolver contra membresías, relación y acceso vigentes.
+    // Esto preserva el contexto activo sin reactivar accesos revocados.
+    let context: Awaited<ReturnType<TenancyService['resolveForUser']>>;
+    try {
+      context = await this.tenancy.resolveForUser(
+        usuario.id,
+        usuario.empresaId,
+        payload.organizacionEmpresaId,
+      );
+    } catch {
+      throw new UnauthorizedException('El contexto del token de refresco ya no está autorizado');
+    }
+
+    const tokens = await this.generateTokens(usuario, context);
 
     await this.prisma.usuario.update({
       where: { id: usuario.id },
@@ -302,3 +316,4 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 }
+
