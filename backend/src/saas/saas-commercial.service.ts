@@ -72,7 +72,12 @@ export class SaasCommercialService {
     });
     if (!subscription) throw new ForbiddenException('La organización no tiene una suscripción comercial activa');
     const state = this.effectiveState(subscription);
-    if (!subscription.plan.activo || [EstadoSuscripcionSaaS.SUSPENDIDA, EstadoSuscripcionSaaS.VENCIDA, EstadoSuscripcionSaaS.CANCELADA].includes(state)) {
+    const blockedStates: EstadoSuscripcionSaaS[] = [
+      EstadoSuscripcionSaaS.SUSPENDIDA,
+      EstadoSuscripcionSaaS.VENCIDA,
+      EstadoSuscripcionSaaS.CANCELADA,
+    ];
+    if (!subscription.plan.activo || blockedStates.includes(state)) {
       throw new ForbiddenException('La cuenta comercial no habilita operaciones; regularice la suscripción');
     }
     return this.toStatus(subscription);
@@ -220,7 +225,12 @@ export class SaasCommercialService {
     const subscription = await tx.suscripcionSaaS.findUnique({ where: { organizacionId }, include: { plan: true } });
     if (!subscription) throw new ForbiddenException('La organización no tiene una suscripción comercial');
     const state = this.effectiveState(subscription);
-    if ([EstadoSuscripcionSaaS.SUSPENDIDA, EstadoSuscripcionSaaS.VENCIDA, EstadoSuscripcionSaaS.CANCELADA].includes(state) || !subscription.plan.activo) {
+    const blockedStates: EstadoSuscripcionSaaS[] = [
+      EstadoSuscripcionSaaS.SUSPENDIDA,
+      EstadoSuscripcionSaaS.VENCIDA,
+      EstadoSuscripcionSaaS.CANCELADA,
+    ];
+    if (blockedStates.includes(state) || !subscription.plan.activo) {
       throw new ForbiddenException('La cuenta comercial no permite nuevas altas');
     }
     const count = resource === 'usuarios'
