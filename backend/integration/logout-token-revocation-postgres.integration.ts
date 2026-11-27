@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { PrismaClient, Rol, RolOrganizacion, TipoOrganizacion } from '@prisma/client';
+import { EstadoSuscripcionSaaS, PrismaClient, Rol, RolOrganizacion, TipoOrganizacion } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const base = process.env.SEH_E2E_BASE_URL || 'http://localhost:3000/api';
@@ -28,6 +28,7 @@ async function main() {
     empresa: randomUUID(),
     organizacion: randomUUID(),
     relacion: randomUUID(),
+    suscripcion: randomUUID(),
     miembro: randomUUID(),
     usuario: randomUUID(),
     acceso: randomUUID(),
@@ -43,6 +44,14 @@ async function main() {
     });
     await prisma.organizacionEmpresa.create({
       data: { id: ids.relacion, organizacionId: ids.organizacion, empresaId: ids.empresa },
+    });
+    await prisma.suscripcionSaaS.create({
+      data: {
+        id: ids.suscripcion,
+        organizacionId: ids.organizacion,
+        planId: '00000000-0000-4000-8000-000000000351',
+        estado: EstadoSuscripcionSaaS.ACTIVA,
+      },
     });
 
     await prisma.usuario.create({
@@ -105,6 +114,8 @@ async function main() {
 
     console.log('Logout token revocation PostgreSQL integration passed: logout invalidated both access devices and refresh token while preserving contexts');
   } finally {
+    await prisma.auditoriaSuscripcionSaaS.deleteMany({ where: { organizacionId: ids.organizacion } });
+    await prisma.suscripcionSaaS.deleteMany({ where: { id: ids.suscripcion } });
     await prisma.accesoEmpresa.deleteMany({ where: { id: ids.acceso } });
     await prisma.organizacionMiembro.deleteMany({ where: { id: ids.miembro } });
     await prisma.usuario.deleteMany({ where: { id: ids.usuario } });
@@ -119,3 +130,4 @@ main().catch((error) => {
   console.error('Logout token revocation integration failed:', error);
   process.exitCode = 1;
 });
+
