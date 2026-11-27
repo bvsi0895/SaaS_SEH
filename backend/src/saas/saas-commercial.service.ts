@@ -221,7 +221,7 @@ export class SaasCommercialService {
   async assertCapacityInTransaction(tx: TransactionClient, organizacionId: string, resource: 'usuarios' | 'empresas') {
     // Bloqueo transaccional por organización: dos altas concurrentes no pueden
     // observar el mismo cupo libre y superarlo simultáneamente.
-    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizacionId}, 0))`);
+    await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizacionId}, 0))`);
     const subscription = await tx.suscripcionSaaS.findUnique({ where: { organizacionId }, include: { plan: true } });
     if (!subscription) throw new ForbiddenException('La organización no tiene una suscripción comercial');
     const state = this.effectiveState(subscription);
