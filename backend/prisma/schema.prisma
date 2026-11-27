@@ -91,6 +91,24 @@ enum EstadoAccion {
   VENCIDA
 }
 
+enum EstadoSuscripcionSaaS {
+  TRIAL
+  ACTIVA
+  SUSPENDIDA
+  VENCIDA
+  CANCELADA
+}
+
+enum EventoSuscripcionSaaS {
+  CREADA
+  ACTIVADA
+  SUSPENDIDA
+  VENCIDA
+  CANCELADA
+  REACTIVADA
+  PLAN_CAMBIADO
+}
+
 // ============================================
 // MODELOS
 // ============================================
@@ -148,6 +166,8 @@ model Usuario {
   historialHallazgos       HallazgoHistorial[]      @relation("HallazgoHistorialUsuario")
   historialResponsables    HallazgoHistorial[]      @relation("HallazgoHistorialResponsable")
   membresiasOrganizacion   OrganizacionMiembro[]
+  administradoresSaaS      AdministradorSaaS[]
+  auditoriaSuscripcionesSaaS AuditoriaSuscripcionSaaS[]
 
   @@index([email])
   @@index([empresaId])
@@ -415,11 +435,84 @@ model Organizacion {
   miembros      OrganizacionMiembro[]
   empresas      OrganizacionEmpresa[]
   checklists    Checklist[]
+  suscripcionSaaS SuscripcionSaaS?
+  auditoriaSuscripciones AuditoriaSuscripcionSaaS[]
   creadaEn      DateTime              @default(now())
   actualizadaEn DateTime              @updatedAt
 
   @@index([activa])
   @@map("organizaciones")
+}
+
+model PlanSaaS {
+  id             String   @id @default(uuid())
+  codigo         String   @unique
+  nombre         String
+  maxUsuarios    Int
+  maxEmpresas    Int
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+  suscripciones  SuscripcionSaaS[]
+
+  @@index([activo])
+  @@map("planes_saas")
+}
+
+model SuscripcionSaaS {
+  id              String              @id @default(uuid())
+  organizacionId  String              @unique
+  planId          String
+  estado          EstadoSuscripcionSaaS @default(TRIAL)
+  inicio          DateTime            @default(now())
+  finPeriodo      DateTime?
+  pruebaFinalizaEn DateTime?
+  suspendidaEn    DateTime?
+  canceladaEn     DateTime?
+  motivo          String?
+  creadoEn        DateTime            @default(now())
+  actualizadoEn   DateTime            @updatedAt
+  organizacion    Organizacion        @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  plan            PlanSaaS            @relation(fields: [planId], references: [id], onDelete: Restrict)
+  auditoria       AuditoriaSuscripcionSaaS[]
+
+  @@index([estado, finPeriodo])
+  @@index([planId])
+  @@map("suscripciones_saas")
+}
+
+model AuditoriaSuscripcionSaaS {
+  id                 String                 @id @default(uuid())
+  suscripcionId      String
+  organizacionId     String
+  actorUsuarioId     String?
+  evento             EventoSuscripcionSaaS
+  estadoAnterior     EstadoSuscripcionSaaS?
+  estadoNuevo        EstadoSuscripcionSaaS?
+  planAnteriorId     String?
+  planNuevoId        String?
+  motivo             String?
+  metadata           Json?
+  creadoEn           DateTime               @default(now())
+  suscripcion        SuscripcionSaaS        @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  organizacion       Organizacion           @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  actorUsuario       Usuario?               @relation(fields: [actorUsuarioId], references: [id], onDelete: SetNull)
+
+  @@index([organizacionId, creadoEn])
+  @@index([suscripcionId, creadoEn])
+  @@map("auditoria_suscripciones_saas")
+}
+
+model AdministradorSaaS {
+  id          String   @id @default(uuid())
+  usuarioId   String   @unique
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([activo])
+  @@map("administradores_saas")
 }
 
 model OrganizacionMiembro {
@@ -505,4 +598,5 @@ model AccesoEstablecimiento {
   @@index([establecimientoId])
   @@map("accesos_establecimiento")
 }
+
 
