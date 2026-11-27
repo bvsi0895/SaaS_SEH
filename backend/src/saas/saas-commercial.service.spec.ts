@@ -31,7 +31,7 @@ describe('SaasCommercialService', () => {
 
   it('uses a transaction-scoped advisory lock before enforcing concurrent limits', async () => {
     const tx = {
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      $executeRaw: jest.fn().mockResolvedValue(0),
       suscripcionSaaS: { findUnique: jest.fn().mockResolvedValue({ estado: EstadoSuscripcionSaaS.ACTIVA, plan: activePlan }) },
       organizacionMiembro: { count: jest.fn().mockResolvedValue(2) },
       organizacionEmpresa: { count: jest.fn() },
@@ -39,7 +39,7 @@ describe('SaasCommercialService', () => {
     const service = new SaasCommercialService({} as never, config as never);
 
     await expect(service.assertCapacityInTransaction(tx as never, 'org-a', 'usuarios')).rejects.toBeInstanceOf(ConflictException);
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
     expect(tx.organizacionMiembro.count).toHaveBeenCalledWith({ where: { organizacionId: 'org-a', activa: true } });
   });
 
