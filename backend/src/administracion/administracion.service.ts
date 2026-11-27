@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
@@ -25,10 +26,11 @@ import {
   UpdateMiembroDto,
   UpdateOrganizacionDto,
 } from './dto';
+import { SaasCommercialService } from '../saas/saas-commercial.service';
 
 @Injectable()
 export class AdministracionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly commercial?: SaasCommercialService) {}
 
   private async assertAdmin(organizacionId: string, usuarioId: string) {
     const member = await this.prisma.organizacionMiembro.findFirst({
@@ -191,6 +193,13 @@ export class AdministracionService {
     if (!target) throw new NotFoundException('El usuario debe existir antes de ser incorporado');
 
     return this.prisma.$transaction(async (tx) => {
+      const existingMember = await tx.organizacionMiembro.findUnique({
+        where: { organizacionId_usuarioId: { organizacionId, usuarioId: target.id } },
+        select: { activa: true },
+      });
+      if (!existingMember?.activa) {
+        await this.commercial?.assertCapacityInTransaction(tx, organizacionId, 'usuarios');
+      }
       const member = await tx.organizacionMiembro.upsert({
         where: { organizacionId_usuarioId: { organizacionId, usuarioId: target.id } },
         create: { id: randomUUID(), organizacionId, usuarioId: target.id, rol: dto.rol, activa: true },
@@ -243,6 +252,7 @@ export class AdministracionService {
   async createCompany(organizacionId: string, organizacionMiembroId: string, usuarioId: string, dto: CreateEmpresaClienteDto) {
     await this.assertAdmin(organizacionId, usuarioId);
     return this.prisma.$transaction(async (tx) => {
+      await this.commercial?.assertCapacityInTransaction(tx, organizacionId, 'empresas');
       const empresa = await tx.empresa.create({ data: dto });
       const relation = await tx.organizacionEmpresa.create({ data: { id: randomUUID(), organizacionId, empresaId: empresa.id } });
       await tx.accesoEmpresa.create({
@@ -256,17 +266,26 @@ export class AdministracionService {
     await this.assertAdmin(organizacionId, usuarioId);
     const empresa = await this.prisma.empresa.findUnique({ where: { id: dto.empresaId } });
     if (!empresa) throw new NotFoundException('Empresa no encontrada');
-    const relation = await this.prisma.organizacionEmpresa.upsert({
-      where: { organizacionId_empresaId: { organizacionId, empresaId: dto.empresaId } },
-      create: { id: randomUUID(), organizacionId, empresaId: dto.empresaId },
-      update: { estado: EstadoRelacionEmpresa.ACTIVA },
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.organizacionEmpresa.findUnique({
+        where: { organizacionId_empresaId: { organizacionId, empresaId: dto.empresaId } },
+        select: { id: true, estado: true },
+      });
+      if (!existing || existing.estado !== EstadoRelacionEmpresa.ACTIVA) {
+        await this.commercial?.assertCapacityInTransaction(tx, organizacionId, 'empresas');
+      }
+      const relation = await tx.organizacionEmpresa.upsert({
+        where: { organizacionId_empresaId: { organizacionId, empresaId: dto.empresaId } },
+        create: { id: randomUUID(), organizacionId, empresaId: dto.empresaId },
+        update: { estado: EstadoRelacionEmpresa.ACTIVA },
+      });
+      await tx.accesoEmpresa.upsert({
+        where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId } },
+        create: { id: randomUUID(), organizacionEmpresaId: relation.id, organizacionMiembroId, organizacionId, empresaId: dto.empresaId, rol: Rol.ADMIN_EMPRESA, activo: true },
+        update: { activo: true, rol: Rol.ADMIN_EMPRESA },
+      });
+      return relation;
     });
-    await this.prisma.accesoEmpresa.upsert({
-      where: { organizacionEmpresaId_organizacionMiembroId: { organizacionEmpresaId: relation.id, organizacionMiembroId } },
-      create: { id: randomUUID(), organizacionEmpresaId: relation.id, organizacionMiembroId, organizacionId, empresaId: dto.empresaId, rol: Rol.ADMIN_EMPRESA, activo: true },
-      update: { activo: true, rol: Rol.ADMIN_EMPRESA },
-    });
-    return relation;
   }
 
   async updateCompanyRelation(organizacionId: string, usuarioId: string, id: string, dto: UpdateEmpresaRelationDto) {
@@ -353,3 +372,4 @@ export class AdministracionService {
     return { message: 'Acceso revocado' };
   }
 }
+
