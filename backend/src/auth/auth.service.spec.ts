@@ -17,11 +17,12 @@ describe('AuthService', () => {
   };
   const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
   const configService = { get: jest.fn() };
+  let tenancy: { resolveForUser: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    const tenancy = { resolveForUser: jest.fn().mockResolvedValue({ organizacionEmpresaId: 'context-1' }) };
+    tenancy = { resolveForUser: jest.fn().mockResolvedValue({ organizacionEmpresaId: 'context-1' }) };
     service = new AuthService(prisma as never, jwtService as never, configService as never, tenancy as never);
     configService.get.mockImplementation((key: string) => {
       const values: Record<string, string> = {
@@ -120,6 +121,7 @@ describe('AuthService', () => {
       tokenVersion: 4,
       tokenType: 'refresh',
       jti: 'refresh-jti',
+      organizacionEmpresaId: 'context-1',
     });
 
     const response = await service.refreshTokens('refresh-token');
@@ -127,10 +129,35 @@ describe('AuthService', () => {
     expect(jwtService.verifyAsync).toHaveBeenCalledWith('refresh-token', { secret: 'test-refresh-secret' });
     expect(bcrypt.compare).not.toHaveBeenCalled();
     expect(response).toEqual({ accessToken: 'access-token', refreshToken: 'refresh-token' });
+    expect(tenancy.resolveForUser).toHaveBeenCalledWith('user-1', 'empresa-1', 'context-1');
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: { refreshToken: createHash('sha256').update('refresh-token', 'utf8').digest('hex') },
     });
+  });
+
+  it('rechaza renovar un token cuyo contexto ya no está autorizado', async () => {
+    const usuario = {
+      id: 'user-1',
+      email: 'tecnico@demo.local',
+      rol: 'TECNICO',
+      tokenVersion: 4,
+      empresaId: 'empresa-1',
+      refreshToken: createHash('sha256').update('refresh-token', 'utf8').digest('hex'),
+    };
+    prisma.usuario.findUnique.mockResolvedValue(usuario);
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: usuario.id,
+      tokenVersion: usuario.tokenVersion,
+      tokenType: 'refresh',
+      jti: 'refresh-jti',
+      organizacionEmpresaId: 'context-revocado',
+    });
+    tenancy.resolveForUser.mockRejectedValue(new Error('context revoked'));
+
+    await expect(service.refreshTokens('refresh-token')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+    expect(prisma.usuario.update).not.toHaveBeenCalled();
   });
 
   it('rejects refresh tokens with an invalid signature or version', async () => {
@@ -162,3 +189,4 @@ describe('AuthService', () => {
     });
   });
 });
+

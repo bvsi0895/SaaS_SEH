@@ -3,7 +3,6 @@ import {
   IsOptional,
   MinLength,
   IsEnum,
-  IsArray,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { NivelRiesgo } from '@prisma/client';
@@ -44,12 +43,5 @@ export class UpdateHallazgoDto {
   @MinLength(3)
   ubicacionTexto?: string;
 
-  @ApiPropertyOptional({
-    type: [String],
-    description: 'URLs de fotos',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  fotosUrls?: string[];
 }
+

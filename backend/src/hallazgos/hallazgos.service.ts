@@ -316,7 +316,6 @@ export class HallazgosService {
           descripcion: createHallazgoDto.descripcion,
           nivelRiesgo: createHallazgoDto.nivelRiesgo,
           ubicacionTexto: createHallazgoDto.ubicacionTexto,
-          fotosUrls: createHallazgoDto.fotosUrls,
         }, empresaId, organizacionEmpresaId, usuarioId, accesoEmpresaId);
       }
     }
@@ -330,9 +329,6 @@ export class HallazgosService {
           descripcion: createHallazgoDto.descripcion,
           nivelRiesgo: createHallazgoDto.nivelRiesgo,
           ubicacionTexto: createHallazgoDto.ubicacionTexto,
-          fotosUrls: createHallazgoDto.fotosUrls
-            ? JSON.stringify(createHallazgoDto.fotosUrls)
-            : null,
         },
         include: {
           inspeccion: {
@@ -665,14 +661,9 @@ export class HallazgosService {
       );
     }
 
-    const { fotosUrls, ...data } = updateHallazgoDto;
-
     return this.prisma.hallazgo.update({
       where: { id },
-      data: {
-        ...data,
-        ...(fotosUrls && { fotosUrls: JSON.stringify(fotosUrls) }),
-      },
+      data: updateHallazgoDto,
     });
   }
 
@@ -758,4 +749,5 @@ export class HallazgosService {
     };
   }
 }
+
 

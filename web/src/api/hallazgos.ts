@@ -6,8 +6,6 @@ export interface CreateHallazgoDto {
   descripcion: string;
   nivelRiesgo: NivelRiesgo;
   ubicacionTexto: string;
-  ubicacionGps?: string;
-  fotosUrls?: string[];
   inspeccionId: string;
   inspeccionItemId?: string;
 }
@@ -100,3 +98,4 @@ export const hallazgosApi = {
   resolver: async (id: string, data: ResolverHallazgoDto): Promise<Hallazgo> => (await apiClient.post<Hallazgo>(`/hallazgos/${id}/resolver`, data)).data,
   verificarResolucion: async (id: string, data: ResolverHallazgoDto): Promise<Hallazgo> => (await apiClient.post<Hallazgo>(`/hallazgos/${id}/verificar-resolucion`, data)).data,
 };
+

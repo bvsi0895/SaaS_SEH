@@ -4,7 +4,6 @@ import {
   IsUUID,
   MinLength,
   IsEnum,
-  IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NivelRiesgo } from '@prisma/client';
@@ -59,13 +58,5 @@ export class CreateHallazgoDto {
   @MinLength(3)
   ubicacionTexto: string;
 
-  @ApiPropertyOptional({
-    example: ['https://storage.com/foto1.jpg', 'https://storage.com/foto2.jpg'],
-    description: 'URLs de las fotos del hallazgo',
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  fotosUrls?: string[];
 }
+

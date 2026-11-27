@@ -9,6 +9,7 @@ describe('UpdateHallazgoDto', () => {
       descripcion: 'Descripción actualizada suficientemente detallada',
       nivelRiesgo: 'MEDIO',
       ubicacionTexto: 'Sector A',
+      fotosUrls: ['/api/hallazgos/otro/fotos/foto.webp'],
       inspeccionId: '00000000-0000-0000-0000-000000000001',
       inspeccionItemId: '00000000-0000-0000-0000-000000000002',
     });
@@ -16,6 +17,7 @@ describe('UpdateHallazgoDto', () => {
     const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
     const rejectedProperties = errors.map((error) => error.property);
 
-    expect(rejectedProperties).toEqual(expect.arrayContaining(['inspeccionId', 'inspeccionItemId']));
+    expect(rejectedProperties).toEqual(expect.arrayContaining(['fotosUrls', 'inspeccionId', 'inspeccionItemId']));
   });
 });
+

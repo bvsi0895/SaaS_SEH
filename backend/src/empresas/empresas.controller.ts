@@ -21,7 +21,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Public } from '../auth/decorators/public.decorator';
 import { Rol } from '@prisma/client';
 
 @ApiTags('empresas')
@@ -29,13 +28,17 @@ import { Rol } from '@prisma/client';
 export class EmpresasController {
   constructor(private readonly empresasService: EmpresasService) {}
 
-  @Public()
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @ApiOperation({ summary: 'Crear nueva empresa (registro inicial)' })
+  @ApiOperation({ summary: 'Crear y vincular una empresa desde una organización administrada' })
   @ApiResponse({ status: 201, description: 'Empresa creada' })
   @ApiResponse({ status: 409, description: 'CUIT ya registrado' })
-  async create(@Body() createEmpresaDto: CreateEmpresaDto) {
-    return this.empresasService.create(createEmpresaDto);
+  async create(
+    @Body() createEmpresaDto: CreateEmpresaDto,
+    @CurrentUser('organizacionId') organizacionId: string,
+    @CurrentUser('id') usuarioId: string,
+  ) {
+    return this.empresasService.create(createEmpresaDto, organizacionId, usuarioId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -96,8 +99,10 @@ export class EmpresasController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateEmpresaDto: UpdateEmpresaDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.empresasService.update(id, updateEmpresaDto, empresaId);
+    return this.empresasService.update(id, updateEmpresaDto, empresaId, organizacionEmpresaId, organizacionId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -109,7 +114,10 @@ export class EmpresasController {
   async updateMyEmpresa(
     @Body() updateEmpresaDto: UpdateEmpresaDto,
     @CurrentUser('empresaId') empresaId: string,
+    @CurrentUser('organizacionEmpresaId') organizacionEmpresaId: string,
+    @CurrentUser('organizacionId') organizacionId: string,
   ) {
-    return this.empresasService.update(empresaId, updateEmpresaDto);
+    return this.empresasService.update(empresaId, updateEmpresaDto, empresaId, organizacionEmpresaId, organizacionId);
   }
 }
+

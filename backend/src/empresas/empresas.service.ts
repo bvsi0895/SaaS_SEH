@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmpresaDto, UpdateEmpresaDto } from './dto';
+import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class EmpresasService {
@@ -38,8 +40,24 @@ export class EmpresasService {
    * Obtener empresa por ID
    */
   async findOne(id: string, organizacionEmpresaId?: string, organizacionId?: string) {
-    const empresa = await this.prisma.empresa.findUnique({
-      where: { id },
+    if (organizacionEmpresaId && !organizacionId) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    const empresa = await this.prisma.empresa.findFirst({
+      where: {
+        id,
+        ...(organizacionEmpresaId && {
+          activa: true,
+          organizaciones: {
+            some: {
+              id: organizacionEmpresaId,
+              organizacionId,
+              estado: EstadoRelacionEmpresa.ACTIVA,
+            },
+          },
+        }),
+      },
       include: {
         _count: {
           select: {
@@ -77,7 +95,23 @@ export class EmpresasService {
   /**
    * Crear nueva empresa
    */
-  async create(createEmpresaDto: CreateEmpresaDto) {
+  async create(createEmpresaDto: CreateEmpresaDto, organizacionId?: string, usuarioId?: string) {
+    if (!organizacionId || !usuarioId) {
+      throw new ForbiddenException('La empresa debe crearse dentro de una organización autorizada');
+    }
+
+    const member = await this.prisma.organizacionMiembro.findFirst({
+      where: {
+        organizacionId,
+        usuarioId,
+        activa: true,
+        organizacion: { activa: true },
+        rol: { in: [RolOrganizacion.OWNER, RolOrganizacion.ADMIN_ORGANIZACION] },
+      },
+      select: { id: true },
+    });
+    if (!member) throw new ForbiddenException('Se requiere un rol administrador de la organización');
+
     // Verificar CUIT único si se proporciona
     if (createEmpresaDto.cuit) {
       const existing = await this.prisma.empresa.findUnique({
@@ -89,17 +123,32 @@ export class EmpresasService {
       }
     }
 
-    return this.prisma.empresa.create({
-      data: createEmpresaDto,
+    return this.prisma.$transaction(async (tx) => {
+      const empresa = await tx.empresa.create({ data: createEmpresaDto });
+      const relation = await tx.organizacionEmpresa.create({
+        data: { id: randomUUID(), organizacionId, empresaId: empresa.id },
+      });
+      await tx.accesoEmpresa.create({
+        data: {
+          id: randomUUID(),
+          organizacionEmpresaId: relation.id,
+          organizacionMiembroId: member.id,
+          organizacionId,
+          empresaId: empresa.id,
+          rol: Rol.ADMIN_EMPRESA,
+          activo: true,
+        },
+      });
+      return relation;
     });
   }
 
   /**
    * Actualizar empresa
    */
-  async update(id: string, updateEmpresaDto: UpdateEmpresaDto, requestingEmpresaId?: string) {
+  async update(id: string, updateEmpresaDto: UpdateEmpresaDto, requestingEmpresaId?: string, organizacionEmpresaId?: string, organizacionId?: string) {
     // Verificar que existe
-    await this.findOne(id);
+    await this.findOne(id, organizacionEmpresaId, organizacionId);
 
     // Verificar permisos (solo puede actualizar su propia empresa)
     if (requestingEmpresaId && id !== requestingEmpresaId) {
@@ -175,3 +224,4 @@ export class EmpresasService {
     };
   }
 }
+

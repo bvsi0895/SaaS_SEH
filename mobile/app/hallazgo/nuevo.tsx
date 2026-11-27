@@ -41,7 +41,11 @@ export default function NuevoHallazgoScreen() {
   const [loadingLocation, setLoadingLocation] = useState(false);
 
   const createMutation = useMutation({
-    mutationFn: hallazgosApi.create,
+    mutationFn: async ({ photo, ...data }: Parameters<typeof hallazgosApi.create>[0] & { photo?: string }) => {
+      const hallazgo = await hallazgosApi.create(data);
+      if (photo) await hallazgosApi.uploadPhoto(hallazgo.id, photo);
+      return hallazgo;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inspeccion', inspeccionId] });
       Alert.alert('Exito', 'Hallazgo registrado correctamente', [
@@ -130,14 +134,17 @@ export default function NuevoHallazgoScreen() {
       return;
     }
 
+    const ubicacionConGps = ubicacionGps
+      ? `${ubicacionTexto.trim()} (GPS: ${ubicacionGps})`
+      : ubicacionTexto.trim();
+
     createMutation.mutate({
       titulo: titulo.trim(),
       descripcion: descripcion.trim(),
-      ubicacionTexto: ubicacionTexto.trim(),
+      ubicacionTexto: ubicacionConGps,
       nivelRiesgo,
-      ubicacionGps: ubicacionGps || undefined,
-      fotosUrls: foto || undefined,
       inspeccionId,
+      photo: foto || undefined,
     });
   };
 
@@ -313,3 +320,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
 });
+
