@@ -10,11 +10,13 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { SaasModule } from '../saas/saas.module';
 
 @Module({
   imports: [
     PrismaModule,
     TenancyModule,
+    SaasModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -32,3 +34,4 @@ import { TenancyModule } from '../tenancy/tenancy.module';
   exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}
+
