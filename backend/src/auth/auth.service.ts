@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,7 @@ import { LoginDto, RegisterDto, AuthResponseDto } from './dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { TenancyService } from '../tenancy/tenancy.service';
+import { SaasCommercialService } from '../saas/saas-commercial.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +23,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private tenancy: TenancyService,
+    @Optional() private commercial?: SaasCommercialService,
   ) {}
 
   /**
@@ -136,38 +139,43 @@ export class AuthService {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    // Crear usuario
-    const usuario = await this.prisma.usuario.create({
-      data: {
-        email: registerDto.email.toLowerCase(),
-        password: hashedPassword,
-        nombre: registerDto.nombre,
-        apellido: registerDto.apellido,
-        rol: Rol.TECNICO,
-        empresaId,
-      },
-    });
+    // Crear la identidad y sus accesos dentro de la misma transacción que
+    // reserva el cupo del plan comercial.
+    const usuario = await this.prisma.$transaction(async (tx) => {
+      await this.commercial?.assertCapacityInTransaction(tx, defaultContext.organizacionId, 'usuarios');
+      const created = await tx.usuario.create({
+        data: {
+          email: registerDto.email.toLowerCase(),
+          password: hashedPassword,
+          nombre: registerDto.nombre,
+          apellido: registerDto.apellido,
+          rol: Rol.TECNICO,
+          empresaId,
+        },
+      });
 
-    const membership = await this.prisma.organizacionMiembro.create({
-      data: {
-        id: randomUUID(),
-        organizacionId: defaultContext.organizacionId,
-        usuarioId: usuario.id,
-        rol: RolOrganizacion.AUDITOR_ORGANIZACION,
-        activa: true,
-      },
-    });
+      const membership = await tx.organizacionMiembro.create({
+        data: {
+          id: randomUUID(),
+          organizacionId: defaultContext.organizacionId,
+          usuarioId: created.id,
+          rol: RolOrganizacion.AUDITOR_ORGANIZACION,
+          activa: true,
+        },
+      });
 
-    await this.prisma.accesoEmpresa.create({
-      data: {
-        id: randomUUID(),
-        organizacionEmpresaId: defaultContext.id,
-        organizacionMiembroId: membership.id,
-        organizacionId: defaultContext.organizacionId,
-        empresaId,
-        rol: Rol.TECNICO,
-        activo: true,
-      },
+      await tx.accesoEmpresa.create({
+        data: {
+          id: randomUUID(),
+          organizacionEmpresaId: defaultContext.id,
+          organizacionMiembroId: membership.id,
+          organizacionId: defaultContext.organizacionId,
+          empresaId,
+          rol: Rol.TECNICO,
+          activo: true,
+        },
+      });
+      return created;
     });
 
     // Generar tokens
