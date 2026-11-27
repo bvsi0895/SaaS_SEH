@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,10 +12,11 @@ import { CreateUsuarioDto, UpdateUsuarioDto, ChangePasswordDto, AdminChangePassw
 import { EstadoRelacionEmpresa, Rol } from '@prisma/client';
 import { RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { SaasCommercialService } from '../saas/saas-commercial.service';
 
 @Injectable()
 export class UsuariosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private readonly commercial?: SaasCommercialService) {}
 
   private withContextualRole(user: any) {
     const contextualAccess = user.membresiasOrganizacion
@@ -352,6 +354,9 @@ export class UsuariosService {
     const hashedPassword = await bcrypt.hash(createUsuarioDto.password, 10);
 
     const usuario = await this.prisma.$transaction(async (tx) => {
+      if (organizacionId && organizacionEmpresaId) {
+        await this.commercial?.assertCapacityInTransaction(tx, organizacionId, 'usuarios');
+      }
       const created = await tx.usuario.create({
         data: {
           email: createUsuarioDto.email.toLowerCase(),
@@ -507,4 +512,5 @@ export class UsuariosService {
     throw new ForbiddenException('No se permite eliminar identidades desde una consultora; revoque el acceso contextual');
   }
 }
+
 

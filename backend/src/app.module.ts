@@ -14,6 +14,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { TenancyModule } from './tenancy/tenancy.module';
 import { AdministracionModule } from './administracion/administracion.module';
+import { SaasModule } from './saas/saas.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -43,6 +44,7 @@ import { HealthController } from './health.controller';
     ReportesModule,
     TenancyModule,
     AdministracionModule,
+    SaasModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -53,3 +55,4 @@ import { HealthController } from './health.controller';
   ],
 })
 export class AppModule {}
+

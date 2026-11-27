@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Optional,
   NotFoundException,
   ConflictException,
   ForbiddenException,
@@ -8,10 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmpresaDto, UpdateEmpresaDto } from './dto';
 import { EstadoRelacionEmpresa, Rol, RolOrganizacion } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { SaasCommercialService } from '../saas/saas-commercial.service';
 
 @Injectable()
 export class EmpresasService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private readonly commercial?: SaasCommercialService) {}
 
   /**
    * Obtener todas las empresas (solo para super admin)
@@ -124,6 +126,7 @@ export class EmpresasService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await this.commercial?.assertCapacityInTransaction(tx, organizacionId, 'empresas');
       const empresa = await tx.empresa.create({ data: createEmpresaDto });
       const relation = await tx.organizacionEmpresa.create({
         data: { id: randomUUID(), organizacionId, empresaId: empresa.id },

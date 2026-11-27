@@ -1,8 +1,10 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException, Optional } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { TenancyService } from '../../tenancy/tenancy.service';
+import { ALLOW_COMMERCIAL_RECOVERY } from '../../saas/commercial-access.decorator';
+import { SaasCommercialService } from '../../saas/saas-commercial.service';
 
 /**
  * Guard de autenticación JWT
@@ -14,6 +16,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(
     private reflector: Reflector,
     private tenancy: TenancyService,
+    @Optional() private commercial?: SaasCommercialService,
   ) {
     super();
   }
@@ -48,6 +51,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       ? requestedContext[0]
       : requestedContext;
     await this.attachTenantContext(request, organizationCompanyId);
+    const allowCommercialRecovery = this.reflector.getAllAndOverride<boolean>(ALLOW_COMMERCIAL_RECOVERY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (!allowCommercialRecovery && this.commercial) {
+      await this.commercial.assertOperationalAccess(request.user.organizacionId);
+    }
     return allowed;
   }
 
@@ -58,3 +68,4 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return user;
   }
 }
+

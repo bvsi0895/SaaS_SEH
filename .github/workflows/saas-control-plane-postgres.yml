@@ -1,0 +1,56 @@
+name: SaaS control plane PostgreSQL integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/prisma/**'
+      - 'backend/src/saas/**'
+      - 'backend/src/auth/**'
+      - 'backend/src/usuarios/**'
+      - 'backend/src/empresas/**'
+      - 'backend/src/administracion/**'
+      - 'backend/integration/saas-control-plane-postgres.integration.ts'
+      - '.github/workflows/saas-control-plane-postgres.yml'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  postgres-16:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seh_saas
+          POSTGRES_PASSWORD: seh_saas_password
+          POSTGRES_DB: seh_saas_test
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd="pg_isready -U seh_saas -d seh_saas_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter seh-backend exec prisma generate
+      - name: Deploy migrations
+        run: pnpm --filter seh-backend exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://seh_saas:seh_saas_password@localhost:5435/seh_saas_test?schema=public
+      - name: Run SaaS control plane integration
+        run: pnpm --filter seh-backend exec ts-node --transpile-only integration/saas-control-plane-postgres.integration.ts
+        env:
+          DATABASE_URL: postgresql://seh_saas:seh_saas_password@localhost:5435/seh_saas_test?schema=public
+
