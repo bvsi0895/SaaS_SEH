@@ -9,16 +9,26 @@ export interface CreateHallazgoDto {
   inspeccionId: string;
 }
 
+export interface HallazgoPhoto {
+  uri: string;
+  fileSize?: number;
+}
+
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
 export const hallazgosApi = {
   create: async (data: CreateHallazgoDto): Promise<Hallazgo> => {
     const response = await apiClient.post<Hallazgo>('/hallazgos', data);
     return response.data;
   },
 
-  uploadPhoto: async (id: string, uri: string): Promise<Hallazgo> => {
+  uploadPhoto: async (id: string, photo: HallazgoPhoto): Promise<Hallazgo> => {
+    if (photo.fileSize !== undefined && photo.fileSize > MAX_PHOTO_BYTES) {
+      throw new Error('La fotografía supera el límite permitido de 5 MiB');
+    }
     const formData = new FormData();
     formData.append('file', {
-      uri,
+      uri: photo.uri,
       name: `hallazgo-${Date.now()}.jpg`,
       type: 'image/jpeg',
     } as any);

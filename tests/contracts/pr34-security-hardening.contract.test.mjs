@@ -44,6 +44,28 @@ test("hallazgo no acepta URLs arbitrarias y conserva la carga multipart autoriza
   assert.match(controller, /addPhoto\(id, empresaId, file/);
 });
 
+test("mobile separates finding creation from photo upload and retries only the photo", async () => {
+  const [screen, api] = await Promise.all([
+    read("mobile/app/hallazgo/nuevo.tsx"),
+    read("mobile/src/api/hallazgos.ts"),
+  ]);
+
+  assert.match(screen, /hallazgoCreadoId/);
+  assert.match(screen, /photoUploadMutation/);
+  assert.match(screen, /if \(hallazgoCreadoId\)/);
+  assert.match(screen, /photoUploadMutation\.mutate\(\{ id: hallazgoCreadoId, photo: foto \}\)/);
+  assert.match(screen, /fileSize: result\.assets\[0\]\.fileSize/);
+  const retryStart = screen.indexOf("if (hallazgoCreadoId)");
+  const retryEnd = screen.indexOf("if (!titulo.trim())", retryStart);
+  assert.ok(retryStart >= 0 && retryEnd > retryStart);
+  assert.doesNotMatch(screen.slice(retryStart, retryEnd), /createMutation\.mutate/);
+  assert.match(screen, /La fotografía no se pudo cargar/);
+  assert.match(screen, /photoUploadError/);
+  assert.match(api, /MAX_PHOTO_BYTES = 5 \* 1024 \* 1024/);
+  assert.match(api, /La fotografía supera el límite permitido de 5 MiB/);
+  assert.match(api, /uploadPhoto: async/);
+});
+
 test("consultoras distintas siguen separando expedientes de una empresa compartida", async () => {
   const source = await read(
     "backend/integration/multiempresa-pr28-postgres.integration.ts",
